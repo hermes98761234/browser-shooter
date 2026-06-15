@@ -98,6 +98,14 @@ function App() {
     data.particleSystem = new ParticleSystem(engine.scene)
     data.controls = new Controls(container)
     data.controls.onMouseMove = onMouseMove
+    data.controls.onCycleWeapon = () => {
+      if (gameStateRef.current !== 'playing') return
+      const wm = gameDataRef.current.session.weaponManager
+      wm.cycleNext()
+      setWeaponName(wm.current.def.name)
+      setAmmo(wm.current.ammo)
+      gameDataRef.current.viewmodel?.setWeapon(wm.current.type)
+    }
 
     data.session.waveManager.onEnemySpawned = (enemy) => {
       gameDataRef.current.session.enemies.push(enemy)

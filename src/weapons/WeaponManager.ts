@@ -17,6 +17,10 @@ export class WeaponManager {
     return this.weapons[this.currentIndex]
   }
 
+  cycleNext() {
+    this.currentIndex = (this.currentIndex + 1) % this.weapons.length
+  }
+
   switchTo(type: WeaponType) {
     const idx = this.weapons.findIndex(w => w.type === type)
     if (idx !== -1) this.currentIndex = idx

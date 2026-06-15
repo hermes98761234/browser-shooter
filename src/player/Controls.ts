@@ -12,6 +12,8 @@ export class Controls {
   private boundMouseUp: (e: MouseEvent) => void
 
   onMouseMove: ((e: MouseEvent) => void) | null = null
+  onCycleWeapon: (() => void) | null = null
+  onToggleStore: (() => void) | null = null
 
   constructor(element: HTMLElement) {
     this.element = element
@@ -45,6 +47,8 @@ export class Controls {
       case 'KeyA': this.left = true; break
       case 'KeyD': this.right = true; break
       case 'Space': this.jump = true; break
+      case 'Tab': e.preventDefault(); this.onCycleWeapon?.(); break
+      case 'KeyB': e.preventDefault(); this.onToggleStore?.(); break
     }
   }
 
