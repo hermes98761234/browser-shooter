@@ -25,8 +25,11 @@ export interface EntityState {
   type: string
   position: Vec3
   rotationY: number
+  rotationX?: number   // pitch (players only; remote aim)
   health: number
   isDead: boolean
+  weaponType?: string  // players only; for remote weapon model
+  name?: string        // players only; nameplate
 }
 
 export interface Snapshot {
@@ -54,7 +57,11 @@ export type SessionEvent =
   | { type: 'pickup'; pickupType: string; value: number }
   | { type: 'playerDied' }
 
-/** Network envelope — unused in Phase 1, consumed by PeerTransport in Phase 2. */
+/** Network envelope carried by Transport. */
 export type NetMessage =
   | { type: 'input'; playerId: string; input: PlayerInput }
   | { type: 'snapshot'; snapshot: Snapshot }
+  | { type: 'join'; name: string }
+  | { type: 'welcome'; playerId: string; mode: GameMode }
+  | { type: 'playerJoined'; playerId: string; name: string }
+  | { type: 'playerLeft'; playerId: string }

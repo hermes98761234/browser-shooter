@@ -18,3 +18,28 @@ describe('GameMode', () => {
     expect(GAME_MODES).toEqual(['coop', 'pvp'])
   })
 })
+
+import type { EntityState, NetMessage } from '../protocol'
+
+describe('extended protocol', () => {
+  it('EntityState carries optional pitch/weapon/name', () => {
+    const s: EntityState = {
+      id: 'player-1', kind: 'player', type: 'player',
+      position: { x: 0, y: 2, z: 0 }, rotationY: 0,
+      rotationX: 0.2, weaponType: 'rifle', name: 'Ann',
+      health: 100, isDead: false,
+    }
+    expect(s.weaponType).toBe('rifle')
+    expect(s.name).toBe('Ann')
+  })
+
+  it('NetMessage includes join/welcome/playerJoined/playerLeft', () => {
+    const msgs: NetMessage[] = [
+      { type: 'join', name: 'Ann' },
+      { type: 'welcome', playerId: 'player-1', mode: 'coop' },
+      { type: 'playerJoined', playerId: 'player-1', name: 'Ann' },
+      { type: 'playerLeft', playerId: 'player-1' },
+    ]
+    expect(msgs).toHaveLength(4)
+  })
+})
