@@ -104,25 +104,24 @@ export class GameSession {
   step(dt: number): SessionEvent[] {
     const events: SessionEvent[] = []
     this.tick++
-    const input = this.getInput(LOCAL_ID)
-    const player = this.player
+    // Advance every player: look, movement+collision, weapons, shooting.
+    for (const entity of this.playerMap.values()) {
+      const input = this.getInput(entity.id)
+      const player = entity.player
+      player.rotation.y = input.yaw
+      player.rotation.x = THREE.MathUtils.clamp(input.pitch, -Math.PI / 2, Math.PI / 2)
+      player.update(dt, input, ARENA_SIZE)
+      if (this.collisionWorld) this.collisionWorld.resolve(player.position, 0.5)
 
-    // Look (yaw/pitch are absolute, set by the input producer).
-    player.rotation.y = input.yaw
-    player.rotation.x = THREE.MathUtils.clamp(input.pitch, -Math.PI / 2, Math.PI / 2)
-
-    // Movement + collision.
-    player.update(dt, input, ARENA_SIZE)
-    if (this.collisionWorld) this.collisionWorld.resolve(player.position, 0.5)
-
-    // Weapons.
-    this.weaponManager.update(dt)
-    if (input.shoot && this.weaponManager.current.canShoot()) {
-      this.weaponManager.current.shoot()
-      this.fireLocalWeapon(events)
+      entity.weapons.update(dt)
+      if (input.shoot && entity.weapons.current.canShoot()) {
+        entity.weapons.current.shoot()
+        this.fireWeapon(entity, events)
+      }
     }
 
-    // Waves + enemies.
+    // Waves + enemies (enemy AI targets the local player).
+    const player = this.player
     this.waveManager.update(dt, ARENA_SIZE)
     for (let i = this.enemies.length - 1; i >= 0; i--) {
       const enemy = this.enemies[i]
@@ -177,15 +176,14 @@ export class GameSession {
     return events
   }
 
-  private fireLocalWeapon(events: SessionEvent[]): void {
-    const weapon = this.weaponManager.current
-    // Forward from the player's full orientation (yaw + pitch), matching the camera.
-    this.cameraQuat.setFromEuler(this.player.rotation)
+  private fireWeapon(entity: PlayerEntity, events: SessionEvent[]): void {
+    const weapon = entity.weapons.current
+    this.cameraQuat.setFromEuler(entity.player.rotation)
     const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(this.cameraQuat)
     const pellets = weapon.type === 'shotgun' ? 6 : 1
     for (let p = 0; p < pellets; p++) {
       const dir = weapon.getSpreadDirection(forward)
-      this.resolveShot(this.player.position, dir, weapon.def.range, weapon.def.damage, events)
+      this.resolveShot(entity.player.position, dir, weapon.def.range, weapon.def.damage, events)
     }
   }
 
