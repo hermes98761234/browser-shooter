@@ -821,7 +821,7 @@ Implement `fireLocalWeapon`: raycast against enemy meshes (handling the shotgun'
 
 ```typescript
 // src/session/__tests__/GameSession.fire.test.ts
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import * as THREE from 'three'
 import { GameSession } from '../GameSession'
 import { Enemy } from '../../enemies/Enemy'
@@ -840,24 +840,25 @@ function placeEnemyInFront(s: GameSession, atZone: 'head' | 'body') {
 }
 
 describe('GameSession hit zones', () => {
+  // Neutralize weapon spread so the pellet flies dead straight (deterministic zone hits).
+  beforeEach(() => { vi.spyOn(Math, 'random').mockReturnValue(0.5) })
+  afterEach(() => { vi.restoreAllMocks() })
+
+  // Read damage from the emitted event (NOT health delta) so the enemy's HP cap
+  // can't clamp a one-shot headshot and hide the 4x multiplier.
+  function fireDamage(zone: 'head' | 'body'): number {
+    const s = new GameSession()
+    placeEnemyInFront(s, zone)
+    s.applyInput('local', { ...emptyInput(), yaw: s.player.rotation.y, pitch: s.player.rotation.x, shoot: true })
+    const events = s.step(0.016)
+    const hit = events.find((e) => e.type === 'playerHitEnemy') as any
+    return hit ? hit.hit.damage : 0
+  }
+
   it('a headshot deals 4x the body damage', () => {
-    const head = (() => {
-      const s = new GameSession()
-      const e = placeEnemyInFront(s, 'head')
-      const before = e.health
-      s.applyInput('local', { ...emptyInput(), yaw: s.player.rotation.y, pitch: s.player.rotation.x, shoot: true })
-      s.step(0.016)
-      return before - e.health
-    })()
-    const body = (() => {
-      const s = new GameSession()
-      const e = placeEnemyInFront(s, 'body')
-      const before = e.health
-      s.applyInput('local', { ...emptyInput(), yaw: s.player.rotation.y, pitch: s.player.rotation.x, shoot: true })
-      s.step(0.016)
-      return before - e.health
-    })()
-    expect(head).toBeGreaterThan(body)
+    const head = fireDamage('head')
+    const body = fireDamage('body')
+    expect(body).toBeGreaterThan(0)
     expect(head).toBeCloseTo(body * 4, 5)
   })
 
