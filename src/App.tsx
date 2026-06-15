@@ -2,14 +2,8 @@ import { useRef, useEffect, useState, useCallback } from 'react'
 import * as THREE from 'three'
 import { GameEngine } from './engine/GameEngine'
 import { createArena } from './engine/Arena'
-import { Player } from './player/Player'
 import { Controls } from './player/Controls'
-import { WeaponManager } from './weapons/WeaponManager'
-import { Enemy } from './enemies/Enemy'
 import { Viewmodel } from './weapons/Viewmodel'
-import type { CollisionWorld } from './engine/CollisionWorld'
-import { WaveManager } from './enemies/WaveManager'
-import { ScoreSystem } from './systems/ScoreSystem'
 import { Pickup } from './systems/Pickup'
 import type { PickupType } from './systems/Pickup'
 import { ParticleSystem } from './effects/ParticleSystem'
@@ -17,6 +11,8 @@ import { AudioManager } from './audio/AudioManager'
 import { SoundEffects } from './audio/SoundEffects'
 import { createDamageIndicatorState, triggerDamage, updateDamageIndicator, type DamageIndicatorState } from './effects/DamageIndicator'
 import type { GameState } from './types'
+import { GameSession, ARENA_SIZE } from './session/GameSession'
+import { emptyInput } from './session/protocol'
 import { HUD } from './ui/HUD'
 import { Minimap } from './ui/Minimap'
 import { WaveAnnounce } from './ui/WaveAnnounce'
@@ -24,8 +20,6 @@ import { MainMenu } from './ui/MainMenu'
 import { GameOver } from './ui/GameOver'
 import { PauseMenu } from './ui/PauseMenu'
 import { DamageOverlay } from './ui/DamageOverlay'
-
-const ARENA_SIZE = 30
 
 function App() {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -52,68 +46,42 @@ function App() {
     setGameState(state)
   }, [])
 
+  const lookRef = useRef({ yaw: 0, pitch: 0 })
+
   const gameDataRef = useRef({
-    player: new Player(),
+    session: new GameSession(),
     controls: null as Controls | null,
-    weaponManager: new WeaponManager(),
-    enemies: [] as Enemy[],
-    waveManager: new WaveManager(),
-    scoreSystem: new ScoreSystem(),
-    pickups: [] as Pickup[],
     particleSystem: null as ParticleSystem | null,
-    collisionWorld: null as CollisionWorld | null,
     viewmodel: null as Viewmodel | null,
     audio: new SoundEffects(new AudioManager()),
-    time: 0,
-    weaponIndex: 0,
     damageIndicator: createDamageIndicatorState(),
+    money: 800, // local stub for the buy store (Phase 3 makes this real)
   })
 
   const startGame = useCallback(() => {
     const data = gameDataRef.current
-    data.player = new Player()
-    data.weaponManager = new WeaponManager()
     const scene = engineRef.current?.scene
-    for (const enemy of data.enemies) {
-      scene?.remove(enemy.mesh)
-      enemy.dispose()
-    }
-    data.enemies = []
-    for (const pickup of data.pickups) {
-      scene?.remove(pickup.mesh)
-      pickup.dispose()
-    }
-    data.pickups = []
-    data.scoreSystem.reset()
-    data.waveManager.currentWave = 0
-    data.waveManager.waveActive = false
-    data.waveManager.wavePauseTimer = 2
-    data.waveManager.enemiesRemaining = 0
-    data.waveManager.spawnTimer = 0
-    data.waveManager.spawnQueue = []
-    data.time = 0
-    data.damageIndicator = createDamageIndicatorState()
+    for (const enemy of data.session.enemies) { scene?.remove(enemy.mesh); enemy.dispose() }
+    for (const pickup of data.session.pickups) { scene?.remove(pickup.mesh); pickup.dispose() }
+
+    const fresh = new GameSession()
+    fresh.collisionWorld = data.session.collisionWorld
+    fresh.waveManager.wavePauseTimer = 2 // 2s grace before wave 1 (matches pre-refactor behavior)
+    fresh.waveManager.onEnemySpawned = data.session.waveManager.onEnemySpawned
+    fresh.waveManager.onWaveComplete = data.session.waveManager.onWaveComplete
+    data.session = fresh
+    lookRef.current = { yaw: 0, pitch: 0 }
+    data.money = 800
 
     if (data.particleSystem) data.particleSystem.clear()
+    data.damageIndicator = createDamageIndicatorState()
 
-    setScore(0)
-    setWave(0)
-    setHealth(100)
-    setAmmo(60)
-    setWeaponName('Pistol')
-    gameDataRef.current.viewmodel?.setWeapon('pistol')
-    setWaveActive(false)
-    setEnemiesRemaining(0)
-    setEnemyPositions([])
-    setDamageIndicator(null)
+    setScore(0); setWave(0); setHealth(100); setAmmo(60); setWeaponName('Pistol')
+    data.viewmodel?.setWeapon('pistol')
+    setWaveActive(false); setEnemiesRemaining(0); setEnemyPositions([]); setDamageIndicator(null)
 
-    const engine = engineRef.current
-    if (engine) {
-      engine.start()
-    }
-
-    data.audio.init()
-    data.audio.loadSounds()
+    engineRef.current?.start()
+    data.audio.init(); data.audio.loadSounds()
     updateGameState('playing')
   }, [updateGameState])
 
@@ -124,251 +92,163 @@ function App() {
     const engine = new GameEngine(container)
     engineRef.current = engine
     const data = gameDataRef.current
-    data.collisionWorld = createArena(engine.scene)
+    data.session.collisionWorld = createArena(engine.scene)
     engine.scene.add(engine.camera) // so the camera-parented viewmodel renders
     data.viewmodel = new Viewmodel(engine.camera)
     data.particleSystem = new ParticleSystem(engine.scene)
     data.controls = new Controls(container)
     data.controls.onMouseMove = onMouseMove
 
-    data.waveManager.onEnemySpawned = (enemy) => {
-      data.enemies.push(enemy)
+    data.session.waveManager.onEnemySpawned = (enemy) => {
+      gameDataRef.current.session.enemies.push(enemy)
       engine.scene.add(enemy.mesh)
     }
 
-    data.waveManager.onWaveComplete = () => {
-      data.scoreSystem.completeWave()
-      setWave(data.scoreSystem.wave)
-      setScore(data.scoreSystem.score)
-
+    data.session.waveManager.onWaveComplete = () => {
+      const session = gameDataRef.current.session
+      session.scoreSystem.completeWave()
+      setWave(session.scoreSystem.wave)
+      setScore(session.scoreSystem.score)
       const pickupTypes: PickupType[] = ['health', 'ammo']
       for (let i = 0; i < 3; i++) {
         const type = pickupTypes[Math.floor(Math.random() * pickupTypes.length)]
-        const pos = new THREE.Vector3(
-          (Math.random() - 0.5) * ARENA_SIZE * 1.5,
-          0,
-          (Math.random() - 0.5) * ARENA_SIZE * 1.5
-        )
+        const pos = new THREE.Vector3((Math.random() - 0.5) * ARENA_SIZE * 1.5, 0, (Math.random() - 0.5) * ARENA_SIZE * 1.5)
         const pickup = new Pickup(type, pos)
-        data.pickups.push(pickup)
+        session.pickups.push(pickup)
         engine.scene.add(pickup.mesh)
       }
-
       data.audio.playWaveStart()
     }
 
-    const shootRaycaster = new THREE.Raycaster()
-    shootRaycaster.far = 100
-
     engine.onUpdate((dt) => {
-      data.time += dt
-      const player = data.player
+      const session = data.session
       const controls = data.controls
-      const weaponManager = data.weaponManager
-      const waveManager = data.waveManager
       const particleSystem = data.particleSystem!
-
       if (!controls) return
 
-      const movement = controls.getMovement()
-      player.update(dt, movement, ARENA_SIZE)
-      if (data.collisionWorld) data.collisionWorld.resolve(player.position, 0.5)
+      const m = controls.getMovement()
+      const input = {
+        ...emptyInput(),
+        forward: m.forward, backward: m.backward, left: m.left, right: m.right, jump: m.jump,
+        shoot: controls.shoot,
+        yaw: lookRef.current.yaw,
+        pitch: lookRef.current.pitch,
+      }
+      session.applyInput(session.localId, input)
 
-      engine.camera.position.copy(player.position)
-      engine.camera.rotation.copy(player.rotation)
-      data.audio.updateListenerPosition(player.position.x, player.position.y, player.position.z)
+      const enemiesBefore = new Set(session.enemies)
+      const pickupsBefore = new Set(session.pickups)
 
-      const isMoving = movement.forward || movement.backward || movement.left || movement.right
+      const events = session.step(dt)
+
+      engine.camera.position.copy(session.player.position)
+      engine.camera.rotation.copy(session.player.rotation)
+      data.audio.updateListenerPosition(session.player.position.x, session.player.position.y, session.player.position.z)
+      const isMoving = m.forward || m.backward || m.left || m.right
       data.viewmodel?.update(dt, isMoving)
 
-      weaponManager.update(dt)
-
-      if (controls.shoot && weaponManager.current.canShoot()) {
-        weaponManager.current.shoot()
-        data.viewmodel?.fire()
-        data.audio.playWeaponShoot(weaponManager.current.type, player.position)
-
-        const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(engine.camera.quaternion)
-        const spreadDir = weaponManager.current.getSpreadDirection(forward)
-
-        if (weaponManager.current.type === 'shotgun') {
-          for (let i = 0; i < 6; i++) {
-            const dir = weaponManager.current.getSpreadDirection(forward)
-            checkHit(player.position, dir, weaponManager.current.def.range, data)
+      for (const ev of events) {
+        switch (ev.type) {
+          case 'playerHitEnemy': {
+            const p = ev.hit.point
+            const point = new THREE.Vector3(p.x, p.y, p.z)
+            if (ev.hit.killed) {
+              data.particleSystem!.explosion(point, ev.enemyType)
+              data.audio.playEnemyDeath(point)
+            } else {
+              data.particleSystem!.bloodSplatter(point)
+              data.audio.playEnemyHit(point)
+            }
+            break
           }
-        } else {
-          checkHit(player.position, spreadDir, weaponManager.current.def.range, data)
-        }
-
-        particleSystem.muzzleFlash(
-          player.position.clone().add(spreadDir.clone().multiplyScalar(1)),
-          spreadDir
-        )
-      }
-
-      setAmmo(weaponManager.current.ammo)
-      setWeaponName(weaponManager.current.def.name)
-
-      waveManager.update(dt, ARENA_SIZE)
-
-      setWaveActive(waveManager.waveActive)
-      setWave(waveManager.currentWave)
-      setEnemiesRemaining(waveManager.enemiesRemaining)
-
-      if (waveManager.currentWave > lastWaveRef.current) {
-        lastWaveRef.current = waveManager.currentWave
-        setShowWaveAnnounce(true)
-        setTimeout(() => setShowWaveAnnounce(false), 2600)
-      }
-
-      const enemyPosArr: THREE.Vector3[] = []
-      for (let i = data.enemies.length - 1; i >= 0; i--) {
-        const enemy = data.enemies[i]
-        const result = enemy.update(dt, player.position, data.collisionWorld ?? undefined)
-
-        if (enemy.isDead) {
-          if (enemy.deathTimer <= 0) {
-            engine.scene.remove(enemy.mesh)
-            enemy.dispose()
-            data.enemies.splice(i, 1)
-          }
-          continue
-        }
-
-        enemyPosArr.push(enemy.mesh.position.clone())
-
-        // Telegraph cue: brief muzzle flash when a ranged enemy starts aiming.
-        if (enemy.telegraphCue) {
-          particleSystem.muzzleFlash(
-            enemy.mesh.position.clone().setY(1.35),
-            new THREE.Vector3(0, 0, -1).applyQuaternion(enemy.mesh.quaternion)
-          )
-        }
-
-        if (result) {
-          if (result.type === 'shoot') {
-            data.audio.playWeaponShoot('rifle', result.from)
-            const endpoint = result.hit ? player.position.clone() : result.to
-            particleSystem.tracer(result.from, endpoint)
-            if (result.hit) {
-              player.takeDamage(result.damage)
+          case 'enemyKilled':
+            setScore(session.scoreSystem.score)
+            break
+          case 'wallImpact':
+            data.particleSystem!.bulletImpact(new THREE.Vector3(ev.point.x, ev.point.y, ev.point.z))
+            break
+          case 'enemyShoot': {
+            const from = new THREE.Vector3(ev.from.x, ev.from.y, ev.from.z)
+            const to = new THREE.Vector3(ev.to.x, ev.to.y, ev.to.z)
+            data.audio.playWeaponShoot('rifle', from)
+            particleSystem.tracer(from, to)
+            if (ev.hit) {
               data.audio.playPlayerHit()
-              setHealth(player.health)
-              data.damageIndicator = triggerDamage(
-                enemy.mesh.position.clone(),
-                player.position.clone(),
-                player.rotation.y
-              )
+              setHealth(session.player.health)
+              data.damageIndicator = triggerDamage(to.clone(), session.player.position.clone(), session.player.rotation.y)
               setDamageIndicator({ ...data.damageIndicator })
             }
-          } else {
-            player.takeDamage(result.damage)
-            data.audio.playPlayerHit()
-            setHealth(player.health)
-            data.damageIndicator = triggerDamage(
-              enemy.mesh.position.clone(),
-              player.position.clone(),
-              player.rotation.y
-            )
-            setDamageIndicator({ ...data.damageIndicator })
+            break
           }
-
-          if (player.isDead) {
+          case 'enemyMelee':
+            data.audio.playPlayerHit()
+            setHealth(session.player.health)
+            data.damageIndicator = triggerDamage(
+              new THREE.Vector3(ev.enemyPos.x, ev.enemyPos.y, ev.enemyPos.z), session.player.position.clone(), session.player.rotation.y)
+            setDamageIndicator({ ...data.damageIndicator })
+            break
+          case 'enemyTelegraph':
+            particleSystem.muzzleFlash(
+              new THREE.Vector3(ev.enemyPos.x, 1.35, ev.enemyPos.z),
+              new THREE.Vector3(ev.facing.x, ev.facing.y, ev.facing.z))
+            break
+          case 'pickup':
+            if (ev.pickupType === 'health') setHealth(session.player.health)
+            data.audio.playPickup()
+            break
+          case 'playerDied':
             document.exitPointerLock()
             data.audio.playPlayerDeath()
-            data.scoreSystem.saveHighScore()
-            setHighScore(data.scoreSystem.highScore)
+            session.scoreSystem.saveHighScore()
+            setHighScore(session.scoreSystem.highScore)
             engine.stop()
             updateGameState('gameover')
             return
-          }
         }
       }
 
-      setEnemyPositions(enemyPosArr)
-      setPlayerPos(player.position.clone())
-      setPlayerRot(player.rotation.y)
-
-      for (let i = data.pickups.length - 1; i >= 0; i--) {
-        const pickup = data.pickups[i]
-        pickup.update(dt, data.time)
-
-        if (pickup.checkCollision(player.position)) {
-          if (pickup.type === 'health') {
-            player.heal(pickup.value)
-            setHealth(player.health)
-          } else {
-            weaponManager.addAmmo(weaponManager.current.type, pickup.value)
-          }
-          data.audio.playPickup()
-          engine.scene.remove(pickup.mesh)
-          pickup.dispose()
-          data.pickups.splice(i, 1)
-        }
+      // Player fire feedback (muzzle flash + recoil + sound): the weapon fired this frame
+      // iff step() just reset fireTimer to def.fireRate this tick.
+      if (controls.shoot && session.weaponManager.current.fireTimer >= session.weaponManager.current.def.fireRate - dt) {
+        data.viewmodel?.fire()
+        data.audio.playWeaponShoot(session.weaponManager.current.type, session.player.position)
+        const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(engine.camera.quaternion)
+        particleSystem.muzzleFlash(session.player.position.clone().add(fwd), fwd)
       }
+
+      // Reconcile removed enemies/pickups → dispose their meshes.
+      for (const e of enemiesBefore) {
+        if (!session.enemies.includes(e)) { engine.scene.remove(e.mesh); e.dispose() }
+      }
+      for (const pk of pickupsBefore) {
+        if (!session.pickups.includes(pk)) { engine.scene.remove(pk.mesh); pk.dispose() }
+      }
+
+      setAmmo(session.weaponManager.current.ammo)
+      setWeaponName(session.weaponManager.current.def.name)
+      setWaveActive(session.waveManager.waveActive)
+      setWave(session.waveManager.currentWave)
+      setEnemiesRemaining(session.waveManager.enemiesRemaining)
+      if (session.waveManager.currentWave > lastWaveRef.current) {
+        lastWaveRef.current = session.waveManager.currentWave
+        setShowWaveAnnounce(true)
+        setTimeout(() => setShowWaveAnnounce(false), 2600)
+      }
+      setEnemyPositions(session.enemies.map(e => e.mesh.position.clone()))
+      setPlayerPos(session.player.position.clone())
+      setPlayerRot(session.player.rotation.y)
 
       particleSystem.update(dt)
-
       data.damageIndicator = updateDamageIndicator(data.damageIndicator, dt)
-      if (data.damageIndicator.active) {
-        setDamageIndicator({ ...data.damageIndicator })
-      } else if (damageIndicator !== null) {
-        setDamageIndicator(null)
-      }
+      if (data.damageIndicator.active) setDamageIndicator({ ...data.damageIndicator })
+      else if (damageIndicator !== null) setDamageIndicator(null)
     })
 
     function onMouseMove(e: MouseEvent) {
-      const data = gameDataRef.current
-      data.player.rotation.y -= e.movementX * 0.002
-      data.player.rotation.x -= e.movementY * 0.002
-      data.player.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, data.player.rotation.x))
-    }
-
-    function checkHit(
-      origin: THREE.Vector3,
-      direction: THREE.Vector3,
-      range: number,
-      data: typeof gameDataRef.current
-    ) {
-      shootRaycaster.set(origin, direction)
-      shootRaycaster.far = range
-
-      let nearestEnemy: Enemy | null = null
-      let nearestDist = Infinity
-      let hitPoint: THREE.Vector3 | null = null
-
-      for (const enemy of data.enemies) {
-        if (enemy.isDead) continue
-        const intersects = shootRaycaster.intersectObject(enemy.mesh, true)
-        if (intersects.length > 0 && intersects[0].distance < nearestDist) {
-          nearestDist = intersects[0].distance
-          nearestEnemy = enemy
-          hitPoint = intersects[0].point
-        }
-      }
-
-      const wallDist = data.collisionWorld
-        ? data.collisionWorld.segmentBlocked(origin, origin.clone().addScaledVector(direction, range))
-        : null
-
-      if (nearestEnemy && (wallDist === null || nearestDist < wallDist)) {
-        const killed = nearestEnemy.takeDamage(data.weaponManager.current.def.damage)
-        if (killed) {
-          data.scoreSystem.addKill(nearestEnemy.def.scoreValue)
-          setScore(data.scoreSystem.score)
-          data.waveManager.onEnemyKilled()
-          data.particleSystem!.explosion(nearestEnemy.mesh.position.clone(), nearestEnemy.type)
-          data.audio.playEnemyDeath(nearestEnemy.mesh.position.clone())
-        } else if (hitPoint) {
-          data.particleSystem!.bloodSplatter(hitPoint)
-          data.audio.playEnemyHit(hitPoint)
-        }
-        return
-      }
-
-      if (wallDist !== null) {
-        data.particleSystem!.bulletImpact(origin.clone().addScaledVector(direction, wallDist))
-      }
+      const look = lookRef.current
+      look.yaw -= e.movementX * 0.002
+      look.pitch -= e.movementY * 0.002
+      look.pitch = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, look.pitch))
     }
 
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -387,15 +267,15 @@ function App() {
       }
 
       if (e.code === 'KeyR') {
-        data.weaponManager.current.reload()
+        data.session.weaponManager.current.reload()
       }
 
       const weaponKeys: Record<string, number> = { Digit1: 0, Digit2: 1, Digit3: 2 }
       if (e.code in weaponKeys) {
-        data.weaponManager.switchByIndex(weaponKeys[e.code])
-        setWeaponName(data.weaponManager.current.def.name)
-        setAmmo(data.weaponManager.current.ammo)
-        data.viewmodel?.setWeapon(data.weaponManager.current.type)
+        data.session.weaponManager.switchByIndex(weaponKeys[e.code])
+        setWeaponName(data.session.weaponManager.current.def.name)
+        setAmmo(data.session.weaponManager.current.ammo)
+        data.viewmodel?.setWeapon(data.session.weaponManager.current.type)
       }
     }
 
@@ -420,7 +300,7 @@ function App() {
             health={health}
             maxHealth={100}
             ammo={ammo}
-            maxAmmo={gameDataRef.current.weaponManager.current.def.maxAmmo}
+            maxAmmo={gameDataRef.current.session.weaponManager.current.def.maxAmmo}
             weaponName={weaponName}
             score={score}
             wave={wave}
