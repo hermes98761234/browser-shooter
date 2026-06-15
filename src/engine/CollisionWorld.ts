@@ -6,7 +6,7 @@ export interface BoxCollider {
 }
 
 export class CollisionWorld {
-  boxes: BoxCollider[] = []
+  readonly boxes: BoxCollider[] = []
 
   addBox(center: THREE.Vector3, size: THREE.Vector3): void {
     const half = size.clone().multiplyScalar(0.5)
@@ -18,6 +18,7 @@ export class CollisionWorld {
 
   /** Push a circle of `radius` (on the XZ plane) out of any overlapping box. Mutates `pos`. */
   resolve(pos: THREE.Vector3, radius: number): void {
+    // Single pass per box: adjacent boxes may not fully separate in one call; acceptable for a static map.
     for (const box of this.boxes) {
       const closestX = THREE.MathUtils.clamp(pos.x, box.min.x, box.max.x)
       const closestZ = THREE.MathUtils.clamp(pos.z, box.min.z, box.max.z)
@@ -54,7 +55,7 @@ export class CollisionWorld {
     if (len < 1e-8) return null
     dir.divideScalar(len)
 
-    const ray = new THREE.Ray(from.clone(), dir)
+    const ray = new THREE.Ray(from, dir)
     const box3 = new THREE.Box3()
     const target = new THREE.Vector3()
     let nearest: number | null = null

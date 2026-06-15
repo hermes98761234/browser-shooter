@@ -22,6 +22,15 @@ describe('CollisionWorld', () => {
     expect(pos.z).toBeCloseTo(5)
   })
 
+  it('pushes an externally-overlapping circle off the box face', () => {
+    const world = new CollisionWorld()
+    world.addBox(new THREE.Vector3(0, 0, 0), new THREE.Vector3(2, 2, 2))
+    const pos = new THREE.Vector3(1.4, 0, 0) // outside the box, but circle overlaps the face
+    world.resolve(pos, 0.5)
+    expect(pos.x).toBeCloseTo(1.5)
+    expect(pos.z).toBeCloseTo(0)
+  })
+
   it('reports a blocking distance when a box is between two points', () => {
     const world = new CollisionWorld()
     world.addBox(new THREE.Vector3(5, 1, 0), new THREE.Vector3(2, 4, 4))
