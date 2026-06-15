@@ -229,6 +229,7 @@ function App() {
           setDamageIndicator({ ...data.damageIndicator })
 
           if (player.isDead) {
+            document.exitPointerLock()
             data.audio.playPlayerDeath()
             data.scoreSystem.saveHighScore()
             setHighScore(data.scoreSystem.highScore)
@@ -318,6 +319,7 @@ function App() {
     const handleKeyDown = (e: KeyboardEvent) => {
       const data = gameDataRef.current
       if (e.code === 'Escape' && gameStateRef.current === 'playing') {
+        document.exitPointerLock()
         engineRef.current?.pause()
         updateGameState('paused')
       } else if (e.code === 'Escape' && gameStateRef.current === 'paused') {
