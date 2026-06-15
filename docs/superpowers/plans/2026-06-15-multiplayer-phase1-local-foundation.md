@@ -1487,8 +1487,10 @@ In `App.tsx` add state and the toggle/buy handlers. Add near the other `useState
 
 ```typescript
   const [storeOpen, setStoreOpen] = useState(false)
-  const [money, setMoney] = useState(800)
+  const [money, setMoney] = useState(16000)
 ```
+
+(The Phase-1 money stub is 16000 — CS max money — so every weapon in the catalog is affordable for the demo. The round-gated real economy in Phase 3 replaces this.)
 
 After `data.controls.onCycleWeapon = ...` (Task 10, Step 6), add the store toggle:
 
@@ -1552,7 +1554,7 @@ import { BuyMenu } from './ui/BuyMenu'
 import { STORE_CATALOG } from './weapons/StoreCatalog'
 ```
 
-Reset money in `startGame` (Task 9, Step 5): add `setMoney(800)` and `setStoreOpen(false)` alongside the other resets.
+Reset money in `startGame` (Task 9, Step 5): change the existing `data.money = 800` line to `data.money = 16000`, and add `setMoney(16000)` and `setStoreOpen(false)` alongside the other resets. (Also update the `money: 800` field in the `gameDataRef` initializer to `money: 16000` for consistency.)
 
 - [ ] **Step 7: Add a Playwright test for the store**
 
