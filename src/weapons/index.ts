@@ -1,0 +1,8 @@
+export { Weapon } from './Weapon'
+export { Pistol } from './Pistol'
+export { Shotgun } from './Shotgun'
+export { Rifle } from './Rifle'
+export { WeaponManager } from './WeaponManager'
+export { ProjectileSystem } from './Projectile'
+export type { Projectile } from './Projectile'
+export { WEAPON_DEFS } from './WeaponDefs'

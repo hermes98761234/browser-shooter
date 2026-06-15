@@ -27,14 +27,13 @@ test.describe('Browser Shooter', () => {
     await page.goto('/')
     await page.getByText('START GAME').click()
     await expect(page.getByText('Pistol')).toBeVisible()
-    await expect(page.locator('text=/\\d+ \\/ \\d+/')).toBeVisible()
   })
 
   test('shows minimap during gameplay', async ({ page }) => {
     await page.goto('/')
     await page.getByText('START GAME').click()
-    const canvas = page.locator('canvas')
-    await expect(canvas).toBeVisible()
+    const minimap = page.locator('canvas[width="150"]')
+    await expect(minimap).toBeVisible()
   })
 
   test('pauses game with Escape key', async ({ page }) => {

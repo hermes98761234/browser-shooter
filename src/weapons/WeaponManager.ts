@@ -1,4 +1,7 @@
-import { Weapon } from './Weapon'
+import type { Weapon } from './Weapon'
+import { Pistol } from './Pistol'
+import { Shotgun } from './Shotgun'
+import { Rifle } from './Rifle'
 import type { WeaponType } from '../types'
 
 export class WeaponManager {
@@ -7,9 +10,9 @@ export class WeaponManager {
 
   constructor() {
     this.weapons = [
-      new Weapon('pistol'),
-      new Weapon('shotgun'),
-      new Weapon('rifle'),
+      new Pistol(),
+      new Shotgun(),
+      new Rifle(),
     ]
   }
 
