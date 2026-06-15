@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { WeaponDef, WeaponType } from '../types'
+import type { WeaponDef, WeaponType } from '../types'
 import { WEAPON_DEFS } from './WeaponDefs'
 
 export class Weapon {

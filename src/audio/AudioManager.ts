@@ -1,7 +1,6 @@
 export class AudioManager {
   private context: AudioContext | null = null
   private muted: boolean = false
-  private sounds: Map<string, AudioBuffer> = new Map()
 
   init() {
     this.context = new AudioContext()

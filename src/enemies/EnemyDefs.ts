@@ -1,5 +1,4 @@
-import * as THREE from 'three'
-import { EnemyDef } from '../types'
+import type { EnemyDef } from '../types'
 
 export const ENEMY_DEFS: Record<string, EnemyDef> = {
   grunt: {

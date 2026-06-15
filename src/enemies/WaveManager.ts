@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { Enemy } from './Enemy'
-import { WaveDef } from '../types'
+import type { WaveDef } from '../types'
 
 const WAVE_DEFS: WaveDef[] = [
   { number: 1, enemies: [{ type: 'grunt', count: 5 }], spawnDelay: 1 },
@@ -77,7 +77,7 @@ export class WaveManager {
   }
 
   onEnemyKilled() {
-    this.enemiesRemaining--
+    this.enemiesRemaining = Math.max(0, this.enemiesRemaining - 1)
     if (this.enemiesRemaining <= 0 && this.spawnQueue.length === 0) {
       this.waveActive = false
       this.wavePauseTimer = 3

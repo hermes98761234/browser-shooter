@@ -1,5 +1,5 @@
 import { Weapon } from './Weapon'
-import { WeaponType } from '../types'
+import type { WeaponType } from '../types'
 
 export class WeaponManager {
   weapons: Weapon[]

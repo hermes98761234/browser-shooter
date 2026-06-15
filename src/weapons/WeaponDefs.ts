@@ -1,4 +1,4 @@
-import { WeaponDef, WeaponType } from '../types'
+import type { WeaponDef, WeaponType } from '../types'
 
 export const WEAPON_DEFS: Record<WeaponType, WeaponDef> = {
   pistol: {

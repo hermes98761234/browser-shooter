@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { GameState } from '../types'
+import type { GameState } from '../types'
 
 export class GameEngine {
   scene: THREE.Scene

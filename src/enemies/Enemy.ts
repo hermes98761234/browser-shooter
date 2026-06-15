@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { EnemyDef } from '../types'
+import type { EnemyDef } from '../types'
 import { ENEMY_DEFS } from './EnemyDefs'
 
 export class Enemy {
@@ -26,7 +26,7 @@ export class Enemy {
 
   takeDamage(amount: number) {
     if (this.isDead) return false
-    this.health -= amount
+    this.health = Math.max(0, this.health - amount)
     if (this.health <= 0) {
       this.isDead = true
       this.deathTimer = 0.5
