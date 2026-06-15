@@ -1106,7 +1106,7 @@ In the `useEffect`, after `data.session.collisionWorld = createArena(engine.scen
             if (ev.hit) {
               data.audio.playPlayerHit()
               setHealth(session.player.health)
-              data.damageIndicator = triggerDamage(to.clone(), session.player.position.clone(), session.player.rotation.y)
+              data.damageIndicator = triggerDamage(from.clone(), session.player.position.clone(), session.player.rotation.y)
               setDamageIndicator({ ...data.damageIndicator })
             }
             break
@@ -1139,7 +1139,7 @@ In the `useEffect`, after `data.session.collisionWorld = createArena(engine.scen
       }
 
       // Player fire feedback (muzzle flash + recoil + sound) — fired this frame iff fireTimer was just reset.
-      if (controls.shoot && session.weaponManager.current.fireTimer >= session.weaponManager.current.def.fireRate - dt) {
+      if (controls.shoot && session.weaponManager.current.fireTimer > session.weaponManager.current.def.fireRate - dt) {
         data.viewmodel?.fire()
         data.audio.playWeaponShoot(session.weaponManager.current.type, session.player.position)
         const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(engine.camera.quaternion)
@@ -1193,6 +1193,7 @@ Replace the body of `startGame` to rebuild the session and reset look:
     fresh.collisionWorld = data.session.collisionWorld
     fresh.waveManager.onEnemySpawned = data.session.waveManager.onEnemySpawned
     fresh.waveManager.onWaveComplete = data.session.waveManager.onWaveComplete
+    fresh.waveManager.wavePauseTimer = 2 // 2s grace before wave 1 (WaveManager defaults this to 0)
     data.session = fresh
     lookRef.current = { yaw: 0, pitch: 0 }
     data.money = 800
