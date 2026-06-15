@@ -175,7 +175,7 @@ function App() {
             if (ev.hit) {
               data.audio.playPlayerHit()
               setHealth(session.player.health)
-              data.damageIndicator = triggerDamage(to.clone(), session.player.position.clone(), session.player.rotation.y)
+              data.damageIndicator = triggerDamage(from.clone(), session.player.position.clone(), session.player.rotation.y)
               setDamageIndicator({ ...data.damageIndicator })
             }
             break
@@ -209,7 +209,7 @@ function App() {
 
       // Player fire feedback (muzzle flash + recoil + sound): the weapon fired this frame
       // iff step() just reset fireTimer to def.fireRate this tick.
-      if (controls.shoot && session.weaponManager.current.fireTimer >= session.weaponManager.current.def.fireRate - dt) {
+      if (controls.shoot && session.weaponManager.current.fireTimer > session.weaponManager.current.def.fireRate - dt) {
         data.viewmodel?.fire()
         data.audio.playWeaponShoot(session.weaponManager.current.type, session.player.position)
         const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(engine.camera.quaternion)
