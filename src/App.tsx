@@ -20,6 +20,8 @@ import { MainMenu } from './ui/MainMenu'
 import { GameOver } from './ui/GameOver'
 import { PauseMenu } from './ui/PauseMenu'
 import { DamageOverlay } from './ui/DamageOverlay'
+import { BuyMenu } from './ui/BuyMenu'
+import { STORE_CATALOG } from './weapons/StoreCatalog'
 
 function App() {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -38,13 +40,18 @@ function App() {
   const [highScore, setHighScore] = useState(0)
   const [damageIndicator, setDamageIndicator] = useState<DamageIndicatorState | null>(null)
   const [showWaveAnnounce, setShowWaveAnnounce] = useState(false)
+  const [storeOpen, setStoreOpen] = useState(false)
+  const [money, setMoney] = useState(16000)
   const lastWaveRef = useRef(0)
   const gameStateRef = useRef<GameState>('menu')
+  const storeOpenRef = useRef(false)
 
   const updateGameState = useCallback((state: GameState) => {
     gameStateRef.current = state
     setGameState(state)
   }, [])
+
+  useEffect(() => { storeOpenRef.current = storeOpen }, [storeOpen])
 
   const lookRef = useRef({ yaw: 0, pitch: 0 })
 
@@ -55,7 +62,7 @@ function App() {
     viewmodel: null as Viewmodel | null,
     audio: new SoundEffects(new AudioManager()),
     damageIndicator: createDamageIndicatorState(),
-    money: 800, // local stub for the buy store (Phase 3 makes this real)
+    money: 16000, // local stub for the buy store (Phase 3 makes this real)
   })
 
   const startGame = useCallback(() => {
@@ -71,12 +78,13 @@ function App() {
     fresh.waveManager.onWaveComplete = data.session.waveManager.onWaveComplete
     data.session = fresh
     lookRef.current = { yaw: 0, pitch: 0 }
-    data.money = 800
+    data.money = 16000
 
     if (data.particleSystem) data.particleSystem.clear()
     data.damageIndicator = createDamageIndicatorState()
 
     setScore(0); setWave(0); setHealth(100); setAmmo(60); setWeaponName('Pistol')
+    setMoney(16000); setStoreOpen(false)
     data.viewmodel?.setWeapon('pistol')
     setWaveActive(false); setEnemiesRemaining(0); setEnemyPositions([]); setDamageIndicator(null)
 
@@ -105,6 +113,14 @@ function App() {
       setWeaponName(wm.current.def.name)
       setAmmo(wm.current.ammo)
       gameDataRef.current.viewmodel?.setWeapon(wm.current.type)
+    }
+    data.controls.onToggleStore = () => {
+      if (gameStateRef.current !== 'playing') return
+      setStoreOpen((open) => {
+        const next = !open
+        if (next) document.exitPointerLock()
+        return next
+      })
     }
 
     data.session.waveManager.onEnemySpawned = (enemy) => {
@@ -138,7 +154,7 @@ function App() {
       const input = {
         ...emptyInput(),
         forward: m.forward, backward: m.backward, left: m.left, right: m.right, jump: m.jump,
-        shoot: controls.shoot,
+        shoot: controls.shoot && !storeOpenRef.current,
         yaw: lookRef.current.yaw,
         pitch: lookRef.current.pitch,
       }
@@ -324,6 +340,26 @@ function App() {
           <WaveAnnounce wave={wave} visible={showWaveAnnounce} />
           <DamageOverlay indicator={damageIndicator} />
         </>
+      )}
+
+      {gameState === 'playing' && storeOpen && (
+        <BuyMenu
+          money={money}
+          onBuy={(type) => {
+            const data = gameDataRef.current
+            const item = STORE_CATALOG.find(i => i.type === type)!
+            if (data.money >= item.price) {
+              data.money -= item.price
+              setMoney(data.money)
+              data.session.weaponManager.switchTo(type)
+              setWeaponName(data.session.weaponManager.current.def.name)
+              setAmmo(data.session.weaponManager.current.ammo)
+              data.viewmodel?.setWeapon(type)
+            }
+            setStoreOpen(false)
+          }}
+          onClose={() => setStoreOpen(false)}
+        />
       )}
 
       {gameState === 'paused' && (
