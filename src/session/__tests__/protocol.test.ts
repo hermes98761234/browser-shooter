@@ -10,3 +10,11 @@ describe('protocol', () => {
     expect(input.pitch).toBe(0)
   })
 })
+
+import { GAME_MODES } from '../protocol'
+
+describe('GameMode', () => {
+  it('lists coop and pvp', () => {
+    expect(GAME_MODES).toEqual(['coop', 'pvp'])
+  })
+})

@@ -1,6 +1,9 @@
 import type { Vec3 } from '../types'
 import type { HitZone } from '../systems/DamageZones'
 
+export type GameMode = 'coop' | 'pvp'
+export const GAME_MODES: readonly GameMode[] = ['coop', 'pvp'] as const
+
 export interface PlayerInput {
   forward: boolean
   backward: boolean
