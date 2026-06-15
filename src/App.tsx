@@ -185,10 +185,10 @@ function App() {
         if (weaponManager.current.type === 'shotgun') {
           for (let i = 0; i < 6; i++) {
             const dir = weaponManager.current.getSpreadDirection(forward)
-            checkHit(player.position, dir, weaponManager.current.def.range, data, engine)
+            checkHit(player.position, dir, weaponManager.current.def.range, data)
           }
         } else {
-          checkHit(player.position, spreadDir, weaponManager.current.def.range, data, engine)
+          checkHit(player.position, spreadDir, weaponManager.current.def.range, data)
         }
 
         particleSystem.muzzleFlash(
@@ -232,7 +232,7 @@ function App() {
         if (enemy.telegraphCue) {
           particleSystem.muzzleFlash(
             enemy.mesh.position.clone().setY(1.35),
-            new THREE.Vector3(0, 0, -1)
+            new THREE.Vector3(0, 0, -1).applyQuaternion(enemy.mesh.quaternion)
           )
         }
 
@@ -319,10 +319,8 @@ function App() {
       origin: THREE.Vector3,
       direction: THREE.Vector3,
       range: number,
-      data: typeof gameDataRef.current,
-      engine: GameEngine
+      data: typeof gameDataRef.current
     ) {
-      void engine
       shootRaycaster.set(origin, direction)
       shootRaycaster.far = range
 
@@ -398,6 +396,7 @@ function App() {
       document.removeEventListener('keydown', handleKeyDown)
       document.removeEventListener('mousemove', onMouseMove)
       data.controls?.destroy()
+      data.viewmodel?.dispose()
       engine.stop()
     }
   }, [updateGameState])

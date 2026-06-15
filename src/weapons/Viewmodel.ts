@@ -62,4 +62,14 @@ export class Viewmodel {
     )
     this.group.rotation.x = this.recoil * 0.25
   }
+
+  dispose() {
+    this.group.traverse((obj) => {
+      if (obj instanceof THREE.Mesh) {
+        obj.geometry.dispose()
+        if (obj.material instanceof THREE.Material) obj.material.dispose()
+      }
+    })
+    this.group.removeFromParent()
+  }
 }
