@@ -65,4 +65,25 @@ describe('Player', () => {
     player.update(0.1, { forward: false, backward: false, left: false, right: false, jump: false })
     expect(player.position.x).toBeLessThanOrEqual(28)
   })
+
+  it('exposes armor through the health system', () => {
+    const p = new Player()
+    expect(p.armor).toBe(0)
+    p.addArmor(50)
+    expect(p.armor).toBe(50)
+    p.addArmor(80) // caps at 100
+    expect(p.armor).toBe(100)
+  })
+
+  it('defaults speedMult to 1 and resets loadout', () => {
+    const p = new Player()
+    expect(p.speedMult).toBe(1)
+    p.speedMult = 1.15
+    p.addArmor(50)
+    p.addMaxHealth(25)
+    p.resetLoadout()
+    expect(p.speedMult).toBe(1)
+    expect(p.armor).toBe(0)
+    expect(p.maxHealth).toBe(100)
+  })
 })

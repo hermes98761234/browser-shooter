@@ -7,6 +7,7 @@ export class Player {
   rotation: THREE.Euler
   speed: number = 12
   jumpHeight: number = 8
+  speedMult: number = 1
   isGrounded: boolean = true
   private yVelocity: number = 0
 
@@ -29,6 +30,28 @@ export class Player {
 
   get maxHealth(): number {
     return this.healthSystem.maxHealth
+  }
+
+  get armor(): number {
+    return this.healthSystem.armor
+  }
+
+  set armor(value: number) {
+    this.healthSystem.armor = value
+  }
+
+  addArmor(amount: number) {
+    this.healthSystem.armor = Math.min(100, this.healthSystem.armor + amount)
+  }
+
+  addMaxHealth(amount: number) {
+    this.healthSystem.addMaxHealth(amount)
+  }
+
+  /** Reset purchased stats (called on death / match restart). */
+  resetLoadout() {
+    this.speedMult = 1
+    this.healthSystem.reset()
   }
 
   get isDead(): boolean {
@@ -73,8 +96,8 @@ export class Player {
       direction.normalize()
     }
 
-    this.velocity.x = direction.x * this.speed
-    this.velocity.z = direction.z * this.speed
+    this.velocity.x = direction.x * this.speed * this.speedMult
+    this.velocity.z = direction.z * this.speed * this.speedMult
 
     if (input.jump && this.isGrounded) {
       this.yVelocity = this.jumpHeight
