@@ -68,6 +68,8 @@ export class HostDirectory {
     this.dialPeer = null
     this.client = null
     await this.connect()
+    // connect() reassigned this.client, but TS still narrows it to null after the
+    // explicit `this.client = null` above; snapshot through the declared type to re-widen.
     const client = this.client as DirectoryClient | null
     if (this.entry && client) client.register(this.entry)
   }
