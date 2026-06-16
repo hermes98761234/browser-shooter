@@ -13,10 +13,12 @@ export interface PlayerInput {
   shoot: boolean
   yaw: number   // absolute look yaw (radians)
   pitch: number // absolute look pitch (radians)
+  seq: number
+  renderTime: number
 }
 
 export function emptyInput(): PlayerInput {
-  return { forward: false, backward: false, left: false, right: false, jump: false, shoot: false, yaw: 0, pitch: 0 }
+  return { forward: false, backward: false, left: false, right: false, jump: false, shoot: false, yaw: 0, pitch: 0, seq: 0, renderTime: 0 }
 }
 
 export interface EntityState {
@@ -35,8 +37,11 @@ export interface EntityState {
 
 export interface Snapshot {
   tick: number
+  seq: number
+  ack: Record<string, number>
   players: EntityState[]
   enemies: EntityState[]
+  events: SessionEvent[]
 }
 
 export interface HitEvent {
@@ -55,8 +60,8 @@ export type SessionEvent =
   | { type: 'enemyMelee'; damage: number; enemyPos: Vec3; victimId: string }
   | { type: 'enemyTelegraph'; enemyPos: Vec3; facing: Vec3 }
   | { type: 'enemyKilled'; enemyType: string; pos: Vec3; scoreValue: number }
-  | { type: 'pickup'; pickupType: string; value: number }
-  | { type: 'playerDied' }
+  | { type: 'pickup'; pickupType: string; value: number; playerId: string }
+  | { type: 'playerDied'; playerId: string }
 
 /** Network envelope carried by Transport. */
 export type NetMessage =
@@ -70,3 +75,5 @@ export type NetMessage =
   | { type: 'pong'; t: number }   // client→host reply carrying the original t
   | { type: 'probe'; t: number }     // pre-join latency probe from a browsing client
   | { type: 'probeAck'; t: number }  // host reply echoing t back to the prober
+  | { type: 'buy'; playerId: string; item: string }
+  | { type: 'startWave'; playerId: string }
