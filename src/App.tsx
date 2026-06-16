@@ -18,6 +18,10 @@ import { NetClient } from './net/NetClient'
 import { PeerHost } from './net/PeerHost'
 import { PeerClient } from './net/PeerClient'
 import { RemotePlayerManager } from './net/RemotePlayerManager'
+import { HostDirectory } from './net/HostDirectory'
+import { dialDirectory } from './net/directoryPeer'
+import { measurePing } from './net/probePing'
+import type { ServerRow } from './ui/ServerList'
 import { HUD } from './ui/HUD'
 import { Crosshair, type CrosshairRuntime } from './ui/Crosshair'
 import { Minimap } from './ui/Minimap'
@@ -64,6 +68,7 @@ function App() {
   const [roomCode, setRoomCode] = useState<string | null>(null)
   const [lobbyPlayers, setLobbyPlayers] = useState<string[]>([])
   const [isHost, setIsHost] = useState(false)
+  const [servers, setServers] = useState<ServerRow[]>([])
   const [settings, setSettings] = useState<Settings>(() => loadSettings())
   const [showScoreboard, setShowScoreboard] = useState(false)
   const [scoreboardPlayers, setScoreboardPlayers] = useState<EntityState[]>([])
@@ -113,6 +118,7 @@ function App() {
     role: 'single' as 'single' | 'host' | 'client',
     netHost: null as NetHost | null,
     netClient: null as NetClient | null,
+    hostDirectory: null as HostDirectory | null,
     peerHost: null as PeerHost | null,
     peerClient: null as PeerClient | null,
     remotePlayers: null as RemotePlayerManager | null,
@@ -124,6 +130,7 @@ function App() {
 
   const resetNetworking = useCallback(() => {
     const data = gameDataRef.current
+    data.hostDirectory?.stop(); data.hostDirectory = null
     data.peerHost?.stop(); data.peerClient?.stop()
     data.peerHost = null; data.peerClient = null
     data.netHost = null; data.netClient = null
@@ -202,12 +209,27 @@ function App() {
         if (msg.type === 'join') {
           const id = 'player-' + (data.nextClientNum++)
           netHost.addClient(id, msg.name, transport)
-          setLobbyPlayers((prev) => [...prev, msg.name])
+          setLobbyPlayers((prev) => {
+            const next = [...prev, msg.name]
+            data.hostDirectory?.setPlayers(next.length)
+            return next
+          })
+        } else if (msg.type === 'probe') {
+          transport.send({ type: 'probeAck', t: msg.t })
         }
       })
     })
     const code = await peerHost.start()
     setRoomCode(code)
+    const hostDirectory = new HostDirectory()
+    data.hostDirectory = hostDirectory
+    await hostDirectory.start({
+      roomCode: code,
+      hostName: settingsRef.current.playerName,
+      players: 1,
+      maxPlayers: 8,
+      status: 'lobby',
+    })
   }, [])
 
   const joinGame = useCallback(async (code: string) => {
@@ -223,11 +245,29 @@ function App() {
     client.join(settingsRef.current.playerName)
   }, [startNetGame])
 
+  const refreshServers = useCallback(async () => {
+    const dialed = await dialDirectory()
+    if (!dialed) { setServers([]); return }
+    const entries = await dialed.client.fetchList()
+    dialed.peer.destroy()
+    setServers(entries.map((e) => ({ ...e, ping: null })))
+    // Measure pings in the background, patching rows as they resolve.
+    for (const e of entries) {
+      measurePing(e.roomCode).then((ping) => {
+        setServers((prev) => prev.map((r) => (r.roomCode === e.roomCode ? { ...r, ping } : r)))
+      })
+    }
+  }, [])
+
   const leaveMultiplayer = useCallback(() => {
     resetNetworking()
     setRoomCode(null); setLobbyPlayers([]); setIsHost(false)
     updateGameState('menu')
   }, [updateGameState, resetNetworking])
+
+  useEffect(() => {
+    if (gameState === 'mpmenu' && roomCode === null) void refreshServers()
+  }, [gameState, roomCode, refreshServers])
 
   useEffect(() => {
     const container = containerRef.current
@@ -592,10 +632,12 @@ function App() {
           roomCode={roomCode}
           players={lobbyPlayers}
           isHost={isHost}
+          servers={servers}
           onHost={hostGame}
           onJoin={joinGame}
-          onStart={() => startNetGame('host')}
+          onStart={() => { gameDataRef.current.hostDirectory?.setStatus('in-progress'); startNetGame('host') }}
           onBack={leaveMultiplayer}
+          onRefresh={refreshServers}
         />
       )}
 

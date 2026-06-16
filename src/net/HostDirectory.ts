@@ -68,6 +68,7 @@ export class HostDirectory {
     this.dialPeer = null
     this.client = null
     await this.connect()
-    if (this.entry) this.client?.register(this.entry)
+    const client = this.client as DirectoryClient | null
+    if (this.entry && client) client.register(this.entry)
   }
 }
