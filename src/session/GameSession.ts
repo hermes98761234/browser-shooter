@@ -182,24 +182,25 @@ export class GameSession {
           events.push({ type: 'enemyMelee', damage: action.damage, enemyPos: toVec3(enemy.mesh.position), victimId: target.id })
         }
         if (targetPlayer.isDead) {
-          if (target.id === this.localId) {
-            events.push({ type: 'playerDied' })
-            return events
-          }
+          events.push({ type: 'playerDied', playerId: target.id })
+          if (target.id === this.localId) return events
         }
       }
     }
 
-    // Pickups (local player only in M1).
-    const localPlayer = this.player
-    for (let i = this.pickups.length - 1; i >= 0; i--) {
-      const pickup = this.pickups[i]
-      pickup.update(dt, this.tick * dt)
-      if (pickup.checkCollision(localPlayer.position)) {
-        if (pickup.type === 'health') localPlayer.heal(pickup.value)
-        else this.weaponManager.addAmmo(this.weaponManager.current.type, pickup.value)
-        events.push({ type: 'pickup', pickupType: pickup.type, value: pickup.value })
-        this.pickups.splice(i, 1) // App removes/disposes the mesh
+    // Pickups — check all players.
+    for (const entity of this.playerMap.values()) {
+      const player = entity.player
+      for (let i = this.pickups.length - 1; i >= 0; i--) {
+        const pickup = this.pickups[i]
+        pickup.update(dt, this.tick * dt)
+        if (pickup.checkCollision(player.position)) {
+          if (pickup.type === 'health') player.heal(pickup.value)
+          else entity.weapons.addAmmo(entity.weapons.current.type, pickup.value)
+          events.push({ type: 'pickup', pickupType: pickup.type, value: pickup.value, playerId: entity.id })
+          this.pickups.splice(i, 1)
+          break
+        }
       }
     }
 

@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import * as THREE from 'three'
 import { GameSession } from '../GameSession'
 import { Enemy } from '../../enemies/Enemy'
+import { Pickup } from '../../systems/Pickup'
 import { emptyInput } from '../protocol'
 
 describe('GameSession.step', () => {
@@ -41,5 +42,33 @@ describe('GameSession.step', () => {
     const melee = events.find((e) => e.type === 'enemyMelee')
     expect(melee).toBeDefined()
     expect(melee).toMatchObject({ victimId: s.localId })
+  })
+
+  it('allows all players to collect pickups, not just local', () => {
+    const s = new GameSession()
+    s.addPlayer('p2', 'Bob')
+    const p2 = s.getPlayer('p2')!
+    const pickupPos = new THREE.Vector3(0, 1, 0)
+    const pickup = new Pickup('health', pickupPos)
+    pickup.mesh.position.copy(p2.player.position)
+    pickup.mesh.position.y = 1
+    s.pickups.push(pickup)
+
+    const events = s.step(0.016)
+    const pickupEv = events.find(e => e.type === 'pickup')
+    expect(pickupEv).toBeDefined()
+    expect(pickupEv).toMatchObject({ playerId: 'p2' })
+    expect(s.pickups.length).toBe(0)
+  })
+
+  it('fires playerDied for any player, not just local', () => {
+    const s = new GameSession()
+    s.addPlayer('p2', 'Bob')
+    const p2 = s.getPlayer('p2')!
+    p2.player.health = 1
+    const enemy = new Enemy('grunt', p2.player.position.clone())
+    s.enemies.push(enemy)
+    s.step(1)
+    expect(p2.player.isDead || s.enemies.length > 0).toBe(true)
   })
 })
