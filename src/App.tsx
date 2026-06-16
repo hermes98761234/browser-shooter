@@ -241,6 +241,56 @@ function App() {
     const transport = await peerClient.connect(code)
     const client = new NetClient(transport)
     data.netClient = client
+    client.onEvent((ev) => {
+      const particleSystem = data.particleSystem!
+      switch (ev.type) {
+        case 'playerHitEnemy': {
+          const p = ev.hit.point
+          const point = new THREE.Vector3(p.x, p.y, p.z)
+          if (ev.hit.killed) {
+            particleSystem.explosion(point, ev.enemyType)
+            data.audio.playEnemyDeath(point)
+          } else {
+            particleSystem.bloodSplatter(point)
+            data.audio.playEnemyHit(point)
+          }
+          break
+        }
+        case 'enemyKilled':
+          setScore(data.session.scoreSystem.score)
+          break
+        case 'wallImpact':
+          particleSystem.bulletImpact(new THREE.Vector3(ev.point.x, ev.point.y, ev.point.z))
+          break
+        case 'enemyShoot': {
+          const from = new THREE.Vector3(ev.from.x, ev.from.y, ev.from.z)
+          const to = new THREE.Vector3(ev.to.x, ev.to.y, ev.to.z)
+          data.audio.playWeaponShoot('rifle', from)
+          particleSystem.tracer(from, to)
+          if (ev.hit && ev.victimId === data.netClient?.playerId) {
+            data.audio.playPlayerHit()
+            setHealth(data.session.player.health)
+          }
+          break
+        }
+        case 'pickup':
+          if (ev.playerId === data.netClient?.playerId) {
+            if (ev.pickupType === 'health') setHealth(data.session.player.health)
+            data.audio.playPickup()
+          }
+          break
+        case 'playerDied':
+          if (ev.playerId === data.netClient?.playerId) {
+            document.exitPointerLock()
+            data.audio.playPlayerDeath()
+            data.session.scoreSystem.saveHighScore()
+            setHighScore(data.session.scoreSystem.highScore)
+            engineRef.current?.stop()
+            updateGameState('gameover')
+          }
+          break
+      }
+    })
     client.onWelcome(() => startNetGame('client'))
     client.join(settingsRef.current.playerName)
   }, [startNetGame])
@@ -469,7 +519,7 @@ function App() {
       // Host: broadcast the locally-simulated snapshot and render remote players.
       if (data.role === 'host' && data.netHost && data.remotePlayers) {
         const snap = session.getSnapshot()
-        data.netHost.broadcastSnapshot(snap) // stamps per-player ping onto snap.players
+        data.netHost.broadcastSnapshot(snap, events)
         data.lastPlayers = snap.players
         data.remotePlayers.sync(snap.players)
         data.remotePlayers.update(dt)
@@ -497,6 +547,8 @@ function App() {
         pitch: lookRef.current.pitch,
       })
 
+      client.predictLocal(dt)
+
       // Smart crosshair (client is non-authoritative, so drive it from local input).
       const weapon = data.session.weaponManager.current
       const ch = crosshairRef.current
@@ -512,13 +564,18 @@ function App() {
       if (!snap) return
       data.lastPlayers = snap.players
 
-      const me = snap.players.find((p) => p.id === client.playerId)
-      if (me) {
-        engine.camera.position.set(me.position.x, me.position.y, me.position.z)
-        engine.camera.rotation.set(me.rotationX ?? 0, me.rotationY, 0, 'YXZ')
-        data.audio.updateListenerPosition(me.position.x, me.position.y, me.position.z)
-        setHealth(me.health)
+      const localPos = client.getLocalPosition()
+      const localRot = client.getLocalRotation()
+      const error = localPos.clone().sub(engine.camera.position)
+      if (error.lengthSq() > 0.001) {
+        engine.camera.position.lerp(localPos, Math.min(1, dt / 0.1))
+      } else {
+        engine.camera.position.copy(localPos)
       }
+      engine.camera.rotation.set(localRot.x, localRot.y, 0, 'YXZ')
+
+      data.audio.updateListenerPosition(engine.camera.position.x, engine.camera.position.y, engine.camera.position.z)
+      setHealth(snap.players.find(p => p.id === client.playerId)?.health ?? 100)
 
       data.remotePlayers?.sync(snap.players)
       renderClientEnemies(snap.enemies)
@@ -580,8 +637,12 @@ function App() {
         data.session.weaponManager.current.reload()
       }
 
-      if (e.code === 'KeyG' && gameStateRef.current === 'playing' && data.role === 'host') {
-        data.session.waveManager.spawnNextWave()
+      if (e.code === 'KeyG' && gameStateRef.current === 'playing') {
+        if (data.role === 'host') {
+          data.session.waveManager.spawnNextWave()
+        } else if (data.role === 'client' && data.netClient) {
+          data.netClient.transport.send({ type: 'startWave', playerId: data.netClient.playerId! })
+        }
       }
 
       const slotKeys: Record<string, 'primary' | 'secondary'> = { Digit1: 'primary', Digit2: 'secondary' }
@@ -689,7 +750,11 @@ function App() {
             if (item && !owned.includes(id) && canAffordItem(data.money, id)) {
               data.money -= item.price
               setMoney(data.money)
-              applyItem(item, data.session.player, data.session.weaponManager)
+              if (data.role === 'client' && data.netClient) {
+                data.netClient.transport.send({ type: 'buy', playerId: data.netClient.playerId!, item: id })
+              } else {
+                applyItem(item, data.session.player, data.session.weaponManager)
+              }
               setOwned((prev) => [...prev, id])
               setMaxHealth(data.session.player.maxHealth)
               const wm = data.session.weaponManager

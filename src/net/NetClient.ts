@@ -26,7 +26,7 @@ export class NetClient {
   private eventCb: ((ev: SessionEvent) => void) | null = null
   private interpBuffers = new Map<string, InterpEntry[]>()
 
-  constructor(private transport: Transport) {
+  constructor(public transport: Transport) {
     this.transport.onMessage((msg: NetMessage) => this.handle(msg))
   }
 
