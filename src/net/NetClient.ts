@@ -34,6 +34,8 @@ export class NetClient {
     } else if (msg.type === 'snapshot') {
       this.latestSnapshot = msg.snapshot
       this.snapshotCb?.(msg.snapshot)
+    } else if (msg.type === 'ping') {
+      this.transport.send({ type: 'pong', t: msg.t })
     }
   }
 }

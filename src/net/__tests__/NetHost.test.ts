@@ -33,4 +33,28 @@ describe('NetHost', () => {
     host.tick(0.016)
     expect(got.some(m => m.type === 'snapshot')).toBe(true)
   })
+
+  it('measures client ping from a pong and stamps it onto broadcast snapshots', () => {
+    const session = new GameSession()
+    const host = new NetHost(session, 'coop')
+    const [hostSide, clientSide] = createLinkedTransports()
+    const got: NetMessage[] = []
+    clientSide.onMessage(m => got.push(m))
+    host.addClient('player-2', 'Bob', hostSide)
+
+    // Host probes, client replies with a slightly-old timestamp → non-negative ping.
+    host.pingClients()
+    clientSide.send({ type: 'pong', t: performance.now() - 30 })
+
+    host.tick(0.016)
+    const snap = got.reverse().find(m => m.type === 'snapshot')
+    expect(snap?.type).toBe('snapshot')
+    if (snap?.type === 'snapshot') {
+      const remote = snap.snapshot.players.find(p => p.id === 'player-2')
+      expect(remote?.ping).toBeGreaterThanOrEqual(30)
+      // The host itself is the authority, so its own latency is 0.
+      const local = snap.snapshot.players.find(p => p.id === session.localId)
+      expect(local?.ping).toBe(0)
+    }
+  })
 })

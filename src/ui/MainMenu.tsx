@@ -3,9 +3,10 @@ import React from 'react'
 interface MainMenuProps {
   onSingleplayer: () => void
   onMultiplayer: () => void
+  onSettings: () => void
 }
 
-export const MainMenu: React.FC<MainMenuProps> = ({ onSingleplayer, onMultiplayer }) => {
+export const MainMenu: React.FC<MainMenuProps> = ({ onSingleplayer, onMultiplayer, onSettings }) => {
   return (
     <div style={{
       position: 'absolute',
@@ -40,6 +41,10 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSingleplayer, onMultiplaye
           padding: '16px 40px', fontSize: 22, fontWeight: 'bold', background: '#3399ff',
           color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer',
         }}>MULTIPLAYER</button>
+        <button onClick={onSettings} style={{
+          padding: '16px 40px', fontSize: 22, fontWeight: 'bold', background: '#444',
+          color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer',
+        }}>SETTINGS</button>
       </div>
 
       <div style={{
@@ -57,6 +62,8 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSingleplayer, onMultiplaye
           <span style={{ opacity: 0.6 }}>1-3</span><span>Switch Weapon</span>
           <span style={{ opacity: 0.6 }}>R</span><span>Reload</span>
           <span style={{ opacity: 0.6 }}>Space</span><span>Jump</span>
+          <span style={{ opacity: 0.6 }}>Tab</span><span>Scoreboard</span>
+          <span style={{ opacity: 0.6 }}>B</span><span>Buy Menu</span>
           <span style={{ opacity: 0.6 }}>M</span><span>Mute Sound</span>
           <span style={{ opacity: 0.6 }}>ESC</span><span>Pause</span>
         </div>

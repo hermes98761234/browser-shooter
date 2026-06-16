@@ -14,6 +14,9 @@ export class Controls {
   onMouseMove: ((e: MouseEvent) => void) | null = null
   onCycleWeapon: (() => void) | null = null
   onToggleStore: (() => void) | null = null
+  /** Fired on Tab down (true) / up (false) to show/hide the scoreboard. */
+  onScoreboard: ((show: boolean) => void) | null = null
+  private scoreboardHeld = false
 
   constructor(element: HTMLElement) {
     this.element = element
@@ -47,7 +50,10 @@ export class Controls {
       case 'KeyA': this.left = true; break
       case 'KeyD': this.right = true; break
       case 'Space': this.jump = true; break
-      case 'Tab': e.preventDefault(); this.onCycleWeapon?.(); break
+      case 'Tab':
+        e.preventDefault()
+        if (!this.scoreboardHeld) { this.scoreboardHeld = true; this.onScoreboard?.(true) }
+        break
       case 'KeyB': e.preventDefault(); this.onToggleStore?.(); break
     }
   }
@@ -59,6 +65,11 @@ export class Controls {
       case 'KeyA': this.left = false; break
       case 'KeyD': this.right = false; break
       case 'Space': this.jump = false; break
+      case 'Tab':
+        e.preventDefault()
+        this.scoreboardHeld = false
+        this.onScoreboard?.(false)
+        break
     }
   }
 

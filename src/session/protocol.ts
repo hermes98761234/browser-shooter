@@ -30,6 +30,7 @@ export interface EntityState {
   isDead: boolean
   weaponType?: string  // players only; for remote weapon model
   name?: string        // players only; nameplate
+  ping?: number        // players only; round-trip latency in ms (host-measured)
 }
 
 export interface Snapshot {
@@ -65,3 +66,5 @@ export type NetMessage =
   | { type: 'welcome'; playerId: string; mode: GameMode }
   | { type: 'playerJoined'; playerId: string; name: string }
   | { type: 'playerLeft'; playerId: string }
+  | { type: 'ping'; t: number }   // host→client latency probe (echo t back)
+  | { type: 'pong'; t: number }   // client→host reply carrying the original t

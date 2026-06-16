@@ -33,4 +33,14 @@ describe('NetClient', () => {
     client.sendInput({ ...emptyInput(), shoot: true })
     expect(hostGot).toContainEqual({ type: 'input', playerId: 'player-2', input: { ...emptyInput(), shoot: true } })
   })
+
+  it('replies to a ping with a pong echoing the timestamp', () => {
+    const [clientSide, hostSide] = createLinkedTransports()
+    const hostGot: NetMessage[] = []
+    hostSide.onMessage(m => hostGot.push(m))
+    new NetClient(clientSide) // constructing wires up the message handler
+
+    hostSide.send({ type: 'ping', t: 1234 })
+    expect(hostGot).toContainEqual({ type: 'pong', t: 1234 })
+  })
 })

@@ -23,11 +23,15 @@ import { Minimap } from './ui/Minimap'
 import { WaveAnnounce } from './ui/WaveAnnounce'
 import { MainMenu } from './ui/MainMenu'
 import { MultiplayerMenu } from './ui/MultiplayerMenu'
+import { SettingsMenu } from './ui/SettingsMenu'
 import { GameOver } from './ui/GameOver'
 import { PauseMenu } from './ui/PauseMenu'
 import { DamageOverlay } from './ui/DamageOverlay'
 import { BuyMenu } from './ui/BuyMenu'
+import { Scoreboard } from './ui/Scoreboard'
+import { TouchControls } from './ui/TouchControls'
 import { STORE_CATALOG } from './weapons/StoreCatalog'
+import { loadSettings, saveSettings, mobileControlsActive, type Settings } from './settings/Settings'
 
 function App() {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -51,16 +55,37 @@ function App() {
   const [roomCode, setRoomCode] = useState<string | null>(null)
   const [lobbyPlayers, setLobbyPlayers] = useState<string[]>([])
   const [isHost, setIsHost] = useState(false)
+  const [settings, setSettings] = useState<Settings>(() => loadSettings())
+  const [showScoreboard, setShowScoreboard] = useState(false)
+  const [scoreboardPlayers, setScoreboardPlayers] = useState<EntityState[]>([])
   const lastWaveRef = useRef(0)
   const gameStateRef = useRef<GameState>('menu')
   const storeOpenRef = useRef(false)
+  const showScoreboardRef = useRef(false)
+  const settingsRef = useRef(settings)
 
   const updateGameState = useCallback((state: GameState) => {
     gameStateRef.current = state
     setGameState(state)
   }, [])
 
+  const updateSettings = useCallback((next: Settings) => {
+    setSettings(next)
+    settingsRef.current = next
+    saveSettings(next)
+  }, [])
+
   useEffect(() => { storeOpenRef.current = storeOpen }, [storeOpen])
+  useEffect(() => { showScoreboardRef.current = showScoreboard }, [showScoreboard])
+
+  // While the scoreboard is open, refresh its rows from the latest snapshot a few times a second.
+  useEffect(() => {
+    if (!showScoreboard) return
+    const sync = () => setScoreboardPlayers([...gameDataRef.current.lastPlayers])
+    sync()
+    const id = setInterval(sync, 400)
+    return () => clearInterval(id)
+  }, [showScoreboard])
 
   const lookRef = useRef({ yaw: 0, pitch: 0 })
 
@@ -80,6 +105,8 @@ function App() {
     remotePlayers: null as RemotePlayerManager | null,
     nextClientNum: 1,
     clientEnemies: new Map<string, THREE.Mesh>(),
+    lastPlayers: [] as EntityState[],
+    pingTimer: 0,
   })
 
   const resetNetworking = useCallback(() => {
@@ -109,9 +136,11 @@ function App() {
     fresh.waveManager.wavePauseTimer = 2 // 2s grace before wave 1 (matches pre-refactor behavior)
     fresh.waveManager.onEnemySpawned = data.session.waveManager.onEnemySpawned
     fresh.waveManager.onWaveComplete = data.session.waveManager.onWaveComplete
+    fresh.getPlayer(fresh.localId)!.name = settingsRef.current.playerName
     data.session = fresh
     lookRef.current = { yaw: 0, pitch: 0 }
     data.money = 16000
+    setShowScoreboard(false)
 
     if (data.particleSystem) data.particleSystem.clear()
     data.damageIndicator = createDamageIndicatorState()
@@ -135,6 +164,7 @@ function App() {
     data.remotePlayers = new RemotePlayerManager(engine.scene, localId)
     lookRef.current = { yaw: 0, pitch: 0 }
     setHealth(100)
+    setShowScoreboard(false)
     engine.start()
     data.audio.init(); data.audio.loadSounds()
     updateGameState('playing')
@@ -148,7 +178,8 @@ function App() {
     data.peerHost = peerHost
     const netHost = new NetHost(data.session, 'coop')
     data.netHost = netHost
-    setLobbyPlayers(['You'])
+    data.session.getPlayer(data.session.localId)!.name = settingsRef.current.playerName
+    setLobbyPlayers([settingsRef.current.playerName])
     peerHost.onClientConnect((transport) => {
       transport.onMessage((msg) => {
         if (msg.type === 'join') {
@@ -172,7 +203,7 @@ function App() {
     const client = new NetClient(transport)
     data.netClient = client
     client.onWelcome(() => startNetGame('client'))
-    client.join('Player')
+    client.join(settingsRef.current.playerName)
   }, [startNetGame])
 
   const leaveMultiplayer = useCallback(() => {
@@ -209,6 +240,11 @@ function App() {
         if (next) document.exitPointerLock()
         return next
       })
+    }
+    data.controls.onScoreboard = (show: boolean) => {
+      if (gameStateRef.current !== 'playing') { showScoreboardRef.current = false; setShowScoreboard(false); return }
+      showScoreboardRef.current = show
+      setShowScoreboard(show)
     }
 
     data.session.waveManager.onEnemySpawned = (enemy) => {
@@ -362,9 +398,15 @@ function App() {
       // Host: broadcast the locally-simulated snapshot and render remote players.
       if (data.role === 'host' && data.netHost && data.remotePlayers) {
         const snap = session.getSnapshot()
-        data.netHost.broadcastSnapshot(snap)
+        data.netHost.broadcastSnapshot(snap) // stamps per-player ping onto snap.players
+        data.lastPlayers = snap.players
         data.remotePlayers.sync(snap.players)
         data.remotePlayers.update(dt)
+
+        data.pingTimer += dt
+        if (data.pingTimer >= 1) { data.pingTimer = 0; data.netHost.pingClients() }
+      } else if (data.role === 'single' && showScoreboardRef.current) {
+        data.lastPlayers = session.getSnapshot().players
       }
     })
 
@@ -386,6 +428,7 @@ function App() {
 
       const snap = client.latestSnapshot
       if (!snap) return
+      data.lastPlayers = snap.players
 
       const me = snap.players.find((p) => p.id === client.playerId)
       if (me) {
@@ -478,7 +521,19 @@ function App() {
   return (
     <div ref={containerRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
       {gameState === 'menu' && (
-        <MainMenu onSingleplayer={startGame} onMultiplayer={() => updateGameState('mpmenu')} />
+        <MainMenu
+          onSingleplayer={startGame}
+          onMultiplayer={() => updateGameState('mpmenu')}
+          onSettings={() => updateGameState('settings')}
+        />
+      )}
+
+      {gameState === 'settings' && (
+        <SettingsMenu
+          settings={settings}
+          onChange={updateSettings}
+          onBack={() => updateGameState('menu')}
+        />
       )}
 
       {gameState === 'mpmenu' && (
@@ -514,6 +569,18 @@ function App() {
           />
           <WaveAnnounce wave={wave} visible={showWaveAnnounce} />
           <DamageOverlay indicator={damageIndicator} />
+          {showScoreboard && <Scoreboard players={scoreboardPlayers} roomCode={roomCode} />}
+          {mobileControlsActive(settings) && gameDataRef.current.controls && (
+            <TouchControls
+              controls={gameDataRef.current.controls}
+              lookRef={lookRef}
+              lookSensitivity={settings.lookSensitivity}
+              onReload={() => gameDataRef.current.session.weaponManager.current.reload()}
+              onCycleWeapon={() => gameDataRef.current.controls?.onCycleWeapon?.()}
+              onToggleStore={() => gameDataRef.current.controls?.onToggleStore?.()}
+              onToggleScoreboard={() => setShowScoreboard((s) => !s)}
+            />
+          )}
         </>
       )}
 
