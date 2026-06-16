@@ -1,45 +1,57 @@
 import { Weapon } from './Weapon'
 import type { WeaponType } from '../types'
 
+export type Slot = 'primary' | 'secondary'
+
 export class WeaponManager {
-  weapons: Weapon[]
-  currentIndex: number = 0
+  primary: Weapon | null = null
+  secondary: Weapon
+  currentSlot: Slot = 'secondary'
 
   constructor() {
-    this.weapons = [
-      new Weapon('pistol'),
-      new Weapon('shotgun'),
-      new Weapon('rifle'),
-    ]
+    this.secondary = new Weapon('pistol')
   }
 
   get current(): Weapon {
-    return this.weapons[this.currentIndex]
+    if (this.currentSlot === 'primary' && this.primary) return this.primary
+    return this.secondary
+  }
+
+  equip(type: WeaponType, slot: Slot) {
+    const weapon = new Weapon(type)
+    if (slot === 'primary') this.primary = weapon
+    else this.secondary = weapon
+    this.currentSlot = slot
+  }
+
+  selectSlot(slot: Slot) {
+    if (slot === 'primary' && !this.primary) return
+    this.currentSlot = slot
   }
 
   cycleNext() {
-    this.currentIndex = (this.currentIndex + 1) % this.weapons.length
+    if (!this.primary) { this.currentSlot = 'secondary'; return }
+    this.currentSlot = this.currentSlot === 'primary' ? 'secondary' : 'primary'
   }
 
   switchTo(type: WeaponType) {
-    const idx = this.weapons.findIndex(w => w.type === type)
-    if (idx !== -1) this.currentIndex = idx
-  }
-
-  switchByIndex(index: number) {
-    if (index >= 0 && index < this.weapons.length) {
-      this.currentIndex = index
-    }
+    if (this.primary?.type === type) this.currentSlot = 'primary'
+    else if (this.secondary.type === type) this.currentSlot = 'secondary'
   }
 
   update(dt: number) {
-    for (const w of this.weapons) {
-      w.update(dt)
-    }
+    this.primary?.update(dt)
+    this.secondary.update(dt)
   }
 
   addAmmo(type: WeaponType, amount: number) {
-    const weapon = this.weapons.find(w => w.type === type)
-    if (weapon) weapon.addAmmo(amount)
+    if (this.primary?.type === type) this.primary.addAmmo(amount)
+    else if (this.secondary.type === type) this.secondary.addAmmo(amount)
+  }
+
+  reset() {
+    this.primary = null
+    this.secondary = new Weapon('pistol')
+    this.currentSlot = 'secondary'
   }
 }
