@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import type { WeaponDef, WeaponType } from '../types'
+import type { WeaponDef, WeaponType, WeaponUpgrade } from '../types'
 import { WEAPON_DEFS } from './WeaponDefs'
 
 export class Weapon {
@@ -12,7 +12,7 @@ export class Weapon {
 
   constructor(type: WeaponType) {
     this.type = type
-    this.def = WEAPON_DEFS[type]
+    this.def = { ...WEAPON_DEFS[type] }
     this.ammo = this.def.maxAmmo
   }
 
@@ -46,6 +46,15 @@ export class Weapon {
 
   addAmmo(amount: number) {
     this.ammo = Math.min(this.def.maxAmmo, this.ammo + amount)
+  }
+
+  applyUpgrade(mod: WeaponUpgrade) {
+    if (mod.ammoMult != null) {
+      this.def.maxAmmo = Math.round(this.def.maxAmmo * mod.ammoMult)
+      this.ammo = this.def.maxAmmo
+    }
+    if (mod.reloadMult != null) this.def.reloadTime *= mod.reloadMult
+    if (mod.damageMult != null) this.def.damage = Math.round(this.def.damage * mod.damageMult)
   }
 
   getSpreadDirection(forward: THREE.Vector3): THREE.Vector3 {

@@ -55,6 +55,28 @@ describe('Weapon', () => {
     weapon.addAmmo(20)
     expect(weapon.ammo).toBe(60)
   })
+
+  it('does not share its def with WEAPON_DEFS (safe to upgrade)', async () => {
+    const { WEAPON_DEFS } = await import('../WeaponDefs')
+    const w = new Weapon('ak')
+    expect(w.def).not.toBe(WEAPON_DEFS.ak)
+    expect(w.def.damage).toBe(WEAPON_DEFS.ak.damage)
+  })
+
+  it('applyUpgrade multiplies ammo and refills', () => {
+    const w = new Weapon('ak') // maxAmmo 90
+    w.ammo = 10
+    w.applyUpgrade({ ammoMult: 1.5 })
+    expect(w.def.maxAmmo).toBe(135)
+    expect(w.ammo).toBe(135)
+  })
+
+  it('applyUpgrade multiplies reload time and damage', () => {
+    const w = new Weapon('ak') // reload 2.5, damage 30
+    w.applyUpgrade({ reloadMult: 0.7, damageMult: 2 })
+    expect(w.def.reloadTime).toBeCloseTo(1.75)
+    expect(w.def.damage).toBe(60)
+  })
 })
 
 describe('WeaponManager', () => {
