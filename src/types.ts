@@ -6,7 +6,7 @@ export interface Vec3 {
   z: number
 }
 
-export type GameState = 'menu' | 'mpmenu' | 'settings' | 'playing' | 'paused' | 'gameover'
+export type GameState = 'menu' | 'mpmenu' | 'settings' | 'teamselect' | 'playing' | 'paused' | 'gameover'
 
 export interface WeaponDef {
   name: string
@@ -18,7 +18,39 @@ export interface WeaponDef {
   reloadTime: number
 }
 
-export type WeaponType = 'pistol' | 'shotgun' | 'rifle'
+export type WeaponType =
+  // secondary (pistols)
+  | 'pistol' | 'usp' | 'glock' | 'deagle'
+  // primary
+  | 'm4' | 'aug' | 'ak' | 'galil' | 'mp5' | 'shotgun' | 'awp' | 'rifle'
+
+export type Team = 'ct' | 't'
+
+export type ItemKind = 'weapon' | 'armor' | 'health' | 'speed' | 'upgrade'
+
+export interface WeaponUpgrade {
+  ammoMult?: number    // multiplies maxAmmo (and refills)
+  reloadMult?: number  // multiplies reloadTime
+  damageMult?: number  // multiplies damage
+}
+
+export interface StatEffect {
+  armor?: number       // +armor points
+  maxHealth?: number   // +max HP (and full heal)
+  speedMult?: number   // multiplies move speed
+  weapon?: WeaponUpgrade // applied to the equipped weapon
+}
+
+export interface StoreItem {
+  id: string
+  name: string
+  price: number
+  kind: ItemKind
+  team?: Team                       // omitted = both teams
+  slot?: 'primary' | 'secondary'    // weapons only
+  weaponType?: WeaponType           // weapons only
+  effects?: StatEffect              // gear/upgrades
+}
 
 export interface EnemyDef {
   type: string
