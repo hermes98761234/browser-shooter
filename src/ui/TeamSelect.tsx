@@ -9,7 +9,7 @@ export function TeamSelect({ onSelect }: TeamSelectProps) {
     <div style={{
       position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
       alignItems: 'center', justifyContent: 'center', gap: 16,
-      background: '#0d0d14', fontFamily: 'monospace', color: '#fff',
+      background: '#0d0d14', fontFamily: 'monospace', color: '#fff', zIndex: 50,
     }}>
       <h2 style={{ margin: 0 }}>CHOOSE YOUR SIDE</h2>
       <div style={{ display: 'flex', gap: 24 }}>

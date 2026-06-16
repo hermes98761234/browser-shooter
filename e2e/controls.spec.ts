@@ -1,44 +1,24 @@
 import { test, expect } from '@playwright/test'
+import { startSingleplayer, buyItem } from './helpers'
 
 test.describe('Controls - Keyboard and Mouse', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/')
-    await page.getByText('START GAME').click()
+    await startSingleplayer(page)
     await expect(page.getByText('SCORE')).toBeVisible()
   })
 
   test('W key moves player forward', async ({ page }) => {
-    // Get initial player position
-    const initialPos = await page.evaluate(() => {
-      const data = (window as any).__GAME_DATA__
-      if (data?.player) {
-        return { x: data.player.position.x, z: data.player.position.z }
-      }
-      return null
-    })
-    // Press W to move forward
     await page.keyboard.down('KeyW')
     await page.waitForTimeout(500)
     await page.keyboard.up('KeyW')
-    // Verify movement occurred (player position changed)
-    if (initialPos) {
-      const newPos = await page.evaluate(() => {
-        const data = (window as any).__GAME_DATA__
-        if (data?.player) {
-          return { x: data.player.position.x, z: data.player.position.z }
-        }
-        return null
-      })
-      // Player should have moved from initial position
-      expect(newPos).not.toBeNull()
-    }
+    await expect(page.getByText('SCORE')).toBeVisible()
   })
 
   test('A key moves player left', async ({ page }) => {
     await page.keyboard.down('KeyA')
     await page.waitForTimeout(500)
     await page.keyboard.up('KeyA')
-    // If we got here without errors, the key was handled
     await expect(page.getByText('SCORE')).toBeVisible()
   })
 
@@ -57,7 +37,6 @@ test.describe('Controls - Keyboard and Mouse', () => {
   })
 
   test('R key triggers reload', async ({ page }) => {
-    // Press R - should not crash the game
     await page.keyboard.press('KeyR')
     await expect(page.getByText('SCORE')).toBeVisible()
     await expect(page.getByText('Pistol')).toBeVisible()
@@ -69,33 +48,32 @@ test.describe('Controls - Keyboard and Mouse', () => {
     await expect(page.getByText('SCORE')).toBeVisible()
   })
 
-  test('number key 1 switches to Pistol', async ({ page }) => {
+  test('key 1 keeps the pistol when no primary is owned', async ({ page }) => {
     await page.keyboard.press('Digit1')
     await expect(page.getByText('Pistol')).toBeVisible()
   })
 
-  test('number key 2 switches to Shotgun', async ({ page }) => {
+  test('key 2 selects the secondary pistol', async ({ page }) => {
     await page.keyboard.press('Digit2')
-    await expect(page.getByText('Shotgun')).toBeVisible()
+    await expect(page.getByText('Pistol')).toBeVisible()
   })
 
-  test('number key 3 switches to Rifle', async ({ page }) => {
-    await page.keyboard.press('Digit3')
-    await expect(page.getByText('Rifle')).toBeVisible()
+  test('after buying a primary, keys 1 and 2 swap slots', async ({ page }) => {
+    await buyItem(page, /M4/)
+    await page.keyboard.press('Digit1')
+    await expect(page.getByText('M4', { exact: true })).toBeVisible()
+    await page.keyboard.press('Digit2')
+    await expect(page.getByText('Pistol')).toBeVisible()
   })
 
   test('weapon switching updates ammo display', async ({ page }) => {
-    // Default is Pistol with 60 ammo
-    await expect(page.locator('text=/60/').first()).toBeVisible()
-    // Switch to Shotgun (30 ammo)
-    await page.keyboard.press('Digit2')
-    await expect(page.getByText('Shotgun')).toBeVisible()
-    // Switch to Rifle (90 ammo)
-    await page.keyboard.press('Digit3')
-    await expect(page.getByText('Rifle')).toBeVisible()
-    // Switch back to Pistol
-    await page.keyboard.press('Digit1')
+    await buyItem(page, /M4/)
+    await page.keyboard.press('Digit1') // M4 has 90 ammo
+    await expect(page.getByText('M4', { exact: true })).toBeVisible()
+    await expect(page.getByText('90', { exact: true })).toBeVisible()
+    await page.keyboard.press('Digit2') // pistol has 60 ammo
     await expect(page.getByText('Pistol')).toBeVisible()
+    await expect(page.getByText('60', { exact: true })).toBeVisible()
   })
 
   test('Escape key toggles pause state', async ({ page }) => {
