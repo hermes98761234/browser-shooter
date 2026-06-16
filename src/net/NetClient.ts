@@ -20,12 +20,11 @@ export class NetClient {
   private localSeq = 0
   private pendingInputs: PlayerInput[] = []
   private localPlayer = new Player()
-  private reconciledPos = new THREE.Vector3()
+  private lastDt = 1 / 30
   private snapshotCb: ((s: Snapshot) => void) | null = null
   private welcomeCb: ((playerId: string, mode: GameMode) => void) | null = null
   private eventCb: ((ev: SessionEvent) => void) | null = null
   private interpBuffers = new Map<string, InterpEntry[]>()
-  private lastSnapshotTime = 0
 
   constructor(private transport: Transport) {
     this.transport.onMessage((msg: NetMessage) => this.handle(msg))
@@ -45,6 +44,7 @@ export class NetClient {
 
   predictLocal(dt: number): void {
     if (!this.playerId || this.pendingInputs.length === 0) return
+    this.lastDt = dt
     const input = this.pendingInputs[this.pendingInputs.length - 1]
     this.localPlayer.update(dt, input, ARENA_SIZE)
   }
@@ -55,6 +55,10 @@ export class NetClient {
 
   getLocalRotation(): THREE.Euler {
     return this.localPlayer.rotation
+  }
+
+  get pendingInputCount(): number {
+    return this.pendingInputs.length
   }
 
   getInterpolatedPosition(id: string, renderTime: number): THREE.Vector3 | null {
@@ -114,7 +118,6 @@ export class NetClient {
       this.welcomeCb?.(msg.playerId, msg.mode)
     } else if (msg.type === 'snapshot') {
       this.latestSnapshot = msg.snapshot
-      this.lastSnapshotTime = performance.now()
       this.reconcile(msg.snapshot)
       this.updateInterpBuffers(msg.snapshot)
       for (const ev of msg.snapshot.events) this.eventCb?.(ev)
@@ -138,10 +141,8 @@ export class NetClient {
     this.localPlayer.health = me.health
 
     for (const input of this.pendingInputs) {
-      this.localPlayer.update(1 / 30, input, ARENA_SIZE)
+      this.localPlayer.update(this.lastDt, input, ARENA_SIZE)
     }
-
-    this.reconciledPos.copy(this.localPlayer.position)
   }
 
   private updateInterpBuffers(snap: Snapshot): void {

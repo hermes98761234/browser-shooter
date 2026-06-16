@@ -67,6 +67,7 @@ describe('NetClient', () => {
     })
 
     expect(client.latestSnapshot?.ack['p2']).toBe(2)
+    expect(client.pendingInputCount).toBe(1)
   })
 
   it('calls event callback when snapshot contains events', () => {
