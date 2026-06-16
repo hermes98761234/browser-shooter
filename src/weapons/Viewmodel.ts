@@ -1,12 +1,12 @@
 import * as THREE from 'three'
-import type { WeaponType } from '../types'
+import type { WeaponVisual } from './WeaponDefs'
 
 const BASE = new THREE.Vector3(0.32, -0.32, -0.7)
 
 /** First-person gun model parented to the camera, with bob and recoil. */
 export class Viewmodel {
   group: THREE.Group
-  private models: Record<WeaponType, THREE.Group>
+  private models: Record<WeaponVisual, THREE.Group>
   private recoil = 0
   private bobTime = 0
 
@@ -39,7 +39,7 @@ export class Viewmodel {
     return g
   }
 
-  setWeapon(type: WeaponType) {
+  setWeapon(type: WeaponVisual) {
     for (const [k, m] of Object.entries(this.models)) {
       m.visible = k === type
     }

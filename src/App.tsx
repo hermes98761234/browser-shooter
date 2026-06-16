@@ -10,7 +10,7 @@ import { ParticleSystem } from './effects/ParticleSystem'
 import { AudioManager } from './audio/AudioManager'
 import { SoundEffects } from './audio/SoundEffects'
 import { createDamageIndicatorState, triggerDamage, updateDamageIndicator, type DamageIndicatorState } from './effects/DamageIndicator'
-import type { GameState } from './types'
+import type { GameState, Team } from './types'
 import { GameSession, ARENA_SIZE } from './session/GameSession'
 import { emptyInput, type EntityState } from './session/protocol'
 import { NetHost } from './net/NetHost'
@@ -28,9 +28,12 @@ import { GameOver } from './ui/GameOver'
 import { PauseMenu } from './ui/PauseMenu'
 import { DamageOverlay } from './ui/DamageOverlay'
 import { BuyMenu } from './ui/BuyMenu'
+import { TeamSelect } from './ui/TeamSelect'
 import { Scoreboard } from './ui/Scoreboard'
 import { TouchControls } from './ui/TouchControls'
-import { STORE_CATALOG } from './weapons/StoreCatalog'
+import { findItem, canAffordItem } from './weapons/StoreCatalog'
+import { applyItem } from './player/applyPurchase'
+import { weaponVisual } from './weapons/WeaponDefs'
 import { loadSettings, saveSettings, mobileControlsActive, type Settings } from './settings/Settings'
 
 function App() {
@@ -52,6 +55,9 @@ function App() {
   const [showWaveAnnounce, setShowWaveAnnounce] = useState(false)
   const [storeOpen, setStoreOpen] = useState(false)
   const [money, setMoney] = useState(16000)
+  const [team, setTeam] = useState<Team>('ct')
+  const [owned, setOwned] = useState<string[]>([])
+  const [maxHealth, setMaxHealth] = useState(100)
   const [roomCode, setRoomCode] = useState<string | null>(null)
   const [lobbyPlayers, setLobbyPlayers] = useState<string[]>([])
   const [isHost, setIsHost] = useState(false)
@@ -147,6 +153,9 @@ function App() {
 
     setScore(0); setWave(0); setHealth(100); setAmmo(60); setWeaponName('Pistol')
     setMoney(16000); setStoreOpen(false)
+    setOwned([]); setMaxHealth(100)
+    data.session.weaponManager.reset()
+    data.session.player.resetLoadout()
     data.viewmodel?.setWeapon('pistol')
     setWaveActive(false); setEnemiesRemaining(0); setEnemyPositions([]); setDamageIndicator(null)
 
@@ -231,7 +240,7 @@ function App() {
       wm.cycleNext()
       setWeaponName(wm.current.def.name)
       setAmmo(wm.current.ammo)
-      gameDataRef.current.viewmodel?.setWeapon(wm.current.type)
+      gameDataRef.current.viewmodel?.setWeapon(weaponVisual(wm.current.type))
     }
     data.controls.onToggleStore = () => {
       if (gameStateRef.current !== 'playing') return
@@ -363,7 +372,7 @@ function App() {
       // iff step() just reset fireTimer to def.fireRate this tick.
       if (controls.shoot && session.weaponManager.current.fireTimer > session.weaponManager.current.def.fireRate - dt) {
         data.viewmodel?.fire()
-        data.audio.playWeaponShoot(session.weaponManager.current.type, session.player.position)
+        data.audio.playWeaponShoot(weaponVisual(session.weaponManager.current.type), session.player.position)
         const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(engine.camera.quaternion)
         particleSystem.muzzleFlash(session.player.position.clone().add(fwd), fwd)
       }
@@ -498,12 +507,13 @@ function App() {
         data.session.weaponManager.current.reload()
       }
 
-      const weaponKeys: Record<string, number> = { Digit1: 0, Digit2: 1, Digit3: 2 }
-      if (e.code in weaponKeys) {
-        data.session.weaponManager.switchByIndex(weaponKeys[e.code])
-        setWeaponName(data.session.weaponManager.current.def.name)
-        setAmmo(data.session.weaponManager.current.ammo)
-        data.viewmodel?.setWeapon(data.session.weaponManager.current.type)
+      const slotKeys: Record<string, 'primary' | 'secondary'> = { Digit1: 'primary', Digit2: 'secondary' }
+      if (e.code in slotKeys) {
+        const wm = data.session.weaponManager
+        wm.selectSlot(slotKeys[e.code])
+        setWeaponName(wm.current.def.name)
+        setAmmo(wm.current.ammo)
+        data.viewmodel?.setWeapon(weaponVisual(wm.current.type))
       }
     }
 
@@ -522,7 +532,7 @@ function App() {
     <div ref={containerRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
       {gameState === 'menu' && (
         <MainMenu
-          onSingleplayer={startGame}
+          onSingleplayer={() => updateGameState('teamselect')}
           onMultiplayer={() => updateGameState('mpmenu')}
           onSettings={() => updateGameState('settings')}
         />
@@ -534,6 +544,10 @@ function App() {
           onChange={updateSettings}
           onBack={() => updateGameState('menu')}
         />
+      )}
+
+      {gameState === 'teamselect' && (
+        <TeamSelect onSelect={(t) => { setTeam(t); startGame() }} />
       )}
 
       {gameState === 'mpmenu' && (
@@ -552,7 +566,7 @@ function App() {
         <>
           <HUD
             health={health}
-            maxHealth={100}
+            maxHealth={maxHealth}
             ammo={ammo}
             maxAmmo={gameDataRef.current.session.weaponManager.current.def.maxAmmo}
             weaponName={weaponName}
@@ -586,19 +600,23 @@ function App() {
 
       {gameState === 'playing' && storeOpen && (
         <BuyMenu
+          team={team}
           money={money}
-          onBuy={(type) => {
+          owned={owned}
+          onBuy={(id) => {
             const data = gameDataRef.current
-            const item = STORE_CATALOG.find(i => i.type === type)
-            if (item && data.money >= item.price) {
+            const item = findItem(id)
+            if (item && !owned.includes(id) && canAffordItem(data.money, id)) {
               data.money -= item.price
               setMoney(data.money)
-              data.session.weaponManager.switchTo(type)
-              setWeaponName(data.session.weaponManager.current.def.name)
-              setAmmo(data.session.weaponManager.current.ammo)
-              data.viewmodel?.setWeapon(type)
+              applyItem(item, data.session.player, data.session.weaponManager)
+              setOwned((prev) => [...prev, id])
+              setMaxHealth(data.session.player.maxHealth)
+              const wm = data.session.weaponManager
+              setWeaponName(wm.current.def.name)
+              setAmmo(wm.current.ammo)
+              data.viewmodel?.setWeapon(weaponVisual(wm.current.type))
             }
-            setStoreOpen(false)
           }}
           onClose={() => setStoreOpen(false)}
         />
