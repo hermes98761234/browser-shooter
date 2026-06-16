@@ -194,6 +194,7 @@ function App() {
     data.peerHost = peerHost
     const netHost = new NetHost(data.session, 'coop')
     data.netHost = netHost
+    data.session.waveManager.auto = false // multiplayer: no auto-bots; host adds waves with G
     data.session.getPlayer(data.session.localId)!.name = settingsRef.current.playerName
     setLobbyPlayers([settingsRef.current.playerName])
     peerHost.onClientConnect((transport) => {
@@ -537,6 +538,10 @@ function App() {
 
       if (e.code === 'KeyR') {
         data.session.weaponManager.current.reload()
+      }
+
+      if (e.code === 'KeyG' && gameStateRef.current === 'playing' && data.role === 'host') {
+        data.session.waveManager.spawnNextWave()
       }
 
       const slotKeys: Record<string, 'primary' | 'secondary'> = { Digit1: 'primary', Digit2: 'secondary' }
