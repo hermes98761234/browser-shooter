@@ -45,6 +45,44 @@ test('two players join the same room and see each other', async ({ browser }) =>
   await joinCtx.close()
 })
 
+test('a hosted game appears in another player\'s server list and is joinable', async ({ browser }) => {
+  test.setTimeout(60_000)
+  const hostCtx = await browser.newContext()
+  const joinCtx = await browser.newContext()
+  const host = await hostCtx.newPage()
+  const join = await joinCtx.newPage()
+
+  await host.goto('/')
+  await host.getByText(/multiplayer/i).click({ force: true })
+  await host.getByText(/host game/i).click({ force: true })
+
+  // Wait for the room code; if the broker never opens, skip.
+  const codeLocator = host.locator('strong').first()
+  try {
+    await expect(codeLocator).toBeVisible({ timeout: 15_000 })
+  } catch {
+    test.skip(true, 'PeerJS broker unreachable in this environment')
+  }
+
+  // Second player opens multiplayer and refreshes the list until the host shows up.
+  await join.goto('/')
+  await join.getByText(/multiplayer/i).click({ force: true })
+  await expect(async () => {
+    await join.getByRole('button', { name: /refresh/i }).click({ force: true })
+    await expect(join.getByRole('button', { name: /^join$/i }).first()).toBeVisible({ timeout: 3_000 })
+  }).toPass({ timeout: 30_000 })
+
+  // Join the listed game from the row's Join button.
+  await join.getByRole('button', { name: /^join$/i }).first().click({ force: true })
+
+  await host.getByText(/start/i).click({ force: true })
+  await expect(host.locator('canvas')).toBeVisible()
+  await expect(join.locator('canvas')).toBeVisible()
+
+  await hostCtx.close()
+  await joinCtx.close()
+})
+
 /*
  * MANUAL VERIFICATION (two browser tabs, `npm run dev`):
  *  1. Tab A: Multiplayer → Host Game → a room code appears and Copy works.
