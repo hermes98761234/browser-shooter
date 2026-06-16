@@ -14,6 +14,7 @@ export class Enemy {
   type: string
   def: EnemyDef
   health: number
+  id: string = ''
   mesh: THREE.Group
   attackTimer: number = 0 // melee cooldown counts up; ranged fire-cooldown counts down
   telegraphTimer: number = 0
