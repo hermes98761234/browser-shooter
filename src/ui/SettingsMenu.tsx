@@ -1,6 +1,7 @@
 import React from 'react'
 import type { Settings, MobileControlsMode } from '../settings/Settings'
 import { isTouchDevice } from '../settings/Settings'
+import { CrosshairEditor } from './CrosshairEditor'
 
 interface SettingsMenuProps {
   settings: Settings
@@ -10,7 +11,8 @@ interface SettingsMenuProps {
 
 const panel: React.CSSProperties = {
   position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
-  alignItems: 'center', justifyContent: 'center', gap: 24,
+  alignItems: 'center', justifyContent: 'flex-start', gap: 24, padding: '40px 0',
+  boxSizing: 'border-box', overflowY: 'auto',
   background: 'linear-gradient(180deg,#0a0a1a,#1a1a3e)', color: 'white', fontFamily: 'monospace',
 }
 const card: React.CSSProperties = {
@@ -84,6 +86,14 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({ settings, onChange, 
             style={{ width: '100%' }}
           />
         </div>
+      </div>
+
+      <div style={card}>
+        <h3 style={{ margin: 0, fontSize: 15, color: '#ff6600', letterSpacing: 1 }}>CROSSHAIR</h3>
+        <CrosshairEditor
+          value={settings.crosshair}
+          onChange={(crosshair) => onChange({ ...settings, crosshair })}
+        />
       </div>
 
       <button style={{ ...btn, background: '#555' }} onClick={onBack}>Back</button>

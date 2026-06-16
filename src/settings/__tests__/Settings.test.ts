@@ -9,8 +9,9 @@ describe('Settings', () => {
   })
 
   it('round-trips saved settings', () => {
-    saveSettings({ playerName: 'Neo', mobileControls: 'on', lookSensitivity: 1.8 })
-    expect(loadSettings()).toEqual({ playerName: 'Neo', mobileControls: 'on', lookSensitivity: 1.8 })
+    const saved = { ...DEFAULT_SETTINGS, playerName: 'Neo', mobileControls: 'on' as const, lookSensitivity: 1.8 }
+    saveSettings(saved)
+    expect(loadSettings()).toEqual(saved)
   })
 
   it('fills missing fields from defaults when stored data is partial', () => {

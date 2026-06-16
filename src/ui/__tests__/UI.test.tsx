@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render, screen, cleanup, fireEvent } from '@testing-library/react'
 import { HUD } from '../HUD'
+import { Crosshair } from '../Crosshair'
+import { DEFAULT_CROSSHAIR } from '../../settings/Crosshair'
 import { Minimap } from '../Minimap'
 import { WaveAnnounce } from '../WaveAnnounce'
 import { MainMenu } from '../MainMenu'
@@ -101,21 +103,10 @@ describe('HUD', () => {
     expect(screen.getByText('7 enemies remaining')).toBeInTheDocument()
   })
 
-  it('renders crosshair', () => {
-    render(
-      <HUD
-        health={100}
-        maxHealth={100}
-        ammo={60}
-        maxAmmo={60}
-        weaponName="Pistol"
-        score={0}
-        wave={1}
-        waveActive={true}
-        enemiesRemaining={3}
-      />
-    )
-    expect(screen.getByText('+')).toBeInTheDocument()
+  it('renders the crosshair canvas', () => {
+    const runtime = { current: { config: DEFAULT_CROSSHAIR, bloom: 0 } }
+    const { container } = render(<Crosshair runtime={runtime} />)
+    expect(container.querySelector('canvas')).toBeInTheDocument()
   })
 
   it('shows low health color', () => {

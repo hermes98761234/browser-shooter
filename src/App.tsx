@@ -19,6 +19,7 @@ import { PeerHost } from './net/PeerHost'
 import { PeerClient } from './net/PeerClient'
 import { RemotePlayerManager } from './net/RemotePlayerManager'
 import { HUD } from './ui/HUD'
+import { Crosshair, type CrosshairRuntime } from './ui/Crosshair'
 import { Minimap } from './ui/Minimap'
 import { WaveAnnounce } from './ui/WaveAnnounce'
 import { MainMenu } from './ui/MainMenu'
@@ -35,6 +36,8 @@ import { findItem, canAffordItem } from './weapons/StoreCatalog'
 import { applyItem } from './player/applyPurchase'
 import { weaponVisual } from './weapons/WeaponDefs'
 import { loadSettings, saveSettings, mobileControlsActive, type Settings } from './settings/Settings'
+import { resolveCrosshair } from './settings/Crosshair'
+import { stepBloom } from './weapons/CrosshairBloom'
 
 function App() {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -69,6 +72,10 @@ function App() {
   const storeOpenRef = useRef(false)
   const showScoreboardRef = useRef(false)
   const settingsRef = useRef(settings)
+  const crosshairRef = useRef<CrosshairRuntime>({
+    config: resolveCrosshair(settings.crosshair, 'pistol'),
+    bloom: 0,
+  })
 
   const updateGameState = useCallback((state: GameState) => {
     gameStateRef.current = state
@@ -370,12 +377,26 @@ function App() {
 
       // Player fire feedback (muzzle flash + recoil + sound): the weapon fired this frame
       // iff step() just reset fireTimer to def.fireRate this tick.
+      let firedThisFrame = false
       if (controls.shoot && session.weaponManager.current.fireTimer > session.weaponManager.current.def.fireRate - dt) {
+        firedThisFrame = true
         data.viewmodel?.fire()
         data.audio.playWeaponShoot(weaponVisual(session.weaponManager.current.type), session.player.position)
         const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(engine.camera.quaternion)
         particleSystem.muzzleFlash(session.player.position.clone().add(fwd), fwd)
       }
+
+      // Smart crosshair: pick the active weapon's crosshair and grow/shrink its bloom
+      // from movement, jumping and firing.
+      const weapon = session.weaponManager.current
+      const ch = crosshairRef.current
+      ch.config = resolveCrosshair(settingsRef.current.crosshair, weapon.type)
+      ch.bloom = stepBloom(ch.bloom, dt, {
+        moving: Math.hypot(session.player.velocity.x, session.player.velocity.z) > 1.5,
+        airborne: !session.player.isGrounded,
+        shotsFired: firedThisFrame ? 1 : 0,
+        weaponSpread: weapon.def.spread,
+      })
 
       // Reconcile removed enemies/pickups → dispose their meshes.
       for (const e of enemiesBefore) {
@@ -433,6 +454,17 @@ function App() {
         shoot: controls.shoot && !storeOpenRef.current,
         yaw: lookRef.current.yaw,
         pitch: lookRef.current.pitch,
+      })
+
+      // Smart crosshair (client is non-authoritative, so drive it from local input).
+      const weapon = data.session.weaponManager.current
+      const ch = crosshairRef.current
+      ch.config = resolveCrosshair(settingsRef.current.crosshair, weapon.type)
+      ch.bloom = stepBloom(ch.bloom, dt, {
+        moving: m.forward || m.backward || m.left || m.right,
+        airborne: m.jump,
+        shotsFired: 0,
+        weaponSpread: weapon.def.spread,
       })
 
       const snap = client.latestSnapshot
@@ -575,6 +607,7 @@ function App() {
             waveActive={waveActive}
             enemiesRemaining={enemiesRemaining}
           />
+          <Crosshair runtime={crosshairRef} />
           <Minimap
             playerPosition={playerPos}
             playerRotation={playerRot}

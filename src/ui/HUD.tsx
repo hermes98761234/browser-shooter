@@ -34,15 +34,8 @@ export const HUD: React.FC<HUDProps> = ({
       fontFamily: 'monospace',
       color: 'white',
     }}>
-      {/* Crosshair */}
-      <div style={{
-        position: 'absolute',
-        top: '50%',
-        left: '50%',
-        transform: 'translate(-50%, -50%)',
-        fontSize: '24px',
-        textShadow: '0 0 5px black',
-      }}>+</div>
+      {/* Crosshair is rendered separately (see <Crosshair/> in App) so it can animate
+          its dynamic bloom without re-rendering the HUD every frame. */}
 
       {/* Health bar */}
       <div style={{
