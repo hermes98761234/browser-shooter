@@ -282,7 +282,7 @@ export class GameSession {
       if (killed) {
         this.scoreboard.recordKill(shooter.id, shooter.team, target.id, target.team, this.config.damagePolicy)
         this.respawnQueue.enqueue(target.id, RESPAWN_DELAY)
-        events.push({ type: 'playerKilledPlayer', attackerId: shooter.id, victimId: target.id, victimTeam: target.team, teamkill: shooter.team === target.team })
+        events.push({ type: 'playerKilledPlayer', attackerId: shooter.id, victimId: target.id, victimTeam: target.team, teamkill: this.config.damagePolicy === 'friendly' && shooter.team === target.team })
         events.push({ type: 'playerDied', playerId: target.id })
         if (this.scoreboard.matchOver) events.push({ type: 'matchOver', winningTeam: this.scoreboard.winningTeam! })
       }

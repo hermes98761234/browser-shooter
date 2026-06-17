@@ -1,9 +1,9 @@
-// src/net/pvp.integration.test.ts
 import { describe, it, expect } from 'vitest'
 import { NetHost } from './NetHost'
 import { NetClient } from './NetClient'
 import { GameSession } from '../session/GameSession'
 import { createLinkedTransports } from '../session/Transport'
+import type { Snapshot } from '../session/protocol'
 
 // Using createLinkedTransports from the repo — identical shape to the brief's makePair():
 // each transport's send() delivers synchronously to the other's onMessage handlers.
@@ -58,6 +58,33 @@ describe('PvP integration', () => {
     client.sendInput({ forward: false, backward: false, left: false, right: false, jump: false, shoot: true, yaw: 0, pitch: 0, seq: 0, renderTime: 0 })
     host.tick(1 / 30)
     expect(latestHealth).toBe(100)
+  })
+
+  it('match-over snapshot reaches client when fragLimit is hit', () => {
+    const config = { mode: 'pvp' as const, damagePolicy: 'team' as const, fragLimit: 1 }
+    const session = new GameSession(config)
+    session.getPlayer(session.localId)!.team = 'ct'
+    session.getPlayer(session.localId)!.player.position.set(0, 2, 0)
+    session.getPlayer(session.localId)!.player.health = 1
+
+    const host = new NetHost(session, config)
+    const [hostSide, clientSide] = createLinkedTransports()
+    const client = new NetClient(clientSide)
+
+    let latestSnap: Snapshot | null = null
+    client.onSnapshot((s) => { latestSnap = s })
+
+    host.addClient('p1', 'Ann', hostSide, 't')
+    session.getPlayer('p1')!.player.position.set(0, 2, 8)
+
+    client.sendInput({ forward: false, backward: false, left: false, right: false, jump: false, shoot: true, yaw: 0, pitch: 0, seq: 0, renderTime: 0 })
+
+    host.tick(1 / 30)
+
+    expect(latestSnap).not.toBeNull()
+    expect(latestSnap!.scores.matchOver).toBe(true)
+    expect(latestSnap!.scores.winningTeam).toBe('t')
+    expect(latestSnap!.events.some(ev => ev.type === 'matchOver')).toBe(true)
   })
 
   it('welcome propagates config to the client', () => {

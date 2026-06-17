@@ -85,7 +85,6 @@ function App() {
   const [settings, setSettings] = useState<Settings>(() => loadSettings())
   const [showScoreboard, setShowScoreboard] = useState(false)
   const [scoreboardPlayers, setScoreboardPlayers] = useState<EntityState[]>([])
-  const [_matchConfig, setMatchConfig] = useState<MatchConfig>(defaultMatchConfig())
   const [showMatchSetup, setShowMatchSetup] = useState(false)
   const [myTeam, setMyTeam] = useState<Team>('ct')
   const [roster, setRoster] = useState<{ ct: string[]; t: string[] }>({ ct: [], t: [] })
@@ -225,7 +224,6 @@ function App() {
     const data = gameDataRef.current
     data.role = 'host'
     data.matchConfig = config
-    setMatchConfig(config)
     setIsHost(true)
     const peerHost = new PeerHost()
     data.peerHost = peerHost
@@ -343,7 +341,7 @@ function App() {
     })
     client.onWelcome((_, mode) => {
       const data = gameDataRef.current
-      if (data.netClient?.config) { data.matchConfig = data.netClient.config; setMatchConfig(data.netClient.config) }
+      if (data.netClient?.config) { data.matchConfig = data.netClient.config }
       void mode
     })
     client.onStart(() => startNetGame('client'))
@@ -467,6 +465,7 @@ function App() {
       const isMoving = m.forward || m.backward || m.left || m.right
       data.viewmodel?.update(dt, isMoving)
 
+      let matchOverPending = false
       for (const ev of events) {
         switch (ev.type) {
           case 'playerHitEnemy': {
@@ -547,9 +546,8 @@ function App() {
           case 'matchOver':
             setMatchScores(session.scoreboard.snapshot())
             document.exitPointerLock()
-            engine.stop()
-            updateGameState('matchover')
-            return
+            matchOverPending = true
+            break
         }
       }
 
@@ -595,6 +593,7 @@ function App() {
         setTimeout(() => setShowWaveAnnounce(false), 2600)
       }
       setEnemyPositions(session.enemies.map(e => e.mesh.position.clone()))
+      setHealth(session.player.health)
       setPlayerPos(session.player.position.clone())
       setPlayerRot(session.player.rotation.y)
       setRespawnIn(session.respawnQueue.isPending(session.localId) ? session.respawnQueue.remaining(session.localId) : null)
@@ -618,6 +617,7 @@ function App() {
       } else if (data.role === 'single' && showScoreboardRef.current) {
         data.lastPlayers = session.getSnapshot().players
       }
+      if (matchOverPending) { engine.stop(); updateGameState('matchover') }
     })
 
     // Client: forward input, render local view + remote players + enemies from the snapshot.
