@@ -81,6 +81,10 @@ export class Player {
     this.healthSystem.reset()
   }
 
+  revive() {
+    this.healthSystem.revive()
+  }
+
   update(dt: number, input: { forward: boolean; backward: boolean; left: boolean; right: boolean; jump: boolean }, arenaSize: number = 28) {
     if (this.isDead) return
 

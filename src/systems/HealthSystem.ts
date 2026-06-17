@@ -50,4 +50,12 @@ export class HealthSystem {
     this.isDead = false
     this.invincibleTimer = 0
   }
+
+  /** Respawn: full health, clear death, brief spawn protection. Keeps maxHealth. */
+  revive() {
+    this.health = this.maxHealth
+    this.armor = 0
+    this.isDead = false
+    this.invincibleTimer = 1
+  }
 }
