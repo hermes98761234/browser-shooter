@@ -161,6 +161,13 @@ Pushing to `main` triggers GitHub Actions:
 
 Tag with `v*` (e.g. `v1.0.0`) to trigger a release build with a distributable zip attached to the GitHub Release.
 
+## Known Follow-ups (TODO)
+
+PvP is functional and host-authoritative. Two client-side polish gaps remain (host side is correct):
+
+- [ ] **Client lobby rosters are empty.** The host shows who is on CT vs T, but it never broadcasts roster/team changes to clients, so a joined client's CT/T roster panels render empty. Fix: have the host push the roster (names + teams) to clients on join and on `setTeam` (a small lobby-sync message or snapshot piggyback).
+- [ ] **Client kill feed shows raw player IDs instead of names.** Remote players aren't in the client's local player map, so the client kill feed prints e.g. `player-2`. Fix: carry the attacker/victim names in the `playerKilledPlayer` event (or resolve them from the snapshot's `players`).
+
 ## License
 
 MIT
