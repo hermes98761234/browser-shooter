@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { ENEMY_DEFS } from './EnemyDefs'
+import { ThirdPersonWeapon } from '../weapons/ThirdPersonWeapon'
 
 /** Builds a humanoid soldier from primitives. Feet sit at y=0; the gun points -Z (forward). */
 export function buildSoldier(type: string): THREE.Group {
@@ -8,7 +9,6 @@ export function buildSoldier(type: string): THREE.Group {
 
   const bodyMat = new THREE.MeshStandardMaterial({ color: def.color, roughness: 0.7, metalness: 0.2 })
   const skinMat = new THREE.MeshStandardMaterial({ color: 0xd2a679, roughness: 0.8 })
-  const gunMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.5, metalness: 0.6 })
 
   const legGeo = new THREE.BoxGeometry(0.25, 0.9, 0.25)
   const lLeg = new THREE.Mesh(legGeo, bodyMat); lLeg.position.set(-0.18, 0.45, 0)
@@ -25,9 +25,6 @@ export function buildSoldier(type: string): THREE.Group {
   const rArm = new THREE.Mesh(armGeo, bodyMat)
   rArm.position.set(0.4, 1.35, 0.12); rArm.rotation.x = -Math.PI / 3
 
-  const gun = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 0.7), gunMat)
-  gun.position.set(0.42, 1.3, -0.35)
-
   const zoned: [THREE.Mesh, 'head' | 'body' | 'legs'][] = [
     [lLeg, 'legs'],
     [rLeg, 'legs'],
@@ -35,12 +32,18 @@ export function buildSoldier(type: string): THREE.Group {
     [head, 'head'],
     [lArm, 'body'],
     [rArm, 'body'],
-    [gun, 'body'],
   ]
   for (const [part, zone] of zoned) {
     part.userData.zone = zone
     part.castShadow = true
     group.add(part)
+  }
+
+  if (def.attackType === 'ranged') {
+    const weaponType = type === 'sniper' ? 'awp' : 'rifle'
+    const weapon = new ThirdPersonWeapon(weaponType)
+    weapon.group.position.set(0.42, 1.3, -0.35)
+    group.add(weapon.group)
   }
 
   const scale = type === 'tank' ? 1.3 : type === 'runner' ? 0.85 : 1
