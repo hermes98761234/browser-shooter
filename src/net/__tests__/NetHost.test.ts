@@ -13,7 +13,7 @@ describe('NetHost', () => {
     clientSide.onMessage(m => got.push(m))
 
     host.addClient('player-2', 'Bob', hostSide)
-    expect(got).toEqual(expect.arrayContaining([expect.objectContaining({ type: 'welcome', playerId: 'player-2', mode: 'coop' })]))
+    expect(got).toEqual(expect.arrayContaining([expect.objectContaining({ type: 'welcome', playerId: 'player-2', mode: 'coop', config: expect.objectContaining({ mode: 'coop' }) })]))
     expect(session.playerIds()).toContain('player-2')
 
     clientSide.send({ type: 'input', playerId: 'player-2', input: { ...emptyInput(), forward: true } })
