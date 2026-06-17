@@ -1,10 +1,8 @@
-import React from 'react'
-
 interface HelpModalProps {
   onClose: () => void
 }
 
-export const HelpModal: React.FC<HelpModalProps> = ({ onClose }) => {
+export const HelpModal = ({ onClose }: HelpModalProps) => {
   return (
     <div style={{
       position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',

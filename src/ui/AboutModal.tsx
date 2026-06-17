@@ -1,10 +1,8 @@
-import React from 'react'
-
 interface AboutModalProps {
   onClose: () => void
 }
 
-export const AboutModal: React.FC<AboutModalProps> = ({ onClose }) => {
+export const AboutModal = ({ onClose }: AboutModalProps) => {
   return (
     <div style={{
       position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',

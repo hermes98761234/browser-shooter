@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import { catalogForTeam, canAffordItem } from '../weapons/StoreCatalog'
 import { WeaponIcon } from './icons/weapons'
 import type { ItemKind, Team } from '../types'
@@ -19,7 +20,14 @@ const SECTIONS: { title: string; kinds: ItemKind[]; slot?: 'primary' | 'secondar
 
 export function BuyMenu({ team, money, owned, onBuy, onClose }: BuyMenuProps) {
   const catalog = catalogForTeam(team)
-  const isMobile = window.innerWidth < 768
+  const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 767px)').matches)
+
+  useEffect(() => {
+    const mql = window.matchMedia('(max-width: 767px)')
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches)
+    mql.addEventListener('change', handler)
+    return () => mql.removeEventListener('change', handler)
+  }, [])
 
   return (
     <div style={{
