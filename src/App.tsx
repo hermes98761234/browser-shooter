@@ -42,6 +42,19 @@ import { weaponVisual } from './weapons/WeaponDefs'
 import { loadSettings, saveSettings, mobileControlsActive, type Settings } from './settings/Settings'
 import { resolveCrosshair } from './settings/Crosshair'
 import { stepBloom } from './weapons/CrosshairBloom'
+import { MatchSetup } from './ui/MatchSetup'
+import { KillFeed, type KillLine } from './ui/KillFeed'
+import { RespawnOverlay } from './ui/RespawnOverlay'
+import { MatchOver } from './ui/MatchOver'
+import { defaultMatchConfig, type MatchConfig } from './session/MatchConfig'
+import type { MatchScores } from './session/protocol'
+
+function moveToTeam(roster: { ct: string[]; t: string[] }, name: string, team: 'ct' | 't') {
+  const ct = roster.ct.filter(n => n !== name)
+  const t = roster.t.filter(n => n !== name)
+  if (team === 'ct') ct.push(name); else t.push(name)
+  return { ct, t }
+}
 
 function App() {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -72,6 +85,13 @@ function App() {
   const [settings, setSettings] = useState<Settings>(() => loadSettings())
   const [showScoreboard, setShowScoreboard] = useState(false)
   const [scoreboardPlayers, setScoreboardPlayers] = useState<EntityState[]>([])
+  const [_matchConfig, setMatchConfig] = useState<MatchConfig>(defaultMatchConfig())
+  const [showMatchSetup, setShowMatchSetup] = useState(false)
+  const [myTeam, setMyTeam] = useState<Team>('ct')
+  const [roster, setRoster] = useState<{ ct: string[]; t: string[] }>({ ct: [], t: [] })
+  const [killFeed, setKillFeed] = useState<KillLine[]>([])
+  const [respawnIn, setRespawnIn] = useState<number | null>(null)
+  const [matchScores, setMatchScores] = useState<MatchScores | null>(null)
   const lastWaveRef = useRef(0)
   const gameStateRef = useRef<GameState>('menu')
   const storeOpenRef = useRef(false)
@@ -126,7 +146,15 @@ function App() {
     clientEnemies: new Map<string, THREE.Mesh>(),
     lastPlayers: [] as EntityState[],
     pingTimer: 0,
+    matchConfig: defaultMatchConfig() as MatchConfig,
+    killSeq: 0,
   })
+
+  const pushKill = useCallback((attacker: string, victim: string, teamkill: boolean) => {
+    const id = gameDataRef.current.killSeq++
+    setKillFeed((prev) => [...prev.slice(-4), { id, attacker, victim, teamkill }])
+    setTimeout(() => setKillFeed((prev) => prev.filter(l => l.id !== id)), 5000)
+  }, [])
 
   const resetNetworking = useCallback(() => {
     const data = gameDataRef.current
@@ -193,27 +221,41 @@ function App() {
     updateGameState('playing')
   }, [updateGameState])
 
-  const hostGame = useCallback(async () => {
+  const hostGame = useCallback(async (config: MatchConfig) => {
     const data = gameDataRef.current
     data.role = 'host'
+    data.matchConfig = config
+    setMatchConfig(config)
     setIsHost(true)
     const peerHost = new PeerHost()
     data.peerHost = peerHost
-    const netHost = new NetHost(data.session, 'coop')
+    // Rebuild the session with the chosen rules (replaces the menu-time session).
+    const scene = engineRef.current?.scene
+    for (const enemy of data.session.enemies) { scene?.remove(enemy.mesh); enemy.dispose() }
+    const fresh = new GameSession(config)
+    fresh.collisionWorld = data.session.collisionWorld
+    fresh.waveManager.onEnemySpawned = data.session.waveManager.onEnemySpawned
+    fresh.waveManager.onWaveComplete = data.session.waveManager.onWaveComplete
+    fresh.getPlayer(fresh.localId)!.name = settingsRef.current.playerName
+    fresh.getPlayer(fresh.localId)!.team = myTeam
+    data.session = fresh
+    const netHost = new NetHost(fresh, config)
     data.netHost = netHost
-    data.session.waveManager.auto = false // multiplayer: no auto-bots; host adds waves with G
-    data.session.getPlayer(data.session.localId)!.name = settingsRef.current.playerName
+    fresh.waveManager.auto = false
     setLobbyPlayers([settingsRef.current.playerName])
+    setRoster({ ct: myTeam === 'ct' ? [settingsRef.current.playerName] : [], t: myTeam === 't' ? [settingsRef.current.playerName] : [] })
     peerHost.onClientConnect((transport) => {
       transport.onMessage((msg) => {
         if (msg.type === 'join') {
           const id = 'player-' + (data.nextClientNum++)
-          netHost.addClient(id, msg.name, transport)
+          const joinTeam = msg.team === 't' ? 't' : 'ct'
+          netHost.addClient(id, msg.name, transport, joinTeam)
           setLobbyPlayers((prev) => {
             const next = [...prev, msg.name]
             data.hostDirectory?.setPlayers(next.length)
             return next
           })
+          setRoster((prev) => ({ ...prev, [joinTeam]: [...prev[joinTeam], msg.name] }))
         } else if (msg.type === 'probe') {
           transport.send({ type: 'probeAck', t: msg.t })
         }
@@ -223,14 +265,8 @@ function App() {
     setRoomCode(code)
     const hostDirectory = new HostDirectory()
     data.hostDirectory = hostDirectory
-    await hostDirectory.start({
-      roomCode: code,
-      hostName: settingsRef.current.playerName,
-      players: 1,
-      maxPlayers: 8,
-      status: 'lobby',
-    })
-  }, [])
+    await hostDirectory.start({ roomCode: code, hostName: settingsRef.current.playerName, players: 1, maxPlayers: 8, status: 'lobby' })
+  }, [myTeam])
 
   const joinGame = useCallback(async (code: string) => {
     const data = gameDataRef.current
@@ -283,20 +319,36 @@ function App() {
           }
           break
         case 'playerDied':
-          if (ev.playerId === data.netClient?.playerId) {
-            document.exitPointerLock()
+          if (data.matchConfig.mode === 'coop' && ev.playerId === data.netClient?.playerId) {
+            document.exitPointerLock(); data.audio.playPlayerDeath()
+            data.session.scoreSystem.saveHighScore(); setHighScore(data.session.scoreSystem.highScore)
+            engineRef.current?.stop(); updateGameState('gameover')
+          } else if (ev.playerId === data.netClient?.playerId) {
             data.audio.playPlayerDeath()
-            data.session.scoreSystem.saveHighScore()
-            setHighScore(data.session.scoreSystem.highScore)
-            engineRef.current?.stop()
-            updateGameState('gameover')
           }
           break
+        case 'playerHitPlayer': {
+          const p = ev.hit.point; const point = new THREE.Vector3(p.x, p.y, p.z)
+          if (ev.hit.killed) data.particleSystem!.explosion(point, 'player')
+          else data.particleSystem!.bloodSplatter(point)
+          if (ev.victimId === data.netClient?.playerId) data.audio.playPlayerHit()
+          break
+        }
+        case 'playerKilledPlayer':
+          pushKill(ev.attackerId, ev.victimId, ev.teamkill)
+          break
+        case 'matchOver':
+          break // handled via snapshot.scores in updateClient
       }
     })
-    client.onWelcome(() => startNetGame('client'))
-    client.join(settingsRef.current.playerName)
-  }, [startNetGame])
+    client.onWelcome((_, mode) => {
+      const data = gameDataRef.current
+      if (data.netClient?.config) { data.matchConfig = data.netClient.config; setMatchConfig(data.netClient.config) }
+      void mode
+    })
+    client.onStart(() => startNetGame('client'))
+    client.transport.send({ type: 'join', name: settingsRef.current.playerName, team: myTeam })
+  }, [startNetGame, myTeam, pushKill])
 
   const refreshServers = useCallback(async () => {
     const dialed = await dialDirectory()
@@ -467,12 +519,36 @@ function App() {
             data.audio.playPickup()
             break
           case 'playerDied':
+            if (session.config.mode === 'coop') {
+              document.exitPointerLock()
+              data.audio.playPlayerDeath()
+              session.scoreSystem.saveHighScore()
+              setHighScore(session.scoreSystem.highScore)
+              engine.stop()
+              updateGameState('gameover')
+              return
+            }
+            if (ev.playerId === session.localId) data.audio.playPlayerDeath()
+            break
+          case 'playerHitPlayer': {
+            const pt = ev.hit.point
+            const point = new THREE.Vector3(pt.x, pt.y, pt.z)
+            if (ev.hit.killed) data.particleSystem!.explosion(point, 'player')
+            else data.particleSystem!.bloodSplatter(point)
+            if (ev.victimId === session.localId) { data.audio.playPlayerHit(); setHealth(session.player.health) }
+            break
+          }
+          case 'playerKilledPlayer': {
+            const a = session.getPlayer(ev.attackerId)?.name ?? ev.attackerId
+            const v = session.getPlayer(ev.victimId)?.name ?? ev.victimId
+            pushKill(a, v, ev.teamkill)
+            break
+          }
+          case 'matchOver':
+            setMatchScores(session.scoreboard.snapshot())
             document.exitPointerLock()
-            data.audio.playPlayerDeath()
-            session.scoreSystem.saveHighScore()
-            setHighScore(session.scoreSystem.highScore)
             engine.stop()
-            updateGameState('gameover')
+            updateGameState('matchover')
             return
         }
       }
@@ -521,6 +597,8 @@ function App() {
       setEnemyPositions(session.enemies.map(e => e.mesh.position.clone()))
       setPlayerPos(session.player.position.clone())
       setPlayerRot(session.player.rotation.y)
+      setRespawnIn(session.respawnQueue.isPending(session.localId) ? session.respawnQueue.remaining(session.localId) : null)
+      if (session.config.mode !== 'coop') setMatchScores(session.scoreboard.snapshot())
 
       particleSystem.update(dt)
       data.damageIndicator = updateDamageIndicator(data.damageIndicator, dt)
@@ -610,6 +688,13 @@ function App() {
 
       data.audio.updateListenerPosition(engine.camera.position.x, engine.camera.position.y, engine.camera.position.z)
       setHealth(snap.players.find(p => p.id === client.playerId)?.health ?? 100)
+      const meState = snap.players.find(p => p.id === client.playerId)
+      setRespawnIn(meState?.respawnIn ?? null)
+      setMatchScores(snap.scores)
+      if (snap.scores.matchOver && gameStateRef.current === 'playing') {
+        document.exitPointerLock()
+        updateGameState('matchover')
+      }
 
       data.remotePlayers?.sync(snap.players)
       renderClientEnemies(snap.enemies)
@@ -673,7 +758,7 @@ function App() {
 
       if (e.code === 'KeyG' && gameStateRef.current === 'playing') {
         if (data.role === 'host') {
-          data.session.waveManager.spawnNextWave()
+          if (data.session.config.mode !== 'pvp') data.session.waveManager.spawnNextWave()
         } else if (data.role === 'client' && data.netClient) {
           data.netClient.transport.send({ type: 'startWave', playerId: data.netClient.playerId! })
         }
@@ -756,11 +841,34 @@ function App() {
           players={lobbyPlayers}
           isHost={isHost}
           servers={servers}
-          onHost={hostGame}
+          onHost={() => setShowMatchSetup(true)}
           onJoin={joinGame}
-          onStart={() => { gameDataRef.current.hostDirectory?.setStatus('in-progress'); startNetGame('host') }}
+          onStart={() => {
+            gameDataRef.current.hostDirectory?.setStatus('in-progress')
+            gameDataRef.current.netHost?.startMatch()
+            startNetGame('host')
+          }}
           onBack={leaveMultiplayer}
           onRefresh={refreshServers}
+          myTeam={myTeam}
+          onSelectTeam={(t) => {
+            setMyTeam(t)
+            const data = gameDataRef.current
+            if (data.role === 'host') {
+              const me = data.session.getPlayer(data.session.localId)
+              if (me) me.team = t
+              setRoster((prev) => moveToTeam(prev, settingsRef.current.playerName, t))
+            } else if (data.netClient) {
+              data.netClient.transport.send({ type: 'setTeam', playerId: data.netClient.playerId!, team: t })
+            }
+          }}
+          roster={roster}
+        />
+      )}
+      {gameState === 'mpmenu' && showMatchSetup && (
+        <MatchSetup
+          onBack={() => setShowMatchSetup(false)}
+          onConfirm={(c) => { setShowMatchSetup(false); void hostGame(c) }}
         />
       )}
 
@@ -786,7 +894,9 @@ function App() {
           />
           <WaveAnnounce wave={wave} visible={showWaveAnnounce} />
           <DamageOverlay indicator={damageIndicator} />
-          {showScoreboard && <Scoreboard players={scoreboardPlayers} roomCode={roomCode} />}
+          <KillFeed lines={killFeed} />
+          {respawnIn !== null && <RespawnOverlay seconds={respawnIn} />}
+          {showScoreboard && <Scoreboard players={scoreboardPlayers} roomCode={roomCode} scores={matchScores ?? undefined} />}
           {mobileControlsActive(settings) && gameDataRef.current.controls && (
             <TouchControls
               controls={gameDataRef.current.controls}
@@ -851,6 +961,18 @@ function App() {
           onMenu={() => {
             engineRef.current?.stop()
             updateGameState('menu')
+          }}
+        />
+      )}
+
+      {gameState === 'matchover' && (
+        <MatchOver
+          winningTeam={matchScores?.winningTeam ?? null}
+          scores={matchScores ?? { teams: { ct: 0, t: 0 }, players: {}, matchOver: true, winningTeam: null }}
+          onBackToLobby={() => {
+            engineRef.current?.stop()
+            setKillFeed([]); setRespawnIn(null)
+            updateGameState('mpmenu')
           }}
         />
       )}
