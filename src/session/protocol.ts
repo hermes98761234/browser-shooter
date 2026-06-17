@@ -1,8 +1,12 @@
-import type { Vec3 } from '../types'
+import type { Vec3, Team } from '../types'
 import type { HitZone } from '../systems/DamageZones'
+import type { MatchConfig } from './MatchConfig'
+import type { MatchScores } from './Scoreboard'
 
-export type GameMode = 'coop' | 'pvp'
-export const GAME_MODES: readonly GameMode[] = ['coop', 'pvp'] as const
+export type GameMode = 'coop' | 'pvp' | 'hybrid'
+export const GAME_MODES: readonly GameMode[] = ['coop', 'pvp', 'hybrid'] as const
+
+export type { MatchScores, PlayerScore } from './Scoreboard'
 
 export interface PlayerInput {
   forward: boolean
@@ -32,6 +36,8 @@ export interface EntityState {
   isDead: boolean
   weaponType?: string  // players only; for remote weapon model
   name?: string        // players only; nameplate
+  team?: Team          // players only
+  respawnIn?: number   // players only; seconds until respawn (omitted if alive)
   ping?: number        // players only; round-trip latency in ms (host-measured)
 }
 
@@ -42,6 +48,7 @@ export interface Snapshot {
   players: EntityState[]
   enemies: EntityState[]
   events: SessionEvent[]
+  scores: MatchScores
 }
 
 export interface HitEvent {
@@ -62,13 +69,17 @@ export type SessionEvent =
   | { type: 'enemyKilled'; enemyType: string; pos: Vec3; scoreValue: number }
   | { type: 'pickup'; pickupType: string; value: number; playerId: string }
   | { type: 'playerDied'; playerId: string }
+  | { type: 'playerHitPlayer'; hit: HitEvent; victimId: string }
+  | { type: 'playerKilledPlayer'; attackerId: string; victimId: string; victimTeam: Team; teamkill: boolean }
+  | { type: 'playerRespawned'; playerId: string }
+  | { type: 'matchOver'; winningTeam: Team }
 
 /** Network envelope carried by Transport. */
 export type NetMessage =
   | { type: 'input'; playerId: string; input: PlayerInput }
   | { type: 'snapshot'; snapshot: Snapshot }
-  | { type: 'join'; name: string }
-  | { type: 'welcome'; playerId: string; mode: GameMode }
+  | { type: 'join'; name: string; team?: Team }
+  | { type: 'welcome'; playerId: string; mode: GameMode; config: MatchConfig }
   | { type: 'playerJoined'; playerId: string; name: string }
   | { type: 'playerLeft'; playerId: string }
   | { type: 'ping'; t: number }   // host→client latency probe (echo t back)
@@ -77,3 +88,5 @@ export type NetMessage =
   | { type: 'probeAck'; t: number }  // host reply echoing t back to the prober
   | { type: 'buy'; playerId: string; item: string }
   | { type: 'startWave'; playerId: string }
+  | { type: 'setTeam'; playerId: string; team: Team }
+  | { type: 'start' }
