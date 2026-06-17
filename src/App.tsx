@@ -241,6 +241,9 @@ function App() {
     const transport = await peerClient.connect(code)
     const client = new NetClient(transport)
     data.netClient = client
+    // Test hook: expose the latest snapshot seq so e2e can assert the host
+    // keeps broadcasting (e.g. while its tab is backgrounded).
+    client.onSnapshot((s) => { (window as unknown as { __snapSeq?: number }).__snapSeq = s.seq })
     client.onEvent((ev) => {
       const particleSystem = data.particleSystem!
       switch (ev.type) {
@@ -375,6 +378,20 @@ function App() {
       data.audio.playWaveStart()
     }
 
+    // Build the local player's input from the current control/look state.
+    // Shared by the render-loop host tick and the hidden-tab keep-alive tick.
+    const captureLocalInput = () => {
+      const c = data.controls!
+      const mv = c.getMovement()
+      return {
+        ...emptyInput(),
+        forward: mv.forward, backward: mv.backward, left: mv.left, right: mv.right, jump: mv.jump,
+        shoot: c.shoot && !storeOpenRef.current,
+        yaw: lookRef.current.yaw,
+        pitch: lookRef.current.pitch,
+      }
+    }
+
     engine.onUpdate((dt) => {
       if (data.role === 'client') { updateClient(dt); return }
 
@@ -384,13 +401,7 @@ function App() {
       if (!controls) return
 
       const m = controls.getMovement()
-      const input = {
-        ...emptyInput(),
-        forward: m.forward, backward: m.backward, left: m.left, right: m.right, jump: m.jump,
-        shoot: controls.shoot && !storeOpenRef.current,
-        yaw: lookRef.current.yaw,
-        pitch: lookRef.current.pitch,
-      }
+      const input = captureLocalInput()
       session.applyInput(session.localId, input)
 
       const enemiesBefore = new Set(session.enemies)
@@ -657,11 +668,39 @@ function App() {
 
     document.addEventListener('keydown', handleKeyDown)
 
+    // Browsers pause requestAnimationFrame for hidden tabs. For a host that
+    // would freeze the authoritative simulation for every connected client —
+    // they'd see the host (and themselves, once reconciled) unable to move or
+    // shoot. A Web Worker's timer is exempt from that throttling, so we drive a
+    // fixed-rate authoritative step from one whenever the host's page is hidden.
+    // (When visible, the render loop above owns stepping; this no-ops.)
+    const HIDDEN_TICK_HZ = 30
+    const keepAliveWorker = new Worker(
+      URL.createObjectURL(
+        new Blob(
+          [`let id=null;onmessage=e=>{if(e.data==='start'){if(id==null)id=setInterval(()=>postMessage(0),${Math.round(1000 / HIDDEN_TICK_HZ)})}else{clearInterval(id);id=null}}`],
+          { type: 'application/javascript' },
+        ),
+      ),
+    )
+    keepAliveWorker.onmessage = () => {
+      if (document.visibilityState !== 'hidden') return
+      if (gameStateRef.current !== 'playing') return
+      if (data.role !== 'host' || !data.netHost) return
+      const session = data.session
+      session.applyInput(session.localId, captureLocalInput())
+      const events = session.step(1 / HIDDEN_TICK_HZ)
+      data.netHost.broadcastSnapshot(session.getSnapshot(), events)
+    }
+    keepAliveWorker.postMessage('start')
+
     return () => {
       document.removeEventListener('keydown', handleKeyDown)
       document.removeEventListener('mousemove', onMouseMove)
       data.controls?.destroy()
       data.viewmodel?.dispose()
+      keepAliveWorker.postMessage('stop')
+      keepAliveWorker.terminate()
       engine.stop()
     }
   }, [updateGameState])

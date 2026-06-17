@@ -83,6 +83,74 @@ test('a hosted game appears in another player\'s server list and is joinable', a
   await joinCtx.close()
 })
 
+// Regression for the "joiner stuck" bug: a host whose tab is hidden must keep
+// stepping the authoritative sim so connected clients can still play. Browsers
+// pause requestAnimationFrame for hidden tabs, so the host drives a Web Worker
+// clock (workers are exempt from that throttling) while hidden.
+//
+// Setup uses two contexts (both visible, so the WebRTC handshake is reliable),
+// then emulates a hidden host tab precisely: kill requestAnimationFrame (as the
+// browser does for hidden tabs) and force visibilityState 'hidden', leaving the
+// worker as the ONLY thing that can advance the sim. The joiner's snapshot seq
+// must keep climbing — which only happens via the worker keep-alive.
+const readSnapSeq = (page: import('@playwright/test').Page) =>
+  page.evaluate(() => (window as unknown as { __snapSeq?: number }).__snapSeq ?? -1)
+
+test('a hidden host keeps broadcasting snapshots to the joiner', async ({ browser }) => {
+  test.setTimeout(60_000)
+  const hostCtx = await browser.newContext()
+  const joinCtx = await browser.newContext()
+  const host = await hostCtx.newPage()
+  const join = await joinCtx.newPage()
+
+  await host.goto('/')
+  await host.getByText(/multiplayer/i).click({ force: true })
+  await host.getByText(/host game/i).click({ force: true })
+
+  // Wait for the room code; if the broker never opens, skip.
+  const codeLocator = host.locator('strong').first()
+  try {
+    await expect(codeLocator).toBeVisible({ timeout: 15_000 })
+  } catch {
+    test.skip(true, 'PeerJS broker unreachable in this environment')
+  }
+  const code = await codeLocator.innerText()
+
+  await join.goto('/')
+  await join.getByText(/multiplayer/i).click({ force: true })
+  await join.getByPlaceholder(/room code/i).fill(code)
+  await join.getByText(/^join$/i).click({ force: true })
+
+  // Host starts the match; both enter the arena and snapshots begin flowing.
+  // If the WebRTC peer connection can't complete (e.g. no NAT traversal in a
+  // sandbox), the joiner never receives a snapshot — skip rather than fail,
+  // matching the broker-unreachable handling above.
+  try {
+    await host.getByText(/start/i).click({ force: true, timeout: 20_000 })
+    await expect(join.locator('canvas').first()).toBeVisible({ timeout: 20_000 })
+    await expect.poll(() => readSnapSeq(join), { timeout: 20_000 }).toBeGreaterThanOrEqual(0)
+  } catch {
+    test.skip(true, 'WebRTC peer connection did not establish in this environment')
+  }
+
+  // Emulate the host's tab going hidden: browsers pause rAF for hidden tabs, so
+  // we stop it here too. Now only the Web Worker keep-alive can advance the sim.
+  await host.evaluate(() => {
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' })
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => true })
+    ;(window as unknown as { requestAnimationFrame: (cb: FrameRequestCallback) => number }).requestAnimationFrame = () => 0
+    document.dispatchEvent(new Event('visibilitychange'))
+  })
+
+  const seqBefore = await readSnapSeq(join)
+  // The host's render loop is now dead; if the worker keep-alive didn't exist,
+  // seq would freeze here. It must keep advancing.
+  await expect.poll(() => readSnapSeq(join), { timeout: 15_000 }).toBeGreaterThan(seqBefore + 5)
+
+  await hostCtx.close()
+  await joinCtx.close()
+})
+
 /*
  * MANUAL VERIFICATION (two browser tabs, `npm run dev`):
  *  1. Tab A: Multiplayer → Host Game → a room code appears and Copy works.
