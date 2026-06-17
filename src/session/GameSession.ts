@@ -7,11 +7,19 @@ import { Pickup } from '../systems/Pickup'
 import { ScoreSystem } from '../systems/ScoreSystem'
 import type { CollisionWorld } from '../engine/CollisionWorld'
 import { emptyInput, type PlayerInput, type Snapshot, type SessionEvent, type EntityState } from './protocol'
-import type { Vec3 } from '../types'
+import type { Vec3, Team } from '../types'
 import { zonedDamage, resolveZone } from '../systems/DamageZones'
+import { type MatchConfig, defaultMatchConfig, canDamage } from './MatchConfig'
+import type { DamagePolicy } from './MatchConfig'
+import { Scoreboard } from './Scoreboard'
+import { RespawnQueue } from './RespawnQueue'
+import { pickSpawn } from './Spawns'
+import { raycastPlayerCapsule } from './PlayerHit'
+import type { HitZone } from '../systems/DamageZones'
 
 export const ARENA_SIZE = 30
 const LOCAL_ID = 'local'
+export const RESPAWN_DELAY = 3 // seconds
 
 function toVec3(v: THREE.Vector3): Vec3 {
   return { x: v.x, y: v.y, z: v.z }
@@ -20,6 +28,7 @@ function toVec3(v: THREE.Vector3): Vec3 {
 export interface PlayerEntity {
   id: string
   name: string
+  team: Team
   player: Player
   weapons: WeaponManager
 }
@@ -34,17 +43,23 @@ export class GameSession {
   collisionWorld: CollisionWorld | null = null
   tick = 0
 
+  config: MatchConfig
+  scoreboard: Scoreboard
+  respawnQueue = new RespawnQueue()
+
   private shootRaycaster = new THREE.Raycaster()
   private cameraQuat = new THREE.Quaternion()
   private inputs = new Map<string, PlayerInput>()
 
-  constructor() {
-    this.addPlayer(LOCAL_ID, 'You')
+  constructor(config: MatchConfig = defaultMatchConfig()) {
+    this.config = config
+    this.scoreboard = new Scoreboard(config.fragLimit)
+    this.addPlayer(LOCAL_ID, 'You', 'ct')
   }
 
-  addPlayer(id: string, name: string): PlayerEntity {
+  addPlayer(id: string, name: string, team: Team = 'ct'): PlayerEntity {
     const index = this.playerMap.size // 0 = host/local, kept at origin
-    const entity: PlayerEntity = { id, name, player: new Player(), weapons: new WeaponManager() }
+    const entity: PlayerEntity = { id, name, team, player: new Player(), weapons: new WeaponManager() }
     entity.player.position.copy(this.spawnPosition(index))
     this.playerMap.set(id, entity)
     this.inputs.set(id, emptyInput())
@@ -112,6 +127,8 @@ export class GameSession {
       isDead: e.player.isDead,
       weaponType: e.weapons.current.type,
       name: e.name,
+      team: e.team,
+      respawnIn: this.respawnQueue.isPending(e.id) ? this.respawnQueue.remaining(e.id) : undefined,
     }))
     const enemies: EntityState[] = this.enemies.map((e, i) => ({
       id: `enemy-${i}`,
@@ -122,7 +139,7 @@ export class GameSession {
       health: e.health,
       isDead: e.isDead,
     }))
-    return { tick: this.tick, seq: 0, ack: {}, players, enemies, events: [] }
+    return { tick: this.tick, seq: 0, ack: {}, players, enemies, events: [], scores: this.scoreboard.snapshot() }
   }
 
   step(dt: number): SessionEvent[] {
