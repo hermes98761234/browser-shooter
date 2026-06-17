@@ -54,7 +54,8 @@ test.describe('UI - HUD and Overlays', () => {
 
   test('HUD shows crosshair during gameplay', async ({ page }) => {
     await startSingleplayer(page)
-    const crosshair = page.locator('text=+').first()
+    // The crosshair is a canvas drawn by <Crosshair> (CANVAS = 220px).
+    const crosshair = page.locator('canvas[width="220"]')
     await expect(crosshair).toBeVisible()
   })
 

@@ -33,7 +33,8 @@ test.describe('Game - Load and Flow', () => {
     await page.goto('/')
     await startSingleplayer(page)
     await expect(page.getByText('Pistol')).toBeVisible()
-    await expect(page.locator('text=+').first()).toBeVisible()
+    // The crosshair is a canvas drawn by <Crosshair> (CANVAS = 220px).
+    await expect(page.locator('canvas[width="220"]')).toBeVisible()
   })
 
   test('shows minimap during gameplay', async ({ page }) => {
