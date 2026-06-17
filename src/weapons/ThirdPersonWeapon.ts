@@ -4,16 +4,27 @@ import type { WeaponType } from '../types'
 type WeaponClass = 'pistol' | 'rifle' | 'shotgun' | 'sniper'
 
 function weaponClassOf(type: WeaponType): WeaponClass {
-  if (type === 'shotgun') return 'shotgun'
-  if (type === 'awp') return 'sniper'
-  if (['m4', 'aug', 'ak', 'galil', 'mp5', 'rifle'].includes(type)) return 'rifle'
-  return 'pistol'
+  switch (type) {
+    case 'shotgun': return 'shotgun'
+    case 'awp': return 'sniper'
+    case 'm4':
+    case 'aug':
+    case 'ak':
+    case 'galil':
+    case 'mp5':
+    case 'rifle': return 'rifle'
+    case 'pistol':
+    case 'usp':
+    case 'glock':
+    case 'deagle': return 'pistol'
+  }
 }
 
 export class ThirdPersonWeapon {
   group: THREE.Group
   private currentType: WeaponType | null = null
   private models: Map<WeaponType, THREE.Object3D[]> = new Map()
+  private materialCache: Map<number, THREE.MeshStandardMaterial> = new Map()
 
   constructor(type: WeaponType) {
     this.group = new THREE.Group()
@@ -53,6 +64,10 @@ export class ThirdPersonWeapon {
       }
     }
     this.models.clear()
+    for (const mat of this.materialCache.values()) {
+      mat.dispose()
+    }
+    this.materialCache.clear()
   }
 
   private buildModel(type: WeaponType): THREE.Group {
@@ -66,7 +81,12 @@ export class ThirdPersonWeapon {
   }
 
   private makeMat(color: number): THREE.MeshStandardMaterial {
-    return new THREE.MeshStandardMaterial({ color, roughness: 0.5, metalness: 0.6 })
+    let mat = this.materialCache.get(color)
+    if (!mat) {
+      mat = new THREE.MeshStandardMaterial({ color, roughness: 0.5, metalness: 0.6 })
+      this.materialCache.set(color, mat)
+    }
+    return mat
   }
 
   private buildPistol(type: WeaponType): THREE.Group {
