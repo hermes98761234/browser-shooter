@@ -348,6 +348,7 @@ function App() {
       if (data.netClient?.config) { data.matchConfig = data.netClient.config }
       setRoomCode(code)
       setLobbyPlayers(players)
+      setRoster({ ct: players, t: [] })
       void mode
     })
     client.onStart(() => startNetGame('client'))
@@ -871,11 +872,11 @@ function App() {
           myTeam={myTeam}
           onSelectTeam={(t) => {
             setMyTeam(t)
+            setRoster((prev) => moveToTeam(prev, settingsRef.current.playerName, t))
             const data = gameDataRef.current
             if (data.role === 'host') {
               const me = data.session.getPlayer(data.session.localId)
               if (me) me.team = t
-              setRoster((prev) => moveToTeam(prev, settingsRef.current.playerName, t))
             } else if (data.netClient) {
               data.netClient.transport.send({ type: 'setTeam', playerId: data.netClient.playerId!, team: t })
             }
