@@ -50,6 +50,7 @@ export interface StoreItem {
   slot?: 'primary' | 'secondary'    // weapons only
   weaponType?: WeaponType           // weapons only
   effects?: StatEffect              // gear/upgrades
+  icon?: string                     // SVG icon component name
 }
 
 export interface EnemyDef {
