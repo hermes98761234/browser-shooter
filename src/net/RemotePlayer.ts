@@ -47,7 +47,10 @@ export class RemotePlayer {
     }
 
     if (s.weaponType) {
-      this.thirdPersonWeapon.setWeapon(s.weaponType as WeaponType)
+      const validTypes: WeaponType[] = ['pistol', 'usp', 'glock', 'deagle', 'm4', 'aug', 'ak', 'galil', 'mp5', 'shotgun', 'awp', 'rifle']
+      if (validTypes.includes(s.weaponType as WeaponType)) {
+        this.thirdPersonWeapon.setWeapon(s.weaponType as WeaponType)
+      }
     }
   }
 
@@ -101,7 +104,7 @@ export class RemotePlayer {
     const seen = new Set<THREE.MeshStandardMaterial>()
     this.group.traverse((o) => {
       if (!(o instanceof THREE.Mesh)) return
-      if (o.userData.zone === 'head') return // preserve skin color
+      if (o.userData.zone === 'head' || o.userData.zone === 'weapon') return // preserve skin color
       const mat = o.material
       if (!(mat instanceof THREE.MeshStandardMaterial)) return
       if (!seen.has(mat)) {

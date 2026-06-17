@@ -96,21 +96,25 @@ export class ThirdPersonWeapon {
     // body
     const body = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.08, 0.18), mat)
     body.position.set(0, 0, 0)
+    body.userData.zone = 'weapon'
 
     // barrel
     const barrelLen = type === 'deagle' ? 0.2 : type === 'usp' ? 0.16 : 0.12
     const barrel = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.04, barrelLen), mat)
     barrel.position.set(0, 0.02, -0.09 - barrelLen / 2)
+    barrel.userData.zone = 'weapon'
 
     // grip
     const grip = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.12, 0.06), mat)
     grip.position.set(0, -0.08, 0.04)
     grip.rotation.x = 0.2
+    grip.userData.zone = 'weapon'
 
     // suppressor for usp
     if (type === 'usp') {
       const supp = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 0.1), this.makeMat(0x1a1a1a))
       supp.position.set(0, 0.02, -0.25)
+      supp.userData.zone = 'weapon'
       g.add(supp)
     }
 
@@ -127,19 +131,23 @@ export class ThirdPersonWeapon {
     // body
     const body = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.09, 0.35), mat)
     body.position.set(0, 0, 0)
+    body.userData.zone = 'weapon'
 
     // barrel
     const barrelLen = type === 'aug' ? 0.3 : 0.25
     const barrel = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.04, barrelLen), mat)
     barrel.position.set(0, 0.01, -0.175 - barrelLen / 2)
+    barrel.userData.zone = 'weapon'
 
     // stock
     const stock = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.1, 0.15), type === 'ak' ? woodMat : mat)
     stock.position.set(0, -0.01, 0.25)
+    stock.userData.zone = 'weapon'
 
     // magazine
     const mag = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.12, 0.06), mat)
     mag.position.set(0, -0.08, -0.05)
+    mag.userData.zone = 'weapon'
     // ak has curved magazine
     if (type === 'ak') mag.rotation.x = 0.15
 
@@ -147,11 +155,13 @@ export class ThirdPersonWeapon {
     const grip = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.1, 0.05), mat)
     grip.position.set(0, -0.08, 0.1)
     grip.rotation.x = 0.2
+    grip.userData.zone = 'weapon'
 
     // scope for aug
     if (type === 'aug') {
       const scope = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.04, 0.1), this.makeMat(0x111111))
       scope.position.set(0, 0.07, -0.05)
+      scope.userData.zone = 'weapon'
       g.add(scope)
     }
 
@@ -167,18 +177,22 @@ export class ThirdPersonWeapon {
     // body
     const body = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.09, 0.3), mat)
     body.position.set(0, 0, 0)
+    body.userData.zone = 'weapon'
 
     // barrel (wider)
     const barrel = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.25), mat)
     barrel.position.set(0, 0.02, -0.275)
+    barrel.userData.zone = 'weapon'
 
     // pump grip
     const pump = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.05, 0.1), woodMat)
     pump.position.set(0, -0.03, -0.1)
+    pump.userData.zone = 'weapon'
 
     // stock
     const stock = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.1, 0.15), woodMat)
     stock.position.set(0, -0.01, 0.22)
+    stock.userData.zone = 'weapon'
 
     g.add(body, barrel, pump, stock)
     return g
@@ -191,27 +205,33 @@ export class ThirdPersonWeapon {
     // body
     const body = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.09, 0.4), mat)
     body.position.set(0, 0, 0)
+    body.userData.zone = 'weapon'
 
     // long barrel
     const barrel = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.04, 0.4), mat)
     barrel.position.set(0, 0.01, -0.4)
+    barrel.userData.zone = 'weapon'
 
     // scope (large)
     const scope = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 0.15), this.makeMat(0x111111))
     scope.position.set(0, 0.08, -0.05)
+    scope.userData.zone = 'weapon'
 
     // stock
     const stock = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.1, 0.18), mat)
     stock.position.set(0, -0.01, 0.29)
+    stock.userData.zone = 'weapon'
 
     // bipod legs
     const legMat = this.makeMat(0x333333)
     const legL = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.12, 0.02), legMat)
     legL.position.set(-0.04, -0.08, -0.2)
     legL.rotation.x = 0.2
+    legL.userData.zone = 'weapon'
     const legR = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.12, 0.02), legMat)
     legR.position.set(0.04, -0.08, -0.2)
     legR.rotation.x = 0.2
+    legR.userData.zone = 'weapon'
 
     g.add(body, barrel, scope, stock, legL, legR)
     return g
