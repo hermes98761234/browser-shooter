@@ -678,6 +678,13 @@ function App() {
         data.netHost.broadcastSnapshot(snap, events)
         data.lastPlayers = snap.players
         data.remotePlayers.sync(snap.players)
+        for (const entity of snap.players) {
+          const remote = data.remotePlayers.get(entity.id)
+          if (remote) {
+            remote.setArmor(entity.hasArmor ?? false)
+            remote.setHelmet(entity.hasHelmet ?? false)
+          }
+        }
         data.remotePlayers.update(dt)
 
         data.pingTimer += dt
@@ -772,6 +779,15 @@ function App() {
       }
 
       data.remotePlayers?.sync(snap.players)
+      if (data.remotePlayers) {
+        for (const entity of snap.players) {
+          const remote = data.remotePlayers.get(entity.id)
+          if (remote) {
+            remote.setArmor(entity.hasArmor ?? false)
+            remote.setHelmet(entity.hasHelmet ?? false)
+          }
+        }
+      }
       renderClientEnemies(snap.enemies)
       data.remotePlayers?.update(dt)
       particleSystem.update(dt)
@@ -1027,7 +1043,17 @@ function App() {
               const wm = data.session.weaponManager
               setWeaponName(wm.current.def.name)
               setAmmo(wm.current.ammo)
-              data.viewmodel?.setWeapon(weaponVisual(wm.current.type))
+              switch (id) {
+                case 'bomb':
+                  data.viewmodel?.setObjective('bomb')
+                  break
+                case 'defuse_kit':
+                  data.viewmodel?.setObjective('defuse_kit')
+                  break
+                default:
+                  data.viewmodel?.setWeapon(weaponVisual(wm.current.type))
+                  break
+              }
             }
           }}
           onClose={() => setStoreOpen(false)}

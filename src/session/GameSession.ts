@@ -163,6 +163,8 @@ export class GameSession {
       name: e.name,
       team: e.team,
       respawnIn: this.respawnQueue.isPending(e.id) ? this.respawnQueue.remaining(e.id) : undefined,
+      hasArmor: e.player.hasArmor ?? false,
+      hasHelmet: e.player.hasHelmet ?? false,
     }))
     const enemies: EntityState[] = this.enemies.map((e) => ({
       id: e.id,

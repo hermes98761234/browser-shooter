@@ -13,6 +13,8 @@ export class Player {
   speedMult: number = 1
   isGrounded: boolean = true
   private yVelocity: number = 0
+  hasArmor: boolean = false
+  hasHelmet: boolean = false
 
   private healthSystem: HealthSystem
 
@@ -54,6 +56,8 @@ export class Player {
   /** Reset purchased stats (called on death / match restart). */
   resetLoadout() {
     this.speedMult = 1
+    this.hasArmor = false
+    this.hasHelmet = false
     this.healthSystem.reset()
   }
 

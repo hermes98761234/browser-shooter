@@ -39,6 +39,8 @@ export interface EntityState {
   team?: Team          // players only
   respawnIn?: number   // players only; seconds until respawn (omitted if alive)
   ping?: number        // players only; round-trip latency in ms (host-measured)
+  hasArmor?: boolean   // players only; armor state
+  hasHelmet?: boolean  // players only; helmet state
 }
 
 export interface Snapshot {

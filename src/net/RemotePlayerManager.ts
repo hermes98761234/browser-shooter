@@ -10,6 +10,8 @@ export class RemotePlayerManager {
 
   ids(): string[] { return [...this.players.keys()] }
 
+  get(id: string): RemotePlayer | undefined { return this.players.get(id) }
+
   sync(playerStates: EntityState[]): void {
     const seen = new Set<string>()
     for (const s of playerStates) {
