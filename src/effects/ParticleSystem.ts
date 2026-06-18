@@ -70,18 +70,24 @@ export class ParticleSystem {
     }
   }
 
-  muzzleFlash(position: THREE.Vector3, direction: THREE.Vector3) {
+  muzzleFlash(
+    position: THREE.Vector3,
+    direction: THREE.Vector3,
+    color: number = 0xffff00,
+    intensity: number = 2,
+    distance: number = 5
+  ) {
     void direction
-    this.emit(position, 5, 0xffff00, 10, 0.1, 0.3)
-    createMuzzleFlash(this.scene, position, 0xffff00, 2, 5, 50)
+    this.emit(position, 5, color, 10, 0.1, 0.3)
+    createMuzzleFlash(this.scene, position, color, intensity, distance, 60)
   }
 
-  tracer(from: THREE.Vector3, to: THREE.Vector3) {
+  tracer(from: THREE.Vector3, to: THREE.Vector3, color: number = 0xffdd66, life: number = 0.12) {
     const geo = new THREE.BufferGeometry().setFromPoints([from.clone(), to.clone()])
-    const mat = new THREE.LineBasicMaterial({ color: 0xffdd66, transparent: true, opacity: 0.9 })
+    const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.95 })
     const line = new THREE.Line(geo, mat)
     this.scene.add(line)
-    this.tracers.push({ line, mat, life: 0.12, maxLife: 0.12 })
+    this.tracers.push({ line, mat, life, maxLife: life })
   }
 
   bulletImpact(position: THREE.Vector3) {

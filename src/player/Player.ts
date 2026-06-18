@@ -1,15 +1,19 @@
 import * as THREE from 'three'
 import { HealthSystem } from '../systems/HealthSystem'
+import type { CollisionWorld } from '../engine/CollisionWorld'
 
 /** Camera/eye height above the player's feet. `position.y` is the eye, not the feet. */
 export const EYE_HEIGHT = 2
+
+/** XZ collision radius of the player capsule. */
+const PLAYER_RADIUS = 0.5
 
 export class Player {
   position: THREE.Vector3
   velocity: THREE.Vector3
   rotation: THREE.Euler
   speed: number = 12
-  jumpHeight: number = 8
+  jumpHeight: number = 9.5
   speedMult: number = 1
   isGrounded: boolean = true
   private yVelocity: number = 0
@@ -89,7 +93,12 @@ export class Player {
     this.healthSystem.revive()
   }
 
-  update(dt: number, input: { forward: boolean; backward: boolean; left: boolean; right: boolean; jump: boolean }, arenaSize: number = 28) {
+  update(
+    dt: number,
+    input: { forward: boolean; backward: boolean; left: boolean; right: boolean; jump: boolean },
+    arenaSize: number = 28,
+    world?: CollisionWorld
+  ) {
     if (this.isDead) return
 
     this.healthSystem.update(dt)
@@ -117,14 +126,22 @@ export class Player {
 
     this.yVelocity -= 20 * dt
 
+    // Horizontal move, then height-aware push-out so we don't get shoved off ledges
+    // we're standing on top of.
     this.position.x += this.velocity.x * dt
     this.position.z += this.velocity.z * dt
-    this.position.y += this.yVelocity * dt
+    if (world) world.resolve(this.position, PLAYER_RADIUS, this.position.y - EYE_HEIGHT)
 
-    if (this.position.y <= EYE_HEIGHT) {
-      this.position.y = EYE_HEIGHT
+    // Vertical move, then land on whatever surface is beneath us (floor or a box top).
+    this.position.y += this.yVelocity * dt
+    const groundY = world ? world.supportHeight(this.position, PLAYER_RADIUS, this.position.y - EYE_HEIGHT) : 0
+    const floorY = groundY + EYE_HEIGHT
+    if (this.position.y <= floorY) {
+      this.position.y = floorY
       this.yVelocity = 0
       this.isGrounded = true
+    } else {
+      this.isGrounded = false
     }
 
     this.position.x = THREE.MathUtils.clamp(this.position.x, -arenaSize, arenaSize)

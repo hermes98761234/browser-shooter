@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { Player } from '../Player'
+import * as THREE from 'three'
+import { Player, EYE_HEIGHT } from '../Player'
+import { CollisionWorld } from '../../engine/CollisionWorld'
+
+const NO_INPUT = { forward: false, backward: false, left: false, right: false, jump: false }
 
 describe('Player', () => {
   it('initializes with default values', () => {
@@ -73,6 +77,30 @@ describe('Player', () => {
     expect(p.armor).toBe(50)
     p.addArmor(80) // caps at 100
     expect(p.armor).toBe(100)
+  })
+
+  it('lands on top of a box instead of falling through it', () => {
+    const world = new CollisionWorld()
+    world.addBox(new THREE.Vector3(0, 0.6, 0), new THREE.Vector3(2, 1.2, 2)) // top at 1.2
+    const player = new Player()
+    player.position.set(0, 1.2 + EYE_HEIGHT + 1, 0) // hovering above the box top
+    player.isGrounded = false
+    // Let gravity pull the player down onto the box over several frames.
+    for (let i = 0; i < 60; i++) player.update(1 / 60, NO_INPUT, 28, world)
+    expect(player.position.y).toBeCloseTo(1.2 + EYE_HEIGHT, 1)
+    expect(player.isGrounded).toBe(true)
+  })
+
+  it('can jump again after landing on a box', () => {
+    const world = new CollisionWorld()
+    world.addBox(new THREE.Vector3(0, 0.6, 0), new THREE.Vector3(2, 1.2, 2))
+    const player = new Player()
+    player.position.set(0, 1.2 + EYE_HEIGHT, 0)
+    player.isGrounded = true
+    player.update(1 / 60, { ...NO_INPUT, jump: true }, 28, world)
+    // Jumping from the box top moves the player above the rest height.
+    expect(player.position.y).toBeGreaterThan(1.2 + EYE_HEIGHT)
+    expect(player.isGrounded).toBe(false)
   })
 
   it('defaults speedMult to 1 and resets loadout', () => {

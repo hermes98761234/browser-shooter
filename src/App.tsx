@@ -328,13 +328,21 @@ function App() {
           const from = new THREE.Vector3(ev.from.x, ev.from.y, ev.from.z)
           const to = new THREE.Vector3(ev.to.x, ev.to.y, ev.to.z)
           data.audio.playWeaponShoot('rifle', from)
-          particleSystem.tracer(from, to)
+          const dir = to.clone().sub(from).normalize()
+          particleSystem.muzzleFlash(from, dir, 0xffcf6a, 4, 7)
+          particleSystem.tracer(from, to, 0xff7a1e, 0.2)
           if (ev.hit && ev.victimId === data.netClient?.playerId) {
             data.audio.playPlayerHit()
             setHealth(data.session.player.health)
           }
           break
         }
+        case 'enemyTelegraph':
+          // Red "about to fire" warning glow — distinct from the bright yellow shot flash.
+          particleSystem.muzzleFlash(
+            new THREE.Vector3(ev.enemyPos.x, 1.35, ev.enemyPos.z),
+            new THREE.Vector3(ev.facing.x, ev.facing.y, ev.facing.z), 0xff3322, 1.5, 4)
+          break
         case 'pickup':
           if (ev.playerId === data.netClient?.playerId) {
             if (ev.pickupType === 'health') setHealth(data.session.player.health)
@@ -590,7 +598,9 @@ function App() {
             const from = new THREE.Vector3(ev.from.x, ev.from.y, ev.from.z)
             const to = new THREE.Vector3(ev.to.x, ev.to.y, ev.to.z)
             data.audio.playWeaponShoot('rifle', from)
-            particleSystem.tracer(from, to)
+            const dir = to.clone().sub(from).normalize()
+            particleSystem.muzzleFlash(from, dir, 0xffcf6a, 4, 7)
+            particleSystem.tracer(from, to, 0xff7a1e, 0.2)
             if (ev.hit && ev.victimId === session.localId) {
               data.audio.playPlayerHit()
               setHealth(session.player.health)
@@ -609,9 +619,10 @@ function App() {
             }
             break
           case 'enemyTelegraph':
+            // Red "about to fire" warning glow — distinct from the bright yellow shot flash.
             particleSystem.muzzleFlash(
               new THREE.Vector3(ev.enemyPos.x, 1.35, ev.enemyPos.z),
-              new THREE.Vector3(ev.facing.x, ev.facing.y, ev.facing.z))
+              new THREE.Vector3(ev.facing.x, ev.facing.y, ev.facing.z), 0xff3322, 1.5, 4)
             break
           case 'pickup':
             if (ev.pickupType === 'health') setHealth(session.player.health)
