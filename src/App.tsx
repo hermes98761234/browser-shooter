@@ -282,7 +282,7 @@ function App() {
     setRoomCode(code)
     const hostDirectory = new HostDirectory()
     data.hostDirectory = hostDirectory
-    await hostDirectory.start({ roomCode: code, hostName: settingsRef.current.playerName, players: 1, maxPlayers: 8, status: 'lobby' })
+    await hostDirectory.start({ roomCode: code, hostName: settingsRef.current.playerName, players: 1, maxPlayers: 8, status: 'lobby', mode: config.mode })
   }, [myTeam])
 
   const joinGame = useCallback(async (code: string) => {

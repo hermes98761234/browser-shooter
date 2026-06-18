@@ -42,7 +42,7 @@ export class HostDirectory {
   }
 
   private sendHeartbeat(): void {
-    if (this.entry) this.client?.heartbeat(this.entry.roomCode, this.entry.players, this.entry.status)
+    if (this.entry) this.client?.heartbeat(this.entry.roomCode, this.entry.players, this.entry.status, this.entry.mode)
   }
 
   stop(): void {
