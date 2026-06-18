@@ -45,6 +45,7 @@ import { loadSettings, saveSettings, mobileControlsActive, type Settings } from 
 import { resolveCrosshair } from './settings/Crosshair'
 import { stepBloom } from './weapons/CrosshairBloom'
 import { MatchSetup } from './ui/MatchSetup'
+import { RoundState } from './session/RoundManager'
 import { KillFeed, type KillLine } from './ui/KillFeed'
 import { RespawnOverlay } from './ui/RespawnOverlay'
 import { MatchOver } from './ui/MatchOver'
@@ -95,6 +96,8 @@ function App() {
   const [killFeed, setKillFeed] = useState<KillLine[]>([])
   const [respawnIn, setRespawnIn] = useState<number | null>(null)
   const [matchScores, setMatchScores] = useState<MatchScores | null>(null)
+  const [roundEnd, setRoundEnd] = useState<{ winner: 'ct' | 't'; reason: string } | null>(null)
+  const [halftime, setHalftime] = useState(false)
   const lastWaveRef = useRef(0)
   const gameStateRef = useRef<GameState>('menu')
   const storeOpenRef = useRef(false)
@@ -182,7 +185,7 @@ function App() {
     for (const enemy of data.session.enemies) { scene?.remove(enemy.mesh); enemy.dispose() }
     for (const pickup of data.session.pickups) { scene?.remove(pickup.mesh); pickup.dispose() }
 
-    const fresh = new GameSession()
+    const fresh = new GameSession(data.matchConfig)
     fresh.collisionWorld = data.session.collisionWorld
     fresh.waveManager.wavePauseTimer = 2 // 2s grace before wave 1 (matches pre-refactor behavior)
     fresh.waveManager.onEnemySpawned = data.session.waveManager.onEnemySpawned
@@ -192,6 +195,11 @@ function App() {
     lookRef.current = { yaw: 0, pitch: 0 }
     data.money = 16000
     setShowScoreboard(false)
+
+    if (data.matchConfig.mode === 'competitive' && fresh.roundManager) {
+      fresh.roundManager.state = RoundState.Buying
+      fresh.roundManager.buyPhaseTimer = 15
+    }
 
     if (data.particleSystem) data.particleSystem.clear()
     data.damageIndicator = createDamageIndicatorState()
@@ -561,6 +569,17 @@ function App() {
             document.exitPointerLock()
             matchOverPending = true
             break
+          case 'roundEnd':
+            setRoundEnd({ winner: ev.winner, reason: ev.reason })
+            setTimeout(() => setRoundEnd(null), 3000)
+            break
+          case 'buyPhaseStart':
+            setStoreOpen(true)
+            break
+          case 'halftime':
+            setHalftime(true)
+            setTimeout(() => setHalftime(false), 10000)
+            break
         }
       }
 
@@ -903,6 +922,13 @@ function App() {
             wave={wave}
             waveActive={waveActive}
             enemiesRemaining={enemiesRemaining}
+            round={gameDataRef.current.session.roundManager?.round}
+            roundTimer={gameDataRef.current.session.roundManager?.roundTimer}
+            buyPhase={gameDataRef.current.session.roundManager?.buyPhase}
+            buyPhaseTimer={gameDataRef.current.session.roundManager?.buyPhaseTimer}
+            money={gameDataRef.current.economy?.money}
+            ctScore={gameDataRef.current.session.roundManager?.ctScore}
+            tScore={gameDataRef.current.session.roundManager?.tScore}
           />
           <Crosshair runtime={crosshairRef} />
           <Minimap
