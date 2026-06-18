@@ -55,6 +55,15 @@ export interface Snapshot {
   buyPhaseTimer?: number
   ctScore?: number
   tScore?: number
+  bomb?: {
+    state: string
+    carrier?: string
+    position?: Vec3
+    site?: 'A' | 'B'
+    timer?: number
+    plantProgress?: number
+    defuseProgress?: number
+  }
 }
 
 export interface HitEvent {
@@ -85,6 +94,11 @@ export type SessionEvent =
   | { type: 'buyPhaseEnd' }
   | { type: 'halftime'; ctScore: number; tScore: number }
   | { type: 'moneyUpdate'; playerId: string; amount: number }
+  | { type: 'bombPlanted'; site: 'A' | 'B'; planterId: string; timer: number }
+  | { type: 'bombDropped'; position: Vec3; playerId: string }
+  | { type: 'bombPickedUp'; playerId: string }
+  | { type: 'bombExploded'; site: 'A' | 'B' }
+  | { type: 'bombDefused'; site: 'A' | 'B' }
 
 /** Network envelope carried by Transport. */
 export type NetMessage =

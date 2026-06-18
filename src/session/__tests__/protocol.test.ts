@@ -148,3 +148,77 @@ describe('Snapshot round fields', () => {
     expect(s.tScore).toBeUndefined()
   })
 })
+
+describe('bomb events', () => {
+  it('bombPlanted includes planterId and timer', () => {
+    const event: SessionEvent = { type: 'bombPlanted', site: 'A', planterId: 'player-1', timer: 40 }
+    expect(event.type).toBe('bombPlanted')
+    expect(event.site).toBe('A')
+    expect(event.planterId).toBe('player-1')
+    expect(event.timer).toBe(40)
+  })
+
+  it('bombDropped includes position and playerId', () => {
+    const event: SessionEvent = { type: 'bombDropped', position: { x: 5, y: 0, z: -15 }, playerId: 'player-1' }
+    expect(event.type).toBe('bombDropped')
+    expect(event.position).toEqual({ x: 5, y: 0, z: -15 })
+    expect(event.playerId).toBe('player-1')
+  })
+
+  it('bombPickedUp includes playerId', () => {
+    const event: SessionEvent = { type: 'bombPickedUp', playerId: 'player-2' }
+    expect(event.type).toBe('bombPickedUp')
+    expect(event.playerId).toBe('player-2')
+  })
+
+  it('bombDefused includes site', () => {
+    const event: SessionEvent = { type: 'bombDefused', site: 'B' }
+    expect(event.type).toBe('bombDefused')
+    expect(event.site).toBe('B')
+  })
+
+  it('bombExploded includes site', () => {
+    const event: SessionEvent = { type: 'bombExploded', site: 'A' }
+    expect(event.type).toBe('bombExploded')
+    expect(event.site).toBe('A')
+  })
+})
+
+describe('Snapshot bomb field', () => {
+  it('has optional bomb state', () => {
+    const s: Snapshot = {
+      tick: 1,
+      seq: 42,
+      ack: {},
+      players: [],
+      enemies: [],
+      events: [],
+      scores: { teams: { ct: 0, t: 0 }, players: {}, matchOver: false, winningTeam: null },
+      bomb: {
+        state: 'planted',
+        carrier: 'player-1',
+        site: 'A',
+        timer: 35,
+        plantProgress: 1.0,
+        defuseProgress: 0,
+      },
+    }
+    expect(s.bomb?.state).toBe('planted')
+    expect(s.bomb?.carrier).toBe('player-1')
+    expect(s.bomb?.site).toBe('A')
+    expect(s.bomb?.timer).toBe(35)
+  })
+
+  it('bomb field is optional', () => {
+    const s: Snapshot = {
+      tick: 1,
+      seq: 42,
+      ack: {},
+      players: [],
+      enemies: [],
+      events: [],
+      scores: { teams: { ct: 0, t: 0 }, players: {}, matchOver: false, winningTeam: null },
+    }
+    expect(s.bomb).toBeUndefined()
+  })
+})
