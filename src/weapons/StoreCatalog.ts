@@ -25,6 +25,13 @@ export const STORE_CATALOG: StoreItem[] = [
   // --- upgrades (shared, applied to equipped weapon) ---
   { id: 'ext_mag',     name: 'Extended Mag', price: 300, kind: 'upgrade', effects: { weapon: { ammoMult: 1.5 } } },
   { id: 'fast_reload', name: 'Fast Reload',  price: 400, kind: 'upgrade', effects: { weapon: { reloadMult: 0.7 } } },
+
+  // --- objective (competitive) ---
+  { id: 'bomb', name: 'C4 Bomb', price: 0, kind: 'objective', team: 't', icon: 'bomb' },
+
+  // --- gear (competitive) ---
+  { id: 'defuse_kit', name: 'Defuse Kit', price: 400, kind: 'gear', team: 'ct', icon: 'defuse_kit' },
+  { id: 'heavy_armor', name: 'Heavy Armor', price: 1000, kind: 'armor', icon: 'heavy_armor' },
 ]
 
 /** Items available to a team: shared (no team) plus that team's own. */

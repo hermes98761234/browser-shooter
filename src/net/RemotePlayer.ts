@@ -21,6 +21,10 @@ export class RemotePlayer {
   private team: Team | null = null
   isDead = false
   private thirdPersonWeapon: ThirdPersonWeapon
+  hasArmor = false
+  hasHelmet = false
+  private vestMesh: THREE.Mesh | null = null
+  private helmetMesh: THREE.Mesh | null = null
 
   constructor(readonly id: string, name: string, tint = 0x3399ff) {
     this.group = buildCharacter({ tint, name })
@@ -118,7 +122,41 @@ export class RemotePlayer {
     this.group.position.set(eyePos.x, eyePos.y - EYE_HEIGHT, eyePos.z)
   }
 
+  setArmor(show: boolean): void {
+    this.hasArmor = show
+    if (show && !this.vestMesh) {
+      this.vestMesh = new THREE.Mesh(
+        new THREE.BoxGeometry(0.5, 0.4, 0.3),
+        new THREE.MeshStandardMaterial({ color: 0x228B22 })
+      )
+      this.vestMesh.position.set(0, 0, 0)
+      this.group.add(this.vestMesh)
+    } else if (!show && this.vestMesh) {
+      this.group.remove(this.vestMesh)
+      this.vestMesh.geometry.dispose()
+      this.vestMesh = null
+    }
+  }
+
+  setHelmet(show: boolean): void {
+    this.hasHelmet = show
+    if (show && !this.helmetMesh) {
+      this.helmetMesh = new THREE.Mesh(
+        new THREE.SphereGeometry(0.2, 16, 16),
+        new THREE.MeshStandardMaterial({ color: 0x228B22 })
+      )
+      this.helmetMesh.position.set(0, 0.9, 0)
+      this.group.add(this.helmetMesh)
+    } else if (!show && this.helmetMesh) {
+      this.group.remove(this.helmetMesh)
+      this.helmetMesh.geometry.dispose()
+      this.helmetMesh = null
+    }
+  }
+
   dispose(): void {
+    this.setArmor(false)
+    this.setHelmet(false)
     this.thirdPersonWeapon.dispose()
     this.group.traverse((o) => {
       if (o instanceof THREE.Mesh) { o.geometry.dispose(); (o.material as THREE.Material).dispose() }

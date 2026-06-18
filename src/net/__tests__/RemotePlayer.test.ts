@@ -41,6 +41,49 @@ describe('RemotePlayer', () => {
   })
 })
 
+describe('armor visualization', () => {
+  it('shows vest when armor equipped', () => {
+    const rp = new RemotePlayer('test', 'TestPlayer', 0x3a6ea5)
+    rp.setArmor(true)
+    expect(rp.hasArmor).toBe(true)
+    rp.dispose()
+  })
+
+  it('shows helmet when helmet equipped', () => {
+    const rp = new RemotePlayer('test', 'TestPlayer', 0x3a6ea5)
+    rp.setHelmet(true)
+    expect(rp.hasHelmet).toBe(true)
+    rp.dispose()
+  })
+
+  it('removes vest when armor unequipped', () => {
+    const rp = new RemotePlayer('test', 'TestPlayer', 0x3a6ea5)
+    rp.setArmor(true)
+    expect(rp.hasArmor).toBe(true)
+    rp.setArmor(false)
+    expect(rp.hasArmor).toBe(false)
+    rp.dispose()
+  })
+
+  it('removes helmet when helmet unequipped', () => {
+    const rp = new RemotePlayer('test', 'TestPlayer', 0x3a6ea5)
+    rp.setHelmet(true)
+    expect(rp.hasHelmet).toBe(true)
+    rp.setHelmet(false)
+    expect(rp.hasHelmet).toBe(false)
+    rp.dispose()
+  })
+
+  it('disposes armor meshes on dispose', () => {
+    const rp = new RemotePlayer('test', 'TestPlayer', 0x3a6ea5)
+    rp.setArmor(true)
+    rp.setHelmet(true)
+    rp.dispose()
+    expect(rp.hasArmor).toBe(false)
+    expect(rp.hasHelmet).toBe(false)
+  })
+})
+
 describe('RemotePlayerManager', () => {
   it('adds, updates and removes remote players, excluding the local id', () => {
     const scene = new THREE.Scene()

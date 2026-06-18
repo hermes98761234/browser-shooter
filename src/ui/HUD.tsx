@@ -10,6 +10,18 @@ interface HUDProps {
   wave: number
   waveActive: boolean
   enemiesRemaining: number
+  round?: number
+  roundTimer?: number
+  buyPhase?: boolean
+  buyPhaseTimer?: number
+  money?: number
+  ctScore?: number
+  tScore?: number
+  bombState?: 'none' | 'carried' | 'dropped' | 'planting' | 'planted' | 'defusing' | 'defused' | 'exploded'
+  bombTimer?: number
+  bombSite?: 'A' | 'B'
+  plantProgress?: number
+  defuseProgress?: number
 }
 
 export const HUD: React.FC<HUDProps> = ({
@@ -22,6 +34,18 @@ export const HUD: React.FC<HUDProps> = ({
   wave,
   waveActive,
   enemiesRemaining,
+  round,
+  roundTimer,
+  buyPhase,
+  buyPhaseTimer,
+  money,
+  ctScore,
+  tScore,
+  bombState,
+  bombTimer,
+  bombSite,
+  plantProgress,
+  defuseProgress,
 }) => {
   const healthPercent = maxHealth > 0 ? (health / maxHealth) * 100 : 0
   const healthColor = healthPercent > 60 ? '#00ff00' : healthPercent > 30 ? '#ffff00' : '#ff0000'
@@ -36,6 +60,31 @@ export const HUD: React.FC<HUDProps> = ({
     }}>
       {/* Crosshair is rendered separately (see <Crosshair/> in App) so it can animate
           its dynamic bloom without re-rendering the HUD every frame. */}
+
+      {/* Round info (competitive mode) */}
+      {round !== undefined && (
+        <div style={{ position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)', textAlign: 'center' }}>
+          <div style={{ fontSize: 18, fontFamily: 'monospace', color: '#fff' }}>
+            Round {round} | CT: {ctScore} - T: {tScore}
+          </div>
+          {buyPhase ? (
+            <div style={{ fontSize: 16, color: '#ffcc00', textAlign: 'center' }}>
+              BUY PHASE: {Math.ceil(buyPhaseTimer ?? 0)}s
+            </div>
+          ) : (
+            <div style={{ fontSize: 16, color: '#fff', textAlign: 'center' }}>
+              {Math.ceil(roundTimer ?? 0)}s
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Money (competitive mode) */}
+      {money !== undefined && (
+        <div style={{ position: 'absolute', top: 10, right: 10, fontSize: 18, fontFamily: 'monospace', color: '#00ff00' }}>
+          ${money}
+        </div>
+      )}
 
       {/* Health bar */}
       <div style={{
@@ -117,6 +166,61 @@ export const HUD: React.FC<HUDProps> = ({
           color: '#ff6600',
         }}>
           WAVE {wave + 1} INCOMING
+        </div>
+      )}
+
+      {/* Bomb timer when planted */}
+      {bombState === 'planted' && (
+        <div style={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          fontSize: 24,
+          fontFamily: 'monospace',
+          color: '#ff0000',
+          textAlign: 'center',
+        }}>
+          <div>BOMB PLANTED AT {bombSite}</div>
+          <div>{Math.ceil(bombTimer ?? 0)}s</div>
+        </div>
+      )}
+
+      {/* Plant progress bar */}
+      {bombState === 'planting' && (
+        <div style={{
+          position: 'absolute',
+          bottom: 100,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          width: 200,
+          height: 10,
+          background: '#333',
+        }}>
+          <div style={{
+            width: `${(plantProgress ?? 0) * 100}%`,
+            height: '100%',
+            background: '#ffcc00',
+          }} />
+        </div>
+      )}
+
+      {/* Defuse progress bar */}
+      {bombState === 'defusing' && (
+        <div style={{
+          position: 'absolute',
+          bottom: 100,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          width: 200,
+          height: 10,
+          background: '#333',
+        }}>
+          <div style={{
+            width: `${(defuseProgress ?? 0) * 100}%`,
+            height: '100%',
+            background: '#00ff00',
+          }} />
         </div>
       )}
     </div>

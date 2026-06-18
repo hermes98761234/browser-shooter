@@ -13,7 +13,7 @@ export class DirectoryServer {
       const t = this.now()
       switch (msg.type) {
         case 'register': this.roster.upsert(msg.entry, t); break
-        case 'heartbeat': this.roster.heartbeat(msg.roomCode, msg.players, msg.status, t); break
+        case 'heartbeat': this.roster.heartbeat(msg.roomCode, msg.players, msg.status, t, msg.mode); break
         case 'unregister': this.roster.remove(msg.roomCode); break
         case 'listRequest':
           this.roster.expire(ENTRY_TTL_MS, t)

@@ -36,8 +36,19 @@ describe('MultiplayerMenu', () => {
     ]
     render(<MultiplayerMenu {...baseProps} servers={servers} onJoin={onJoin} />)
     expect(screen.getByText('Alice')).toBeInTheDocument()
-    // With a row rendered there are two "Join" buttons (the row + the manual form); the first is the row's.
     fireEvent.click(screen.getAllByRole('button', { name: /^join$/i })[0])
     expect(onJoin).toHaveBeenCalledWith('ROOM1')
+  })
+
+  it('shows three connection options on the main menu', () => {
+    render(<MultiplayerMenu {...baseProps} />)
+    expect(screen.getByText('Quick Match')).toBeInTheDocument()
+    expect(screen.getByText('Create Room')).toBeInTheDocument()
+  })
+
+  it('shows server filters on the main menu', () => {
+    render(<MultiplayerMenu {...baseProps} />)
+    expect(screen.getByText('Mode')).toBeInTheDocument()
+    expect(screen.getByText('Status')).toBeInTheDocument()
   })
 })

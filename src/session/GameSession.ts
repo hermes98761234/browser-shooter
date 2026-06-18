@@ -10,11 +10,15 @@ import { emptyInput, type PlayerInput, type Snapshot, type SessionEvent, type En
 import type { Vec3, Team } from '../types'
 import { zonedDamage, resolveZone } from '../systems/DamageZones'
 import { type MatchConfig, defaultMatchConfig, canDamage } from './MatchConfig'
+import { RoundManager, RoundState } from './RoundManager'
+import { Economy } from './Economy'
 import { Scoreboard } from './Scoreboard'
 import { RespawnQueue } from './RespawnQueue'
 import { pickSpawn } from './Spawns'
 import { raycastPlayerCapsule } from './PlayerHit'
 import type { HitZone } from '../systems/DamageZones'
+import { Bombsite } from './Bombsite'
+import { BombCarrier, BombState } from './BombCarrier'
 
 export const ARENA_SIZE = 30
 const LOCAL_ID = 'local'
@@ -45,6 +49,10 @@ export class GameSession {
   config: MatchConfig
   scoreboard: Scoreboard
   respawnQueue = new RespawnQueue()
+  roundManager: RoundManager | null = null
+  economy: Economy | null = null
+  bombsites: Bombsite[] = []
+  bomb: BombCarrier = new BombCarrier()
 
   private shootRaycaster = new THREE.Raycaster()
   private cameraQuat = new THREE.Quaternion()
@@ -54,6 +62,15 @@ export class GameSession {
     this.config = config
     this.scoreboard = new Scoreboard(config.fragLimit)
     this.addPlayer(LOCAL_ID, 'You', 'ct')
+
+    if (config.mode === 'competitive') {
+      this.roundManager = new RoundManager()
+      this.economy = new Economy(800)
+      this.bombsites = [
+        new Bombsite('A', { x: 0, y: 0, z: -25 }),
+        new Bombsite('B', { x: 0, y: 0, z: 25 }),
+      ]
+    }
   }
 
   addPlayer(id: string, name: string, team: Team = 'ct'): PlayerEntity {
@@ -103,6 +120,95 @@ export class GameSession {
     return this.inputs.get(playerId) ?? emptyInput()
   }
 
+  handleDeath(playerId: string): void {
+    if (this.config.mode === 'competitive') {
+      const entity = this.playerMap.get(playerId)
+      if (entity) {
+        entity.weapons.reset()
+      }
+      // If the bomb carrier dies, drop the bomb at their position
+      if (this.bomb.carrier === playerId) {
+        const pos = entity ? toVec3(entity.player.position) : this.bomb.position
+        if (pos) this.bomb.drop(pos)
+      }
+    }
+  }
+
+  /** Determine round winner when the timer expires (no bomb explosion/defuse). */
+  private resolveRoundWinner(): 'ct' | 't' | 'draw' {
+    // If bomb was planted but not yet exploded/defused when time runs out, T wins
+    if (this.bomb.state === BombState.Planted || this.bomb.state === BombState.Defusing) {
+      return 't'
+    }
+    // Otherwise CT wins on time
+    return 'ct'
+  }
+
+  /** Settle the round: score it, award economy, then either end the match or set up the next round. */
+  private concludeRound(winner: 'ct' | 't' | 'draw', reason: string, events: SessionEvent[]): void {
+    const rm = this.roundManager!
+    rm.endRound(winner)
+    events.push({ type: 'roundEnd', winner, reason, ctScore: rm.ctScore, tScore: rm.tScore })
+    if (rm.isHalftime) {
+      events.push({ type: 'halftime', ctScore: rm.ctScore, tScore: rm.tScore })
+    }
+    if (this.economy) {
+      if (winner === 'ct') this.economy.recordWin()
+      else if (winner === 't') this.economy.recordLoss()
+      // draw: no economy change
+      if (rm.isHalftime) this.economy.reset(800)
+      events.push({ type: 'moneyUpdate', playerId: this.localId, amount: this.economy.money })
+    }
+    if (rm.matchOver) {
+      events.push({ type: 'matchOver', winningTeam: rm.winner as Team })
+      return
+    }
+    // Next round: reset the bomb (reassigned when the round goes active) and respawn everyone
+    // with a fresh loadout at their team spawn.
+    this.bomb.reset()
+    for (const entity of this.playerMap.values()) {
+      entity.player.revive()
+      entity.player.position.copy(pickSpawn(entity.team))
+      if (this.config.mode === 'competitive') entity.weapons.reset()
+    }
+    events.push({ type: 'roundStart', round: rm.round, money: this.economy?.money ?? 800, ctScore: rm.ctScore, tScore: rm.tScore })
+    events.push({ type: 'buyPhaseStart', duration: rm.buyPhaseTimer })
+  }
+
+  assignBomb(): void {
+    for (const entity of this.playerMap.values()) {
+      if (entity.team === 't') {
+        this.bomb.assign(entity.id)
+        return
+      }
+    }
+  }
+
+  /** T carrier requests a plant. Succeeds only if alive, carrying, and inside a bombsite. */
+  tryPlant(playerId: string): boolean {
+    if (this.config.mode !== 'competitive') return false
+    const entity = this.playerMap.get(playerId)
+    if (!entity || entity.player.isDead) return false
+    if (this.bomb.state !== BombState.Carried || this.bomb.carrier !== playerId) return false
+    const pos = toVec3(entity.player.position)
+    const site = this.bombsites.find((s) => s.isInside(pos))
+    if (!site) return false
+    this.bomb.startPlant(site.id)
+    return true
+  }
+
+  /** CT requests a defuse. Succeeds only if alive, CT, and standing on the planted site. */
+  tryDefuse(playerId: string, hasKit: boolean): boolean {
+    if (this.config.mode !== 'competitive') return false
+    const entity = this.playerMap.get(playerId)
+    if (!entity || entity.player.isDead || entity.team !== 'ct') return false
+    if (this.bomb.state !== BombState.Planted) return false
+    const site = this.bombsites.find((s) => s.id === this.bomb.site)
+    if (!site || !site.isInside(toVec3(entity.player.position))) return false
+    this.bomb.startDefuse(hasKit)
+    return true
+  }
+
   nearestPlayer(point: THREE.Vector3): PlayerEntity | null {
     let best: PlayerEntity | null = null
     let bestDist = Infinity
@@ -128,6 +234,8 @@ export class GameSession {
       name: e.name,
       team: e.team,
       respawnIn: this.respawnQueue.isPending(e.id) ? this.respawnQueue.remaining(e.id) : undefined,
+      hasArmor: e.player.hasArmor ?? false,
+      hasHelmet: e.player.hasHelmet ?? false,
     }))
     const enemies: EntityState[] = this.enemies.map((e) => ({
       id: e.id,
@@ -138,12 +246,54 @@ export class GameSession {
       health: e.health,
       isDead: e.isDead,
     }))
-    return { tick: this.tick, seq: 0, ack: {}, players, enemies, events: [], scores: this.scoreboard.snapshot() }
+    return {
+      tick: this.tick, seq: 0, ack: {}, players, enemies, events: [],
+      scores: this.scoreboard.snapshot(),
+      round: this.roundManager?.round,
+      roundTimer: this.roundManager?.roundTimer,
+      buyPhase: this.roundManager?.buyPhase,
+      buyPhaseTimer: this.roundManager?.buyPhaseTimer,
+      ctScore: this.roundManager?.ctScore,
+      tScore: this.roundManager?.tScore,
+      bomb: {
+        state: this.bomb.state,
+        carrier: this.bomb.carrier ?? undefined,
+        position: this.bomb.position ?? undefined,
+        site: this.bomb.site ?? undefined,
+        timer: this.bomb.timer,
+        plantProgress: this.bomb.plantProgress,
+        defuseProgress: this.bomb.defuseProgress,
+        defuseDuration: this.bomb.defuseDuration,
+      },
+    }
   }
 
   step(dt: number): SessionEvent[] {
     const events: SessionEvent[] = []
     this.tick++
+
+    if (this.roundManager) {
+      const prevState = this.roundManager.state
+      this.roundManager.update(dt)
+      // Hand the bomb to a T player when the round goes live.
+      if (prevState === RoundState.Buying && this.roundManager.state === RoundState.Active && this.bomb.state === BombState.None) {
+        this.assignBomb()
+      }
+      // Round timer expired with no plant/defuse result.
+      if (this.roundManager.state === RoundState.Over && !this.roundManager.matchOver) {
+        const winner = this.resolveRoundWinner()
+        this.concludeRound(winner, winner === 't' ? 'bomb' : 'time', events)
+      }
+      // Bomb exploded mid-round → T wins.
+      if (this.bomb.state === BombState.Exploded && this.roundManager.state === RoundState.Active && !this.roundManager.matchOver) {
+        this.concludeRound('t', 'bomb', events)
+      }
+      // Bomb defused → CT wins.
+      if (this.bomb.state === BombState.Defused && this.roundManager.state === RoundState.Active && !this.roundManager.matchOver) {
+        this.concludeRound('ct', 'defuse', events)
+      }
+    }
+
     // Respawn any players whose timer elapsed.
     for (const id of this.respawnQueue.update(dt)) {
       const entity = this.playerMap.get(id)
@@ -207,11 +357,17 @@ export class GameSession {
         }
         if (targetPlayer.isDead) {
           events.push({ type: 'playerDied', playerId: target.id })
+          const wasCarrier = this.bomb.carrier === target.id
+          this.handleDeath(target.id)
+          if (wasCarrier && this.bomb.state === BombState.Dropped) {
+            events.push({ type: 'bombDropped', position: this.bomb.position!, playerId: target.id })
+          }
           if (this.config.mode === 'coop') {
             if (target.id === this.localId) return events
           } else {
             this.scoreboard.recordDeath(target.id)
-            this.respawnQueue.enqueue(target.id, RESPAWN_DELAY)
+            // Competitive: no mid-round respawn — players revive at the next round start.
+            if (this.config.mode !== 'competitive') this.respawnQueue.enqueue(target.id, RESPAWN_DELAY)
           }
         }
       }
@@ -232,6 +388,42 @@ export class GameSession {
           this.pickups.splice(i, 1)
           break
         }
+      }
+    }
+
+    // Auto-pickup: a living T player walking over a dropped bomb grabs it.
+    if (this.bomb.state === BombState.Dropped && this.bomb.position) {
+      const bp = new THREE.Vector3(this.bomb.position.x, this.bomb.position.y, this.bomb.position.z)
+      for (const entity of this.playerMap.values()) {
+        if (entity.team !== 't' || entity.player.isDead) continue
+        if (entity.player.position.distanceToSquared(bp) <= 4) { // within 2 units
+          this.bomb.pickup(entity.id)
+          events.push({ type: 'bombPickedUp', playerId: entity.id })
+          break
+        }
+      }
+    }
+
+    // Update bomb state
+    if (this.bomb.state === BombState.Planting ||
+        this.bomb.state === BombState.Planted ||
+        this.bomb.state === BombState.Defusing) {
+      const wasPlanting = this.bomb.state === BombState.Planting
+      this.bomb.update(dt)
+      const afterState = this.bomb.state as BombState
+
+      if (wasPlanting && afterState === BombState.Planted) {
+        events.push({ type: 'bombPlanted', site: this.bomb.site!, planterId: this.bomb.carrier ?? 'unknown', timer: this.bomb.timer })
+        if (this.config.mode === 'competitive' && this.economy) {
+          this.economy.recordBombPlant()
+          events.push({ type: 'moneyUpdate', playerId: this.localId, amount: this.economy.money })
+        }
+      }
+      if (afterState === BombState.Exploded) {
+        events.push({ type: 'bombExploded', site: this.bomb.site! })
+      }
+      if (afterState === BombState.Defused) {
+        events.push({ type: 'bombDefused', site: this.bomb.site! })
       }
     }
 
@@ -283,9 +475,19 @@ export class GameSession {
       events.push({ type: 'playerHitPlayer', victimId: target.id, hit: { targetId: target.id, zone, damage, killed, point: playerHit!.point } })
       if (killed) {
         this.scoreboard.recordKill(shooter.id, shooter.team, target.id, target.team, this.config.damagePolicy)
-        this.respawnQueue.enqueue(target.id, RESPAWN_DELAY)
+        // Competitive: no mid-round respawn — players revive at the next round start.
+        if (this.config.mode !== 'competitive') this.respawnQueue.enqueue(target.id, RESPAWN_DELAY)
         events.push({ type: 'playerKilledPlayer', attackerId: shooter.id, victimId: target.id, victimTeam: target.team, teamkill: this.config.damagePolicy === 'friendly' && shooter.team === target.team })
         events.push({ type: 'playerDied', playerId: target.id })
+        const wasCarrier = this.bomb.carrier === target.id
+        this.handleDeath(target.id)
+        if (wasCarrier && this.bomb.state === BombState.Dropped) {
+          events.push({ type: 'bombDropped', position: this.bomb.position!, playerId: target.id })
+        }
+        if (this.config.mode === 'competitive' && this.economy) {
+          this.economy.recordKillReward(shooter.weapons.current.type)
+          events.push({ type: 'moneyUpdate', playerId: shooter.id, amount: this.economy.money })
+        }
         if (this.scoreboard.matchOver) events.push({ type: 'matchOver', winningTeam: this.scoreboard.winningTeam! })
       }
       return

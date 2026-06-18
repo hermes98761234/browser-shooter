@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { canDamage, defaultMatchConfig } from './MatchConfig'
+import { canDamage, defaultMatchConfig, defaultCompetitiveConfig } from './MatchConfig'
 
 describe('canDamage', () => {
   it('team policy: only opposite teams', () => {
@@ -19,5 +19,17 @@ describe('canDamage', () => {
 describe('defaultMatchConfig', () => {
   it('defaults to coop / team / 30', () => {
     expect(defaultMatchConfig()).toEqual({ mode: 'coop', damagePolicy: 'team', fragLimit: 30 })
+  })
+})
+
+describe('competitive mode', () => {
+  it('defaultCompetitiveConfig returns correct defaults', () => {
+    const config = defaultCompetitiveConfig()
+    expect(config.mode).toBe('competitive')
+    expect(config.damagePolicy).toBe('team')
+    expect(config.fragLimit).toBe(0)
+    expect(config.roundsToWin).toBe(16)
+    expect(config.buyPhaseDuration).toBe(15)
+    expect(config.roundDuration).toBe(115)
   })
 })

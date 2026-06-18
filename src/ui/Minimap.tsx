@@ -6,6 +6,8 @@ interface MinimapProps {
   playerRotation: number
   enemies: THREE.Vector3[]
   arenaSize: number
+  bombsites?: { id: string; position: { x: number; z: number } }[]
+  bombPosition?: { x: number; z: number }
 }
 
 export const Minimap: React.FC<MinimapProps> = ({
@@ -13,6 +15,8 @@ export const Minimap: React.FC<MinimapProps> = ({
   playerRotation,
   enemies,
   arenaSize,
+  bombsites,
+  bombPosition,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
@@ -56,7 +60,32 @@ export const Minimap: React.FC<MinimapProps> = ({
         ctx.fill()
       }
     }
-  }, [playerPosition, playerRotation, enemies, arenaSize])
+
+    if (bombsites) {
+      for (const site of bombsites) {
+        const sx = cx + (site.position.x - playerPosition.x) * scale
+        const sy = cy + (site.position.z - playerPosition.z) * scale
+        if (sx > 5 && sx < size - 5 && sy > 5 && sy < size - 5) {
+          ctx.fillStyle = site.id === 'A' ? '#ff3333' : '#3333ff'
+          ctx.font = 'bold 12px sans-serif'
+          ctx.textAlign = 'center'
+          ctx.textBaseline = 'middle'
+          ctx.fillText(site.id, sx, sy)
+        }
+      }
+    }
+
+    if (bombPosition) {
+      const bx = cx + (bombPosition.x - playerPosition.x) * scale
+      const by = cy + (bombPosition.z - playerPosition.z) * scale
+      if (bx > 5 && bx < size - 5 && by > 5 && by < size - 5) {
+        ctx.fillStyle = '#ff0000'
+        ctx.beginPath()
+        ctx.arc(bx, by, 3, 0, Math.PI * 2)
+        ctx.fill()
+      }
+    }
+  }, [playerPosition, playerRotation, enemies, arenaSize, bombsites, bombPosition])
 
   return (
     <canvas

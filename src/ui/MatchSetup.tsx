@@ -1,11 +1,13 @@
 import React, { useState } from 'react'
 import type { MatchConfig, DamagePolicy } from '../session/MatchConfig'
+import { defaultCompetitiveConfig } from '../session/MatchConfig'
 import type { GameMode } from '../session/protocol'
 
 const MODES: { value: GameMode; label: string }[] = [
   { value: 'coop', label: 'Co-op (vs AI)' },
   { value: 'pvp', label: 'Team PvP (no AI)' },
   { value: 'hybrid', label: 'Hybrid (teams + AI)' },
+  { value: 'competitive', label: 'Competitive (CS-style)' },
 ]
 const POLICIES: { value: DamagePolicy; label: string }[] = [
   { value: 'team', label: 'Opposite team only' },
@@ -45,7 +47,7 @@ export function MatchSetup({ onConfirm, onBack }: { onConfirm: (c: MatchConfig) 
         </div>
       )}
 
-      {mode !== 'coop' && (
+      {mode !== 'coop' && mode !== 'competitive' && (
         <div><div style={{ opacity: 0.6, marginBottom: 6 }}>FRAG LIMIT</div>
           <div style={{ display: 'flex', gap: 8 }}>
             {FRAG_LIMITS.map(f => <button key={f} style={btn(frag === f)} onClick={() => setFrag(f)}>{f === 0 ? 'Endless' : f}</button>)}
@@ -55,7 +57,9 @@ export function MatchSetup({ onConfirm, onBack }: { onConfirm: (c: MatchConfig) 
 
       <div style={{ display: 'flex', gap: 12, marginTop: 12 }}>
         <button style={btn(false)} onClick={onBack}>Back</button>
-        <button style={btn(true)} onClick={() => onConfirm({ mode, damagePolicy: policy, fragLimit: frag })}>Create Room</button>
+        <button style={btn(true)} onClick={() => onConfirm(
+          mode === 'competitive' ? { ...defaultCompetitiveConfig(), damagePolicy: policy } : { mode, damagePolicy: policy, fragLimit: frag }
+        )}>Create Room</button>
       </div>
     </div>
   )

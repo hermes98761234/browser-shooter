@@ -45,11 +45,14 @@ import { loadSettings, saveSettings, mobileControlsActive, type Settings } from 
 import { resolveCrosshair } from './settings/Crosshair'
 import { stepBloom } from './weapons/CrosshairBloom'
 import { MatchSetup } from './ui/MatchSetup'
+import { RoundState } from './session/RoundManager'
 import { KillFeed, type KillLine } from './ui/KillFeed'
 import { RespawnOverlay } from './ui/RespawnOverlay'
 import { MatchOver } from './ui/MatchOver'
 import { defaultMatchConfig, type MatchConfig } from './session/MatchConfig'
 import type { MatchScores } from './session/protocol'
+import { BombState } from './session/BombCarrier'
+import { Matchmaker } from './net/Matchmaker'
 
 function moveToTeam(roster: { ct: string[]; t: string[] }, name: string, team: 'ct' | 't') {
   const ct = roster.ct.filter(n => n !== name)
@@ -95,7 +98,14 @@ function App() {
   const [killFeed, setKillFeed] = useState<KillLine[]>([])
   const [respawnIn, setRespawnIn] = useState<number | null>(null)
   const [matchScores, setMatchScores] = useState<MatchScores | null>(null)
+  const [bombState, setBombState] = useState<BombState>(BombState.None)
+  const [bombTimer, setBombTimer] = useState(40)
+  const [bombSite, setBombSite] = useState<'A' | 'B' | null>(null)
+  const [plantProgress, setPlantProgress] = useState(0)
+  const [defuseProgress, setDefuseProgress] = useState(0)
+
   const lastWaveRef = useRef(0)
+  const ownedRef = useRef<string[]>([])
   const gameStateRef = useRef<GameState>('menu')
   const storeOpenRef = useRef(false)
   const showScoreboardRef = useRef(false)
@@ -182,7 +192,7 @@ function App() {
     for (const enemy of data.session.enemies) { scene?.remove(enemy.mesh); enemy.dispose() }
     for (const pickup of data.session.pickups) { scene?.remove(pickup.mesh); pickup.dispose() }
 
-    const fresh = new GameSession()
+    const fresh = new GameSession(data.matchConfig)
     fresh.collisionWorld = data.session.collisionWorld
     fresh.waveManager.wavePauseTimer = 2 // 2s grace before wave 1 (matches pre-refactor behavior)
     fresh.waveManager.onEnemySpawned = data.session.waveManager.onEnemySpawned
@@ -193,12 +203,17 @@ function App() {
     data.money = 16000
     setShowScoreboard(false)
 
+    if (data.matchConfig.mode === 'competitive' && fresh.roundManager) {
+      fresh.roundManager.state = RoundState.Buying
+      fresh.roundManager.buyPhaseTimer = 15
+    }
+
     if (data.particleSystem) data.particleSystem.clear()
     data.damageIndicator = createDamageIndicatorState()
 
     setScore(0); setWave(0); setHealth(100); setAmmo(60); setWeaponName('Pistol')
     setMoney(16000); setStoreOpen(false)
-    setOwned([]); setMaxHealth(100)
+    setOwned([]); ownedRef.current = []; setMaxHealth(100)
     data.session.weaponManager.reset()
     data.session.player.resetLoadout()
     data.viewmodel?.setWeapon('pistol')
@@ -341,6 +356,21 @@ function App() {
           break
         case 'matchOver':
           break // handled via snapshot.scores in updateClient
+        case 'bombPlanted':
+          setBombState(BombState.Planted)
+          setBombSite(ev.site)
+          setBombTimer(40)
+          break
+        case 'bombExploded':
+          break
+        case 'bombDefused':
+          break
+        case 'bombDropped':
+          setBombState(BombState.Dropped)
+          break
+        case 'bombPickedUp':
+          setBombState(BombState.Carried)
+          break
       }
     })
     client.onWelcome((_, mode, players) => {
@@ -374,6 +404,21 @@ function App() {
       })
     }
   }, [])
+
+  const matchmakerRef = useRef(new Matchmaker())
+
+  const handleQuickMatch = useCallback(async () => {
+    const dialed = await dialDirectory()
+    if (!dialed) return
+    const match = await matchmakerRef.current.findMatch(dialed.client)
+    dialed.peer.destroy()
+    if (match) {
+      joinGame(match.roomCode)
+    } else {
+      // No servers available, create new room
+      setShowMatchSetup(true)
+    }
+  }, [joinGame])
 
   const leaveMultiplayer = useCallback(() => {
     resetNetworking()
@@ -561,6 +606,24 @@ function App() {
             document.exitPointerLock()
             matchOverPending = true
             break
+          case 'buyPhaseStart':
+            setStoreOpen(true)
+            break
+          case 'bombPlanted':
+            setBombState(BombState.Planted)
+            setBombSite(ev.site)
+            setBombTimer(40)
+            break
+          case 'bombExploded':
+            break
+          case 'bombDefused':
+            break
+          case 'bombDropped':
+            setBombState(BombState.Dropped)
+            break
+          case 'bombPickedUp':
+            setBombState(BombState.Carried)
+            break
         }
       }
 
@@ -609,6 +672,15 @@ function App() {
       setHealth(session.player.health)
       setPlayerPos(session.player.position.clone())
       setPlayerRot(session.player.rotation.y)
+
+      // Sync bomb state from session
+      if (session.config.mode === 'competitive') {
+        setBombState(session.bomb.state)
+        setBombTimer(session.bomb.timer)
+        setBombSite(session.bomb.site)
+        setPlantProgress(session.bomb.plantProgress / 3)
+        setDefuseProgress(session.bomb.defuseProgress / session.bomb.defuseDuration)
+      }
       setRespawnIn(session.respawnQueue.isPending(session.localId) ? session.respawnQueue.remaining(session.localId) : null)
       if (session.config.mode !== 'coop') setMatchScores(session.scoreboard.snapshot())
 
@@ -623,6 +695,13 @@ function App() {
         data.netHost.broadcastSnapshot(snap, events)
         data.lastPlayers = snap.players
         data.remotePlayers.sync(snap.players)
+        for (const entity of snap.players) {
+          const remote = data.remotePlayers.get(entity.id)
+          if (remote) {
+            remote.setArmor(entity.hasArmor ?? false)
+            remote.setHelmet(entity.hasHelmet ?? false)
+          }
+        }
         data.remotePlayers.update(dt)
 
         data.pingTimer += dt
@@ -704,12 +783,28 @@ function App() {
       const meState = snap.players.find(p => p.id === client.playerId)
       setRespawnIn(meState?.respawnIn ?? null)
       setMatchScores(snap.scores)
+      if (snap.bomb) {
+        setBombState(snap.bomb.state as BombState)
+        setBombTimer(snap.bomb.timer ?? 40)
+        setBombSite(snap.bomb.site ?? null)
+        if (snap.bomb.plantProgress !== undefined) setPlantProgress(snap.bomb.plantProgress / 3)
+        if (snap.bomb.defuseProgress !== undefined) setDefuseProgress(snap.bomb.defuseProgress / (snap.bomb.defuseDuration ?? 5))
+      }
       if (snap.scores.matchOver && gameStateRef.current === 'playing') {
         document.exitPointerLock()
         updateGameState('matchover')
       }
 
       data.remotePlayers?.sync(snap.players)
+      if (data.remotePlayers) {
+        for (const entity of snap.players) {
+          const remote = data.remotePlayers.get(entity.id)
+          if (remote) {
+            remote.setArmor(entity.hasArmor ?? false)
+            remote.setHelmet(entity.hasHelmet ?? false)
+          }
+        }
+      }
       renderClientEnemies(snap.enemies)
       data.remotePlayers?.update(dt)
       particleSystem.update(dt)
@@ -774,6 +869,25 @@ function App() {
           if (data.session.config.mode !== 'pvp') data.session.waveManager.spawnNextWave()
         } else if (data.role === 'client' && data.netClient) {
           data.netClient.transport.send({ type: 'startWave', playerId: data.netClient.playerId! })
+        }
+      }
+
+      // Bomb objective (competitive): '5' plants, 'E' defuses. The authoritative
+      // session lives on the host/single-player; clients ask the host to act.
+      if (e.code === 'Digit5' && gameStateRef.current === 'playing') {
+        if (data.role === 'client' && data.netClient) {
+          data.netClient.transport.send({ type: 'plantBomb', playerId: data.netClient.playerId! })
+        } else {
+          data.session.tryPlant(data.session.localId)
+        }
+      }
+
+      if (e.code === 'KeyE' && gameStateRef.current === 'playing') {
+        const hasKit = ownedRef.current.includes('defuse_kit')
+        if (data.role === 'client' && data.netClient) {
+          data.netClient.transport.send({ type: 'defuseBomb', playerId: data.netClient.playerId!, hasKit })
+        } else {
+          data.session.tryDefuse(data.session.localId, hasKit)
         }
       }
 
@@ -869,6 +983,7 @@ function App() {
           }}
           onBack={leaveMultiplayer}
           onRefresh={refreshServers}
+          onQuickMatch={handleQuickMatch}
           myTeam={myTeam}
           onSelectTeam={(t) => {
             setMyTeam(t)
@@ -903,6 +1018,18 @@ function App() {
             wave={wave}
             waveActive={waveActive}
             enemiesRemaining={enemiesRemaining}
+            round={gameDataRef.current.session.roundManager?.round}
+            roundTimer={gameDataRef.current.session.roundManager?.roundTimer}
+            buyPhase={gameDataRef.current.session.roundManager?.buyPhase}
+            buyPhaseTimer={gameDataRef.current.session.roundManager?.buyPhaseTimer}
+            money={gameDataRef.current.session.economy?.money}
+            ctScore={gameDataRef.current.session.roundManager?.ctScore}
+            tScore={gameDataRef.current.session.roundManager?.tScore}
+            bombState={bombState}
+            bombTimer={bombTimer}
+            bombSite={bombSite ?? undefined}
+            plantProgress={plantProgress}
+            defuseProgress={defuseProgress}
           />
           <Crosshair runtime={crosshairRef} />
           <Minimap
@@ -910,6 +1037,8 @@ function App() {
             playerRotation={playerRot}
             enemies={enemyPositions}
             arenaSize={ARENA_SIZE}
+            bombsites={gameDataRef.current.session.bombsites.map(s => ({ id: s.id, position: s.center }))}
+            bombPosition={gameDataRef.current.session.bomb.position ?? undefined}
           />
           <WaveAnnounce wave={wave} visible={showWaveAnnounce} />
           <DamageOverlay indicator={damageIndicator} />
@@ -946,12 +1075,22 @@ function App() {
               } else {
                 applyItem(item, data.session.player, data.session.weaponManager)
               }
-              setOwned((prev) => [...prev, id])
+              setOwned((prev) => { const next = [...prev, id]; ownedRef.current = next; return next })
               setMaxHealth(data.session.player.maxHealth)
               const wm = data.session.weaponManager
               setWeaponName(wm.current.def.name)
               setAmmo(wm.current.ammo)
-              data.viewmodel?.setWeapon(weaponVisual(wm.current.type))
+              switch (id) {
+                case 'bomb':
+                  data.viewmodel?.setObjective('bomb')
+                  break
+                case 'defuse_kit':
+                  data.viewmodel?.setObjective('defuse_kit')
+                  break
+                default:
+                  data.viewmodel?.setWeapon(weaponVisual(wm.current.type))
+                  break
+              }
             }
           }}
           onClose={() => setStoreOpen(false)}

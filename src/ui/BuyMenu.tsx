@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { catalogForTeam, canAffordItem } from '../weapons/StoreCatalog'
 import { WeaponIcon } from './icons/weapons'
-import type { ItemKind, Team } from '../types'
+import { BuyPreview } from './BuyPreview'
+import type { ItemKind, StoreItem, Team } from '../types'
 
 interface BuyMenuProps {
   team: Team
@@ -9,6 +10,8 @@ interface BuyMenuProps {
   owned: string[]
   onBuy: (id: string) => void
   onClose: () => void
+  buyPhase?: boolean
+  buyPhaseTimer?: number
 }
 
 const SECTIONS: { title: string; kinds: ItemKind[]; slot?: 'primary' | 'secondary' }[] = [
@@ -18,9 +21,10 @@ const SECTIONS: { title: string; kinds: ItemKind[]; slot?: 'primary' | 'secondar
   { title: 'Upgrades', kinds: ['upgrade'] },
 ]
 
-export function BuyMenu({ team, money, owned, onBuy, onClose }: BuyMenuProps) {
+export function BuyMenu({ team, money, owned, onBuy, onClose, buyPhase, buyPhaseTimer }: BuyMenuProps) {
   const catalog = catalogForTeam(team)
   const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 767px)').matches)
+  const [selectedItem, setSelectedItem] = useState<StoreItem | null>(null)
 
   useEffect(() => {
     const mql = window.matchMedia('(max-width: 767px)')
@@ -43,47 +47,68 @@ export function BuyMenu({ team, money, owned, onBuy, onClose }: BuyMenuProps) {
           <span>${money}</span>
         </div>
 
-        {SECTIONS.map((section) => {
-          const items = catalog.filter(
-            (i) => section.kinds.includes(i.kind) && (section.slot ? i.slot === section.slot : true),
-          )
-          if (items.length === 0) return null
-          return (
-            <div key={section.title} style={{ marginBottom: 12 }}>
-              <div style={{ color: '#8a8aad', fontSize: 12, margin: '8px 0 4px' }}>{section.title}</div>
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: isMobile ? '1fr' : 'repeat(5, 1fr)',
-                gap: 8,
-              }}>
-                {items.map((item) => {
-                  const isOwned = owned.includes(item.id)
-                  const affordable = canAffordItem(money, item.id)
-                  const disabled = isOwned || !affordable
-                  return (
-                    <button
-                      key={item.id}
-                      disabled={disabled}
-                      onClick={() => onBuy(item.id)}
-                      style={{
-                        display: 'flex', flexDirection: 'column', alignItems: 'center',
-                        padding: '12px 8px', background: disabled ? '#1a1a24' : '#23233a',
-                        color: disabled ? '#666' : '#fff', border: '1px solid #3a3a55',
-                        cursor: disabled ? 'not-allowed' : 'pointer',
-                      }}
-                    >
-                      {item.icon && <WeaponIcon name={item.icon} size={48} />}
-                      <span style={{ fontSize: 12, marginTop: 8 }}>{item.name}</span>
-                      <span style={{ fontSize: 11, opacity: 0.7 }}>
-                        {isOwned ? 'OWNED' : item.price === 0 ? 'FREE' : `$${item.price}`}
-                      </span>
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-          )
-        })}
+        {buyPhase === false && (
+          <div style={{ padding: 16, color: '#ffcc00', textAlign: 'center' }}>
+            BUY PHASE ENDED - Wait for next round
+          </div>
+        )}
+
+        {buyPhase === true && buyPhaseTimer !== undefined && (
+          <div style={{ padding: 8, color: '#ffcc00', textAlign: 'center', fontSize: 14 }}>
+            Buy phase: {Math.ceil(buyPhaseTimer)}s remaining
+          </div>
+        )}
+
+        <div style={{ display: 'flex', gap: 16 }}>
+          <div style={{ flex: 1 }}>
+            {SECTIONS.map((section) => {
+              const items = catalog.filter(
+                (i) => section.kinds.includes(i.kind) && (section.slot ? i.slot === section.slot : true),
+              )
+              if (items.length === 0) return null
+              return (
+                <div key={section.title} style={{ marginBottom: 12 }}>
+                  <div style={{ color: '#8a8aad', fontSize: 12, margin: '8px 0 4px' }}>{section.title}</div>
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: isMobile ? '1fr' : 'repeat(5, 1fr)',
+                    gap: 8,
+                  }}>
+                    {items.map((item) => {
+                      const isOwned = owned.includes(item.id)
+                      const affordable = canAffordItem(money, item.id)
+                      const disabled = isOwned || !affordable
+                      return (
+                        <button
+                          key={item.id}
+                          disabled={disabled}
+                          onClick={() => onBuy(item.id)}
+                          onMouseEnter={() => setSelectedItem(item)}
+                          style={{
+                            display: 'flex', flexDirection: 'column', alignItems: 'center',
+                            padding: '12px 8px', background: disabled ? '#1a1a24' : '#23233a',
+                            color: disabled ? '#666' : '#fff', border: '1px solid #3a3a55',
+                            cursor: disabled ? 'not-allowed' : 'pointer',
+                          }}
+                        >
+                          {item.icon && <WeaponIcon name={item.icon} size={48} />}
+                          <span style={{ fontSize: 12, marginTop: 8 }}>{item.name}</span>
+                          <span style={{ fontSize: 11, opacity: 0.7 }}>
+                            {isOwned ? 'OWNED' : item.price === 0 ? 'FREE' : `$${item.price}`}
+                          </span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          <div style={{ width: 220, borderLeft: '1px solid #3a3a55', paddingLeft: 16 }}>
+            <BuyPreview item={selectedItem} />
+          </div>
+        </div>
 
         <button onClick={onClose} style={{ marginTop: 12, width: '100%', padding: 10, background: '#3a3a55', color: '#fff', border: 'none', cursor: 'pointer' }}>
           CLOSE (B)

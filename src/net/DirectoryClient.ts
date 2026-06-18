@@ -15,8 +15,8 @@ export class DirectoryClient {
     this.channel.send({ type: 'register', entry })
   }
 
-  heartbeat(roomCode: string, players: number, status: ServerStatus): void {
-    this.channel.send({ type: 'heartbeat', roomCode, players, status })
+  heartbeat(roomCode: string, players: number, status: ServerStatus, mode?: string): void {
+    this.channel.send({ type: 'heartbeat', roomCode, players, status, mode })
   }
 
   unregister(roomCode: string): void {

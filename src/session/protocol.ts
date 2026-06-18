@@ -3,8 +3,8 @@ import type { HitZone } from '../systems/DamageZones'
 import type { MatchConfig } from './MatchConfig'
 import type { MatchScores } from './Scoreboard'
 
-export type GameMode = 'coop' | 'pvp' | 'hybrid'
-export const GAME_MODES: readonly GameMode[] = ['coop', 'pvp', 'hybrid'] as const
+export type GameMode = 'coop' | 'pvp' | 'hybrid' | 'competitive'
+export const GAME_MODES: readonly GameMode[] = ['coop', 'pvp', 'hybrid', 'competitive'] as const
 
 export type { MatchScores, PlayerScore } from './Scoreboard'
 
@@ -39,6 +39,8 @@ export interface EntityState {
   team?: Team          // players only
   respawnIn?: number   // players only; seconds until respawn (omitted if alive)
   ping?: number        // players only; round-trip latency in ms (host-measured)
+  hasArmor?: boolean   // players only; armor state
+  hasHelmet?: boolean  // players only; helmet state
 }
 
 export interface Snapshot {
@@ -49,6 +51,22 @@ export interface Snapshot {
   enemies: EntityState[]
   events: SessionEvent[]
   scores: MatchScores
+  round?: number
+  roundTimer?: number
+  buyPhase?: boolean
+  buyPhaseTimer?: number
+  ctScore?: number
+  tScore?: number
+  bomb?: {
+    state: string
+    carrier?: string
+    position?: Vec3
+    site?: 'A' | 'B'
+    timer?: number
+    plantProgress?: number
+    defuseProgress?: number
+    defuseDuration?: number
+  }
 }
 
 export interface HitEvent {
@@ -73,6 +91,17 @@ export type SessionEvent =
   | { type: 'playerKilledPlayer'; attackerId: string; victimId: string; victimTeam: Team; teamkill: boolean }
   | { type: 'playerRespawned'; playerId: string }
   | { type: 'matchOver'; winningTeam: Team }
+  | { type: 'roundStart'; round: number; money: number; ctScore: number; tScore: number }
+  | { type: 'roundEnd'; winner: 'ct' | 't' | 'draw'; reason: string; ctScore: number; tScore: number }
+  | { type: 'buyPhaseStart'; duration: number }
+  | { type: 'buyPhaseEnd' }
+  | { type: 'halftime'; ctScore: number; tScore: number }
+  | { type: 'moneyUpdate'; playerId: string; amount: number }
+  | { type: 'bombPlanted'; site: 'A' | 'B'; planterId: string; timer: number }
+  | { type: 'bombDropped'; position: Vec3; playerId: string }
+  | { type: 'bombPickedUp'; playerId: string }
+  | { type: 'bombExploded'; site: 'A' | 'B' }
+  | { type: 'bombDefused'; site: 'A' | 'B' }
 
 /** Network envelope carried by Transport. */
 export type NetMessage =
@@ -89,4 +118,6 @@ export type NetMessage =
   | { type: 'buy'; playerId: string; item: string }
   | { type: 'startWave'; playerId: string }
   | { type: 'setTeam'; playerId: string; team: Team }
+  | { type: 'plantBomb'; playerId: string }
+  | { type: 'defuseBomb'; playerId: string; hasKit: boolean }
   | { type: 'start' }

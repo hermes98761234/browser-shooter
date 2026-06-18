@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { ServerList, type ServerRow } from './ServerList'
+import { MatchmakingButton } from './MatchmakingButton'
 
 interface MultiplayerMenuProps {
   roomCode: string | null      // set once hosting; null while choosing/joining
@@ -11,6 +12,7 @@ interface MultiplayerMenuProps {
   onStart: () => void          // host begins the match
   onBack: () => void
   onRefresh: () => void        // re-query the directory
+  onQuickMatch?: () => void    // quick match handler
   myTeam?: import('../types').Team
   onSelectTeam?: (team: import('../types').Team) => void
   roster?: { ct: string[]; t: string[] }
@@ -32,6 +34,7 @@ const btn: React.CSSProperties = {
 
 export const MultiplayerMenu: React.FC<MultiplayerMenuProps> = (p) => {
   const [code, setCode] = useState('')
+  const [queuing, setQueuing] = useState(false)
   const inLobby = p.roomCode !== null || p.players.length > 0
 
   if (inLobby) {
@@ -77,14 +80,43 @@ export const MultiplayerMenu: React.FC<MultiplayerMenuProps> = (p) => {
   return (
     <div style={panel}>
       <div style={panelInner}>
-        <h2>Multiplayer (Co-op)</h2>
-        <button style={btn} onClick={p.onHost}>Host Game</button>
-        <ServerList servers={p.servers} onJoin={p.onJoin} onRefresh={p.onRefresh} />
-        <div style={{ display: 'flex', gap: 8 }}>
+        <h2>Multiplayer</h2>
+
+        {/* Quick Match */}
+        <div style={{ width: '100%', maxWidth: 400 }}>
+          <MatchmakingButton
+            queuing={queuing}
+            onFind={() => {
+              setQueuing(true)
+              p.onQuickMatch?.()
+            }}
+            onCancel={() => setQueuing(false)}
+          />
+          <p style={{ fontSize: 12, opacity: 0.6, marginTop: 4, textAlign: 'center' }}>
+            Auto-find a competitive match
+          </p>
+        </div>
+
+        {/* Browse Servers */}
+        <div style={{ width: '100%', maxWidth: 600 }}>
+          <ServerList servers={p.servers} onJoin={p.onJoin} onRefresh={p.onRefresh} />
+        </div>
+
+        {/* Create Room */}
+        <div style={{ width: '100%', maxWidth: 400, borderTop: '1px solid #3a3a55', paddingTop: 16 }}>
+          <button style={btn} onClick={p.onHost}>Create Room</button>
+          <p style={{ fontSize: 12, opacity: 0.6, marginTop: 4, textAlign: 'center' }}>
+            Host your own game
+          </p>
+        </div>
+
+        {/* Room Code Join */}
+        <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
           <input placeholder="Room code" value={code} onChange={(e) => setCode(e.target.value)}
             style={{ padding: 10, fontSize: 16 }} />
           <button style={btn} onClick={() => onJoinClick()}>Join</button>
         </div>
+
         <button style={{ ...btn, background: '#555' }} onClick={p.onBack}>Back</button>
       </div>
     </div>

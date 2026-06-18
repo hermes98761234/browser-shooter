@@ -1,16 +1,23 @@
 import * as THREE from 'three'
 import type { WeaponVisual } from './WeaponDefs'
+import { BombModel } from './BombModel'
+import { DefuseKitModel } from './DefuseKitModel'
 
 const BASE = new THREE.Vector3(0.32, -0.32, -0.7)
 
 /** First-person gun model parented to the camera, with bob and recoil. */
 export class Viewmodel {
   group: THREE.Group
+  currentObjective: 'bomb' | 'defuse_kit' | null = null
   private models: Record<WeaponVisual, THREE.Group>
   private recoil = 0
   private bobTime = 0
+  private bombModel: BombModel | null = null
+  private defuseKitModel: DefuseKitModel | null = null
+  private camera: THREE.Camera
 
   constructor(camera: THREE.Camera) {
+    this.camera = camera
     this.group = new THREE.Group()
     this.models = {
       pistol: this.buildGun(0.35, 0x303030),
@@ -40,9 +47,35 @@ export class Viewmodel {
   }
 
   setWeapon(type: WeaponVisual) {
+    this.clearObjective()
     for (const [k, m] of Object.entries(this.models)) {
       m.visible = k === type
     }
+  }
+
+  setObjective(type: 'bomb' | 'defuse_kit') {
+    this.clearObjective()
+    this.currentObjective = type
+
+    if (type === 'bomb') {
+      this.bombModel = new BombModel()
+      this.camera.add(this.bombModel.mesh)
+    } else {
+      this.defuseKitModel = new DefuseKitModel()
+      this.camera.add(this.defuseKitModel.mesh)
+    }
+  }
+
+  clearObjective() {
+    if (this.bombModel) {
+      this.bombModel.dispose()
+      this.bombModel = null
+    }
+    if (this.defuseKitModel) {
+      this.defuseKitModel.dispose()
+      this.defuseKitModel = null
+    }
+    this.currentObjective = null
   }
 
   fire() {
@@ -64,6 +97,7 @@ export class Viewmodel {
   }
 
   dispose() {
+    this.clearObjective()
     this.group.traverse((obj) => {
       if (obj instanceof THREE.Mesh) {
         obj.geometry.dispose()

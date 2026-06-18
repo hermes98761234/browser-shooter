@@ -26,7 +26,7 @@ export type WeaponType =
 
 export type Team = 'ct' | 't'
 
-export type ItemKind = 'weapon' | 'armor' | 'health' | 'speed' | 'upgrade'
+export type ItemKind = 'weapon' | 'armor' | 'health' | 'speed' | 'upgrade' | 'objective' | 'gear'
 
 export interface WeaponUpgrade {
   ammoMult?: number    // multiplies maxAmmo (and refills)

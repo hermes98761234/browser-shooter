@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest'
 import { GameSession } from '../GameSession'
 import { emptyInput } from '../protocol'
+import { defaultCompetitiveConfig } from '../MatchConfig'
+import { RoundState } from '../RoundManager'
+import { BombState } from '../BombCarrier'
 
 describe('GameSession skeleton', () => {
   it('starts with one local player and no enemies', () => {
@@ -18,5 +21,248 @@ describe('GameSession skeleton', () => {
     s.applyInput('local', input)
     expect(s.getInput('local').forward).toBe(true)
     expect(s.getInput('local').yaw).toBe(1.2)
+  })
+})
+
+describe('competitive mode', () => {
+  it('creates with RoundManager when mode is competitive', () => {
+    const config = defaultCompetitiveConfig()
+    const session = new GameSession(config)
+    expect(session.roundManager).toBeDefined()
+    expect(session.economy).toBeDefined()
+    expect(session.roundManager!.state).toBe(RoundState.Buying)
+  })
+
+  it('does not create RoundManager when mode is not competitive', () => {
+    const session = new GameSession()
+    expect(session.roundManager).toBeNull()
+    expect(session.economy).toBeNull()
+  })
+
+  it('resets weapons on death in competitive mode', () => {
+    const config = defaultCompetitiveConfig()
+    const session = new GameSession(config)
+    session.weaponManager.equip('ak', 'primary')
+    expect(session.weaponManager.current.type).toBe('ak')
+    session.handleDeath('local')
+    expect(session.weaponManager.current.type).toBe('pistol')
+  })
+
+  it('does not reset weapons on death in non-competitive mode', () => {
+    const session = new GameSession()
+    session.weaponManager.equip('ak', 'primary')
+    expect(session.weaponManager.current.type).toBe('ak')
+    session.handleDeath('local')
+    expect(session.weaponManager.current.type).toBe('ak')
+  })
+
+  it('round advances after buy phase', () => {
+    const config = defaultCompetitiveConfig()
+    const session = new GameSession(config)
+    session.step(16) // buy phase -> active
+    expect(session.roundManager!.buyPhase).toBe(false)
+  })
+})
+
+describe('bomb mechanics', () => {
+  it('creates bombsites in competitive mode', () => {
+    const config = defaultCompetitiveConfig()
+    const session = new GameSession(config)
+    expect(session.bombsites).toHaveLength(2)
+    expect(session.bombsites[0].id).toBe('A')
+    expect(session.bombsites[1].id).toBe('B')
+  })
+
+  it('creates bomb carrier in competitive mode', () => {
+    const config = defaultCompetitiveConfig()
+    const session = new GameSession(config)
+    expect(session.bomb).toBeDefined()
+    expect(session.bomb.state).toBe(BombState.None)
+  })
+
+  it('does not create bombsites in non-competitive mode', () => {
+    const session = new GameSession()
+    expect(session.bombsites).toHaveLength(0)
+  })
+
+  it('assigns bomb at round start', () => {
+    const config = defaultCompetitiveConfig()
+    const session = new GameSession(config)
+    session.addPlayer('t1', 'TPlayer', 't')
+    session.assignBomb()
+    expect(session.bomb.state).toBe(BombState.Carried)
+  })
+
+  it('updates bomb state during step when planting', () => {
+    const config = defaultCompetitiveConfig()
+    const session = new GameSession(config)
+    session.addPlayer('t1', 'TPlayer', 't')
+    session.assignBomb()
+    session.bomb.startPlant('A')
+    session.step(1)
+    expect(session.bomb.state).toBe(BombState.Planting)
+    expect(session.bomb.plantProgress).toBe(1)
+  })
+
+  it('emits bombPlanted when plant completes', () => {
+    const config = defaultCompetitiveConfig()
+    const session = new GameSession(config)
+    session.addPlayer('t1', 'TPlayer', 't')
+    session.assignBomb()
+    session.bomb.startPlant('A')
+    const events = session.step(3)
+    expect(session.bomb.state).toBe(BombState.Planted)
+    expect(events.some(e => e.type === 'bombPlanted')).toBe(true)
+  })
+
+  it('emits bombExploded when timer runs out', () => {
+    const config = defaultCompetitiveConfig()
+    const session = new GameSession(config)
+    session.addPlayer('t1', 'TPlayer', 't')
+    session.assignBomb()
+    session.bomb.startPlant('A')
+    session.step(3) // plant
+    const events = session.step(40) // explode
+    expect(session.bomb.state).toBe(BombState.Exploded)
+    expect(events.some(e => e.type === 'bombExploded')).toBe(true)
+  })
+
+  it('emits bombDefused when defuse completes', () => {
+    const config = defaultCompetitiveConfig()
+    const session = new GameSession(config)
+    session.addPlayer('t1', 'TPlayer', 't')
+    session.assignBomb()
+    session.bomb.startPlant('A')
+    session.step(3) // plant
+    session.bomb.startDefuse(true)
+    const events = session.step(5) // defuse
+    expect(session.bomb.state).toBe(BombState.Defused)
+    expect(events.some(e => e.type === 'bombDefused')).toBe(true)
+  })
+})
+
+describe('bomb interaction', () => {
+  function comp(): GameSession {
+    return new GameSession(defaultCompetitiveConfig())
+  }
+
+  it('tryPlant starts a plant when the T carrier stands inside a bombsite', () => {
+    const s = comp()
+    const t = s.addPlayer('t1', 'T', 't')
+    s.assignBomb() // t1 carries
+    t.player.position.set(0, 2, -25) // inside site A
+    expect(s.tryPlant('t1')).toBe(true)
+    expect(s.bomb.state).toBe(BombState.Planting)
+    expect(s.bomb.site).toBe('A')
+  })
+
+  it('tryPlant fails when the carrier is not inside a bombsite', () => {
+    const s = comp()
+    const t = s.addPlayer('t1', 'T', 't')
+    s.assignBomb()
+    t.player.position.set(0, 2, 0) // arena centre, no site
+    expect(s.tryPlant('t1')).toBe(false)
+    expect(s.bomb.state).toBe(BombState.Carried)
+  })
+
+  it('tryPlant fails when the requester is not the carrier', () => {
+    const s = comp()
+    s.addPlayer('t1', 'T', 't')
+    const t2 = s.addPlayer('t2', 'T2', 't')
+    s.assignBomb() // t1 carries
+    t2.player.position.set(0, 2, -25)
+    expect(s.tryPlant('t2')).toBe(false)
+  })
+
+  it('tryDefuse lets a CT near the planted bomb start defusing', () => {
+    const s = comp()
+    const t = s.addPlayer('t1', 'T', 't')
+    s.assignBomb()
+    t.player.position.set(0, 2, -25)
+    s.tryPlant('t1')
+    s.step(3) // complete plant
+    expect(s.bomb.state).toBe(BombState.Planted)
+    const ct = s.getPlayer('local')!
+    ct.player.position.set(0, 2, -25)
+    expect(s.tryDefuse('local', true)).toBe(true)
+    expect(s.bomb.state).toBe(BombState.Defusing)
+  })
+
+  it('tryDefuse fails for a T player', () => {
+    const s = comp()
+    const t = s.addPlayer('t1', 'T', 't')
+    s.assignBomb()
+    t.player.position.set(0, 2, -25)
+    s.tryPlant('t1')
+    s.step(3)
+    t.player.position.set(0, 2, -25)
+    expect(s.tryDefuse('t1', true)).toBe(false)
+  })
+
+  it('auto-picks up a dropped bomb when a T player walks over it', () => {
+    const s = comp()
+    const t = s.addPlayer('t1', 'T', 't')
+    s.assignBomb()
+    s.bomb.drop({ x: 0, y: 0, z: 5 })
+    t.player.position.set(0, 2, 5)
+    s.step(0.1)
+    expect(s.bomb.state).toBe(BombState.Carried)
+    expect(s.bomb.carrier).toBe('t1')
+  })
+
+  it('auto-assigns the bomb to a T player when the round goes active', () => {
+    const s = comp()
+    s.addPlayer('t1', 'T', 't')
+    expect(s.bomb.state).toBe(BombState.None)
+    s.step(16) // buy phase (15s) -> active
+    expect(s.roundManager!.buyPhase).toBe(false)
+    expect(s.bomb.state).toBe(BombState.Carried)
+    expect(s.bomb.carrier).toBe('t1')
+  })
+})
+
+describe('round resolution', () => {
+  function comp(): GameSession {
+    return new GameSession(defaultCompetitiveConfig())
+  }
+
+  it('concludes a defused round exactly once and resets the bomb', () => {
+    const s = comp()
+    s.roundManager!.state = RoundState.Active
+    s.roundManager!.roundTimer = 100
+    s.bomb.state = BombState.Planted
+    s.bomb.site = 'A'
+    s.bomb.timer = 40
+    s.bomb.startDefuse(true)
+    s.step(5) // defuse completes this tick
+    expect(s.bomb.state).toBe(BombState.Defused)
+    s.step(1) // resolution: CT wins the round
+    expect(s.roundManager!.ctScore).toBe(1)
+    expect(s.bomb.state).toBe(BombState.None) // reset for next round
+    s.step(1)
+    s.step(1)
+    expect(s.roundManager!.ctScore).toBe(1) // does NOT re-fire
+  })
+
+  it('resets economy money to 800 at halftime', () => {
+    const s = comp()
+    s.economy!.money = 5000
+    s.roundManager!.round = 15
+    s.roundManager!.state = RoundState.Active
+    s.roundManager!.roundTimer = 0.01
+    s.step(1) // round 15 ends -> halftime
+    expect(s.roundManager!.isHalftime).toBe(true)
+    expect(s.economy!.money).toBe(800)
+  })
+
+  it('revives dead players at the start of the next round', () => {
+    const s = comp()
+    const t = s.addPlayer('t1', 'T', 't')
+    t.player.takeDamage(1000)
+    expect(t.player.isDead).toBe(true)
+    s.roundManager!.state = RoundState.Active
+    s.roundManager!.roundTimer = 0.01
+    s.step(1) // round ends -> next round
+    expect(t.player.isDead).toBe(false)
   })
 })

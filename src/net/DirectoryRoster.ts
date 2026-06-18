@@ -10,12 +10,13 @@ export class DirectoryRoster {
     this.records.set(entry.roomCode, { ...entry, lastSeen: now })
   }
 
-  heartbeat(roomCode: string, players: number, status: ServerStatus, now: number): void {
+  heartbeat(roomCode: string, players: number, status: ServerStatus, now: number, mode?: string): void {
     const rec = this.records.get(roomCode)
     if (!rec) return
     rec.players = players
     rec.status = status
     rec.lastSeen = now
+    if (mode !== undefined) rec.mode = mode
   }
 
   remove(roomCode: string): void {
