@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
-import { ServerFilters, type ServerFilter } from '../ServerFilters'
+import { ServerFilters } from '../ServerFilters'
 import { ServerList, type ServerRow } from '../ServerList'
 
 const makeRow = (overrides: Partial<ServerRow> = {}): ServerRow => ({
