@@ -65,6 +65,7 @@ export interface Snapshot {
     timer?: number
     plantProgress?: number
     defuseProgress?: number
+    defuseDuration?: number
   }
 }
 
@@ -117,4 +118,6 @@ export type NetMessage =
   | { type: 'buy'; playerId: string; item: string }
   | { type: 'startWave'; playerId: string }
   | { type: 'setTeam'; playerId: string; team: Team }
+  | { type: 'plantBomb'; playerId: string }
+  | { type: 'defuseBomb'; playerId: string; hasKit: boolean }
   | { type: 'start' }

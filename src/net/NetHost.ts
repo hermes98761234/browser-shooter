@@ -38,6 +38,10 @@ export class NetHost {
       } else if (msg.type === 'setTeam' && msg.playerId === playerId) {
         const entity = this.session.getPlayer(playerId)
         if (entity && (msg.team === 'ct' || msg.team === 't')) entity.team = msg.team
+      } else if (msg.type === 'plantBomb' && msg.playerId === playerId) {
+        this.session.tryPlant(playerId)
+      } else if (msg.type === 'defuseBomb' && msg.playerId === playerId) {
+        this.session.tryDefuse(playerId, msg.hasKit)
       }
     })
     const players = this.links.map(l => this.session.getPlayer(l.playerId)?.name ?? l.playerId)

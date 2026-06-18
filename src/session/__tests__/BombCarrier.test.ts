@@ -14,6 +14,31 @@ describe('BombCarrier', () => {
     expect(bomb.carrier).toBe('player-1')
   })
 
+  it('reset() clears all bomb state back to None', () => {
+    const bomb = new BombCarrier()
+    bomb.assign('player-1')
+    bomb.startPlant('A')
+    bomb.reset()
+    expect(bomb.state).toBe(BombState.None)
+    expect(bomb.carrier).toBeNull()
+    expect(bomb.position).toBeNull()
+    expect(bomb.site).toBeNull()
+    expect(bomb.plantProgress).toBe(0)
+    expect(bomb.defuseProgress).toBe(0)
+  })
+
+  it('exposes the current defuseDuration', () => {
+    const bomb = new BombCarrier()
+    bomb.assign('player-1')
+    bomb.startPlant('A')
+    bomb.update(3) // -> planted
+    bomb.startDefuse(false)
+    expect(bomb.defuseDuration).toBe(10)
+    bomb.cancelDefuse()
+    bomb.startDefuse(true)
+    expect(bomb.defuseDuration).toBe(5)
+  })
+
   it('drops bomb', () => {
     const bomb = new BombCarrier()
     bomb.assign('player-1')

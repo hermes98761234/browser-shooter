@@ -21,8 +21,18 @@ export class BombCarrier {
   defuseProgress: number = 0
 
   private plantDuration = 3
-  private defuseDuration = 5
+  defuseDuration = 5
   private defuseDurationNoKit = 10
+
+  reset(): void {
+    this.state = BombState.None
+    this.carrier = null
+    this.position = null
+    this.site = null
+    this.timer = 40
+    this.plantProgress = 0
+    this.defuseProgress = 0
+  }
 
   assign(playerId: string): void {
     this.state = BombState.Carried

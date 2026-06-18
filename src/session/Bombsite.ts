@@ -3,7 +3,7 @@ import type { Vec3 } from '../types'
 export class Bombsite {
   id: 'A' | 'B'
   center: Vec3
-  radius: number = 2
+  radius: number = 4
 
   constructor(id: 'A' | 'B', center: Vec3) {
     this.id = id

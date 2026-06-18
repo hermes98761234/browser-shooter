@@ -105,6 +105,7 @@ function App() {
   const [defuseProgress, setDefuseProgress] = useState(0)
 
   const lastWaveRef = useRef(0)
+  const ownedRef = useRef<string[]>([])
   const gameStateRef = useRef<GameState>('menu')
   const storeOpenRef = useRef(false)
   const showScoreboardRef = useRef(false)
@@ -212,7 +213,7 @@ function App() {
 
     setScore(0); setWave(0); setHealth(100); setAmmo(60); setWeaponName('Pistol')
     setMoney(16000); setStoreOpen(false)
-    setOwned([]); setMaxHealth(100)
+    setOwned([]); ownedRef.current = []; setMaxHealth(100)
     data.session.weaponManager.reset()
     data.session.player.resetLoadout()
     data.viewmodel?.setWeapon('pistol')
@@ -678,7 +679,7 @@ function App() {
         setBombTimer(session.bomb.timer)
         setBombSite(session.bomb.site)
         setPlantProgress(session.bomb.plantProgress / 3)
-        setDefuseProgress(session.bomb.defuseProgress > 5 ? session.bomb.defuseProgress / 10 : session.bomb.defuseProgress / 5)
+        setDefuseProgress(session.bomb.defuseProgress / session.bomb.defuseDuration)
       }
       setRespawnIn(session.respawnQueue.isPending(session.localId) ? session.respawnQueue.remaining(session.localId) : null)
       if (session.config.mode !== 'coop') setMatchScores(session.scoreboard.snapshot())
@@ -787,7 +788,7 @@ function App() {
         setBombTimer(snap.bomb.timer ?? 40)
         setBombSite(snap.bomb.site ?? null)
         if (snap.bomb.plantProgress !== undefined) setPlantProgress(snap.bomb.plantProgress / 3)
-        if (snap.bomb.defuseProgress !== undefined) setDefuseProgress(snap.bomb.defuseProgress > 5 ? snap.bomb.defuseProgress / 10 : snap.bomb.defuseProgress / 5)
+        if (snap.bomb.defuseProgress !== undefined) setDefuseProgress(snap.bomb.defuseProgress / (snap.bomb.defuseDuration ?? 5))
       }
       if (snap.scores.matchOver && gameStateRef.current === 'playing') {
         document.exitPointerLock()
@@ -868,6 +869,25 @@ function App() {
           if (data.session.config.mode !== 'pvp') data.session.waveManager.spawnNextWave()
         } else if (data.role === 'client' && data.netClient) {
           data.netClient.transport.send({ type: 'startWave', playerId: data.netClient.playerId! })
+        }
+      }
+
+      // Bomb objective (competitive): '5' plants, 'E' defuses. The authoritative
+      // session lives on the host/single-player; clients ask the host to act.
+      if (e.code === 'Digit5' && gameStateRef.current === 'playing') {
+        if (data.role === 'client' && data.netClient) {
+          data.netClient.transport.send({ type: 'plantBomb', playerId: data.netClient.playerId! })
+        } else {
+          data.session.tryPlant(data.session.localId)
+        }
+      }
+
+      if (e.code === 'KeyE' && gameStateRef.current === 'playing') {
+        const hasKit = ownedRef.current.includes('defuse_kit')
+        if (data.role === 'client' && data.netClient) {
+          data.netClient.transport.send({ type: 'defuseBomb', playerId: data.netClient.playerId!, hasKit })
+        } else {
+          data.session.tryDefuse(data.session.localId, hasKit)
         }
       }
 
@@ -1055,7 +1075,7 @@ function App() {
               } else {
                 applyItem(item, data.session.player, data.session.weaponManager)
               }
-              setOwned((prev) => [...prev, id])
+              setOwned((prev) => { const next = [...prev, id]; ownedRef.current = next; return next })
               setMaxHealth(data.session.player.maxHealth)
               const wm = data.session.weaponManager
               setWeaponName(wm.current.def.name)
