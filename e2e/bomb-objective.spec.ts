@@ -12,10 +12,10 @@ test.describe('Bomb Objective', () => {
     // Host: set up competitive match
     await host.goto('/')
     await clickButton(host, 'MULTIPLAYER')
-    await clickButton(host, 'Host Game')
+    await host.getByRole('button', { name: 'Create Room' }).first().click()
     await expect(host.getByText('MATCH SETUP')).toBeVisible()
     await clickButton(host, 'Competitive (CS-style)', true)
-    await clickButton(host, 'Create Room')
+    await host.getByRole('button', { name: 'Create Room' }).last().click()
 
     // Wait for room code; skip if broker unreachable
     const codeLocator = host.locator('strong').first()
@@ -62,10 +62,10 @@ test.describe('Bomb Objective', () => {
     // Host: set up competitive match
     await host.goto('/')
     await clickButton(host, 'MULTIPLAYER')
-    await clickButton(host, 'Host Game')
+    await host.getByRole('button', { name: 'Create Room' }).first().click()
     await expect(host.getByText('MATCH SETUP')).toBeVisible()
     await clickButton(host, 'Competitive (CS-style)', true)
-    await clickButton(host, 'Create Room')
+    await host.getByRole('button', { name: 'Create Room' }).last().click()
 
     const codeLocator = host.locator('strong').first()
     try {

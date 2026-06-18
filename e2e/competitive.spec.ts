@@ -5,11 +5,11 @@ test.describe('Competitive Mode', () => {
   test('can start competitive match', async ({ page }) => {
     await page.goto('/')
     await clickButton(page, 'MULTIPLAYER')
-    await clickButton(page, 'Host Game')
+    await page.getByRole('button', { name: 'Create Room' }).first().click()
     // MatchSetup screen: select Competitive mode, then Create Room
     await expect(page.getByText('MATCH SETUP')).toBeVisible()
     await clickButton(page, 'Competitive (CS-style)', true)
-    await clickButton(page, 'Create Room')
+    await page.getByRole('button', { name: 'Create Room' }).last().click()
     // Lobby shows after room creation
     await expect(page.getByText('Lobby')).toBeVisible()
   })
@@ -24,10 +24,10 @@ test.describe('Competitive Mode', () => {
     // Host: go to multiplayer, set up competitive match
     await host.goto('/')
     await clickButton(host, 'MULTIPLAYER')
-    await clickButton(host, 'Host Game')
+    await host.getByRole('button', { name: 'Create Room' }).first().click()
     await expect(host.getByText('MATCH SETUP')).toBeVisible()
     await clickButton(host, 'Competitive (CS-style)', true)
-    await clickButton(host, 'Create Room')
+    await host.getByRole('button', { name: 'Create Room' }).last().click()
 
     // Wait for room code; skip if broker unreachable
     const codeLocator = host.locator('strong').first()
@@ -73,10 +73,10 @@ test.describe('Competitive Mode', () => {
     // Host: set up competitive match
     await host.goto('/')
     await clickButton(host, 'MULTIPLAYER')
-    await clickButton(host, 'Host Game')
+    await host.getByRole('button', { name: 'Create Room' }).first().click()
     await expect(host.getByText('MATCH SETUP')).toBeVisible()
     await clickButton(host, 'Competitive (CS-style)', true)
-    await clickButton(host, 'Create Room')
+    await host.getByRole('button', { name: 'Create Room' }).last().click()
 
     const codeLocator = host.locator('strong').first()
     try {

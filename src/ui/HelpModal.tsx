@@ -29,6 +29,21 @@ export const HelpModal = ({ onClose }: HelpModalProps) => {
             <span style={{ opacity: 0.6 }}>ESC</span><span>Pause</span>
           </div>
         </div>
+
+        <div style={{ marginBottom: 20 }}>
+          <h3 style={{ marginBottom: 12, fontSize: 14, color: '#8a8aad' }}>COMPETITIVE MODE (Bomb)</h3>
+          <div style={{ fontSize: 13, lineHeight: 1.6, opacity: 0.8 }}>
+            <p style={{ margin: '0 0 8px' }}>Available in <strong>Multiplayer → Create Room → Competitive (CS-style)</strong></p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 20px' }}>
+              <span style={{ opacity: 0.6 }}>5</span><span>Plant Bomb (T side, in bombsite)</span>
+              <span style={{ opacity: 0.6 }}>E</span><span>Defuse Bomb (CT side, near bomb)</span>
+            </div>
+            <p style={{ margin: '12px 0 0', fontSize: 12, opacity: 0.6 }}>
+              T side: Carry bomb to site A or B, hold 5 to plant (3s). Bomb explodes after 40s = T wins.
+              <br />CT side: Defuse before explosion, hold E near bomb (5s with kit, 10s without) = CT wins.
+            </p>
+          </div>
+        </div>
         
         <button onClick={onClose} style={{
           width: '100%', padding: 12, background: '#3a3a55', color: '#fff',
