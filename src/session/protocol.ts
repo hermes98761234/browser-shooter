@@ -73,6 +73,7 @@ export type SessionEvent =
   | { type: 'playerKilledPlayer'; attackerId: string; victimId: string; victimTeam: Team; teamkill: boolean }
   | { type: 'playerRespawned'; playerId: string }
   | { type: 'matchOver'; winningTeam: Team }
+  | { type: 'roundEnd'; winner: 'ct' | 't'; reason: string; ctScore: number; tScore: number }
 
 /** Network envelope carried by Transport. */
 export type NetMessage =

@@ -10,6 +10,8 @@ import { emptyInput, type PlayerInput, type Snapshot, type SessionEvent, type En
 import type { Vec3, Team } from '../types'
 import { zonedDamage, resolveZone } from '../systems/DamageZones'
 import { type MatchConfig, defaultMatchConfig, canDamage } from './MatchConfig'
+import { RoundManager, RoundState } from './RoundManager'
+import { Economy } from './Economy'
 import { Scoreboard } from './Scoreboard'
 import { RespawnQueue } from './RespawnQueue'
 import { pickSpawn } from './Spawns'
@@ -45,6 +47,8 @@ export class GameSession {
   config: MatchConfig
   scoreboard: Scoreboard
   respawnQueue = new RespawnQueue()
+  roundManager: RoundManager | null = null
+  economy: Economy | null = null
 
   private shootRaycaster = new THREE.Raycaster()
   private cameraQuat = new THREE.Quaternion()
@@ -54,6 +58,11 @@ export class GameSession {
     this.config = config
     this.scoreboard = new Scoreboard(config.fragLimit)
     this.addPlayer(LOCAL_ID, 'You', 'ct')
+
+    if (config.mode === 'competitive') {
+      this.roundManager = new RoundManager()
+      this.economy = new Economy(800)
+    }
   }
 
   addPlayer(id: string, name: string, team: Team = 'ct'): PlayerEntity {
@@ -103,6 +112,15 @@ export class GameSession {
     return this.inputs.get(playerId) ?? emptyInput()
   }
 
+  handleDeath(playerId: string): void {
+    if (this.config.mode === 'competitive') {
+      const entity = this.playerMap.get(playerId)
+      if (entity) {
+        entity.weapons.reset()
+      }
+    }
+  }
+
   nearestPlayer(point: THREE.Vector3): PlayerEntity | null {
     let best: PlayerEntity | null = null
     let bestDist = Infinity
@@ -144,6 +162,14 @@ export class GameSession {
   step(dt: number): SessionEvent[] {
     const events: SessionEvent[] = []
     this.tick++
+
+    if (this.roundManager) {
+      this.roundManager.update(dt)
+      if (this.roundManager.state === RoundState.Over) {
+        events.push({ type: 'roundEnd', winner: 'ct', reason: 'time', ctScore: this.roundManager.ctScore, tScore: this.roundManager.tScore })
+      }
+    }
+
     // Respawn any players whose timer elapsed.
     for (const id of this.respawnQueue.update(dt)) {
       const entity = this.playerMap.get(id)
