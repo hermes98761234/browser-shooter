@@ -2,6 +2,8 @@ import React, { useRef } from 'react'
 import type { MutableRefObject } from 'react'
 import type { Controls } from '../player/Controls'
 
+type GrenadeType = 'he' | 'flash' | 'smoke'
+
 interface TouchControlsProps {
   controls: Controls
   lookRef: MutableRefObject<{ yaw: number; pitch: number }>
@@ -10,6 +12,8 @@ interface TouchControlsProps {
   onCycleWeapon: () => void
   onToggleStore: () => void
   onToggleScoreboard: () => void
+  onSelectGrenade: (type: GrenadeType) => void
+  activeGrenade?: GrenadeType | null
 }
 
 const JOY_SIZE = 130
@@ -26,6 +30,7 @@ const LOOK_SPEED = 0.004
 export const TouchControls: React.FC<TouchControlsProps> = ({
   controls, lookRef, lookSensitivity,
   onReload, onCycleWeapon, onToggleStore, onToggleScoreboard,
+  onSelectGrenade, activeGrenade,
 }) => {
   const joyId = useRef<number | null>(null)
   const joyCenter = useRef({ x: 0, y: 0 })
@@ -159,6 +164,32 @@ export const TouchControls: React.FC<TouchControlsProps> = ({
         <div style={actionBtn} onTouchStart={tap(onReload)}>RELOAD</div>
         <div style={actionBtn} onTouchStart={tap(onCycleWeapon)}>WEAP</div>
         <div style={actionBtn} onTouchStart={tap(onToggleStore)}>BUY</div>
+      </div>
+
+      {/* Grenade selector (above action column) */}
+      <div style={{
+        position: 'absolute', right: 32, bottom: 350, display: 'flex', flexDirection: 'column', gap: 10,
+      }}>
+        {(['he', 'flash', 'smoke'] as const).map((type) => (
+          <div
+            key={type}
+            style={{
+              ...actionBtn,
+              width: 52,
+              height: 52,
+              fontSize: 11,
+              background: activeGrenade === type
+                ? 'rgba(255,200,0,0.4)'
+                : 'rgba(255,255,255,0.12)',
+              border: activeGrenade === type
+                ? '2px solid rgba(255,220,0,0.8)'
+                : '2px solid rgba(255,255,255,0.4)',
+            }}
+            onTouchStart={tap(() => onSelectGrenade(type))}
+          >
+            {type === 'he' ? 'HE' : type === 'flash' ? 'FLASH' : 'SMOKE'}
+          </div>
+        ))}
       </div>
 
       {/* Scoreboard toggle (top-right) */}
