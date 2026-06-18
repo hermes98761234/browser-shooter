@@ -29,3 +29,35 @@ describe('StoreCatalog', () => {
     expect(canAffordItem(0, 'nope')).toBe(false)
   })
 })
+
+describe('new items', () => {
+  it('includes bomb item', () => {
+    const bomb = findItem('bomb')
+    expect(bomb).toBeDefined()
+    expect(bomb!.price).toBe(0)
+    expect(bomb!.team).toBe('t')
+    expect(bomb!.kind).toBe('objective')
+  })
+
+  it('includes defuse kit item', () => {
+    const kit = findItem('defuse_kit')
+    expect(kit).toBeDefined()
+    expect(kit!.price).toBe(400)
+    expect(kit!.team).toBe('ct')
+    expect(kit!.kind).toBe('gear')
+  })
+
+  it('includes heavy armor item', () => {
+    const armor = findItem('heavy_armor')
+    expect(armor).toBeDefined()
+    expect(armor!.price).toBe(1000)
+    expect(armor!.kind).toBe('armor')
+  })
+
+  it('bomb is free for T team', () => {
+    const items = catalogForTeam('t')
+    const bomb = items.find(i => i.id === 'bomb')
+    expect(bomb).toBeDefined()
+    expect(bomb!.price).toBe(0)
+  })
+})
