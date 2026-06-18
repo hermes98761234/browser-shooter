@@ -101,4 +101,29 @@ export class SoundEffects {
   playWaveStart() {
     this.audio.play('wave_start', { volume: 0.5 })
   }
+
+  // Grenade sounds
+  playGrenadeThrow(position?: { x: number; y: number; z: number }) {
+    this.audio.play('weapon_reload', {
+      volume: 0.5,
+      position,
+    })
+  }
+
+  playGrenadeBounce(position: { x: number; y: number; z: number }) {
+    this.audio.play('bullet_impact', {
+      volume: 0.3,
+      position,
+    })
+  }
+
+  playGrenadeDetonate(type: 'he' | 'flash' | 'smoke', position: { x: number; y: number; z: number }) {
+    if (type === 'he') {
+      this.audio.play('enemy_death', { volume: 1.5, position })
+    } else if (type === 'flash') {
+      this.audio.play('weapon_fire', { volume: 0.8, position })
+    } else {
+      this.audio.play('weapon_reload', { volume: 0.5, position })
+    }
+  }
 }

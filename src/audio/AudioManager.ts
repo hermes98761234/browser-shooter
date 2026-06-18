@@ -3,6 +3,7 @@ export type SoundName =
   | 'enemy_hit' | 'enemy_death'
   | 'player_hit' | 'player_death'
   | 'pickup' | 'wave_start'
+  | 'weapon_reload' | 'bullet_impact' | 'weapon_fire'
 
 interface SoundEntry {
   buffer: AudioBuffer
@@ -24,6 +25,9 @@ export class AudioManager {
     player_death: 'sounds/player_death.mp3',
     pickup: 'sounds/pickup.mp3',
     wave_start: 'sounds/wave_start.mp3',
+    weapon_reload: 'sounds/weapon_reload.mp3',
+    bullet_impact: 'sounds/bullet_impact.mp3',
+    weapon_fire: 'sounds/weapon_fire.mp3',
   }
 
   async init() {
