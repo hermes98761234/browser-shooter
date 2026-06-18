@@ -173,7 +173,25 @@ export class GameSession {
       health: e.health,
       isDead: e.isDead,
     }))
-    return { tick: this.tick, seq: 0, ack: {}, players, enemies, events: [], scores: this.scoreboard.snapshot() }
+    return {
+      tick: this.tick, seq: 0, ack: {}, players, enemies, events: [],
+      scores: this.scoreboard.snapshot(),
+      round: this.roundManager?.round,
+      roundTimer: this.roundManager?.roundTimer,
+      buyPhase: this.roundManager?.buyPhase,
+      buyPhaseTimer: this.roundManager?.buyPhaseTimer,
+      ctScore: this.roundManager?.ctScore,
+      tScore: this.roundManager?.tScore,
+      bomb: {
+        state: this.bomb.state,
+        carrier: this.bomb.carrier ?? undefined,
+        position: this.bomb.position ?? undefined,
+        site: this.bomb.site ?? undefined,
+        timer: this.bomb.timer,
+        plantProgress: this.bomb.plantProgress,
+        defuseProgress: this.bomb.defuseProgress,
+      },
+    }
   }
 
   step(dt: number): SessionEvent[] {

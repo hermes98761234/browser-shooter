@@ -51,6 +51,7 @@ import { RespawnOverlay } from './ui/RespawnOverlay'
 import { MatchOver } from './ui/MatchOver'
 import { defaultMatchConfig, type MatchConfig } from './session/MatchConfig'
 import type { MatchScores } from './session/protocol'
+import { BombState } from './session/BombCarrier'
 
 function moveToTeam(roster: { ct: string[]; t: string[] }, name: string, team: 'ct' | 't') {
   const ct = roster.ct.filter(n => n !== name)
@@ -96,6 +97,11 @@ function App() {
   const [killFeed, setKillFeed] = useState<KillLine[]>([])
   const [respawnIn, setRespawnIn] = useState<number | null>(null)
   const [matchScores, setMatchScores] = useState<MatchScores | null>(null)
+  const [bombState, setBombState] = useState<BombState>(BombState.None)
+  const [bombTimer, setBombTimer] = useState(40)
+  const [bombSite, setBombSite] = useState<'A' | 'B' | null>(null)
+  const [plantProgress, setPlantProgress] = useState(0)
+  const [defuseProgress, setDefuseProgress] = useState(0)
 
   const lastWaveRef = useRef(0)
   const gameStateRef = useRef<GameState>('menu')
@@ -348,6 +354,21 @@ function App() {
           break
         case 'matchOver':
           break // handled via snapshot.scores in updateClient
+        case 'bombPlanted':
+          setBombState(BombState.Planted)
+          setBombSite(ev.site)
+          setBombTimer(40)
+          break
+        case 'bombExploded':
+          break
+        case 'bombDefused':
+          break
+        case 'bombDropped':
+          setBombState(BombState.Dropped)
+          break
+        case 'bombPickedUp':
+          setBombState(BombState.Carried)
+          break
       }
     })
     client.onWelcome((_, mode, players) => {
@@ -571,6 +592,21 @@ function App() {
           case 'buyPhaseStart':
             setStoreOpen(true)
             break
+          case 'bombPlanted':
+            setBombState(BombState.Planted)
+            setBombSite(ev.site)
+            setBombTimer(40)
+            break
+          case 'bombExploded':
+            break
+          case 'bombDefused':
+            break
+          case 'bombDropped':
+            setBombState(BombState.Dropped)
+            break
+          case 'bombPickedUp':
+            setBombState(BombState.Carried)
+            break
         }
       }
 
@@ -619,6 +655,15 @@ function App() {
       setHealth(session.player.health)
       setPlayerPos(session.player.position.clone())
       setPlayerRot(session.player.rotation.y)
+
+      // Sync bomb state from session
+      if (session.config.mode === 'competitive') {
+        setBombState(session.bomb.state)
+        setBombTimer(session.bomb.timer)
+        setBombSite(session.bomb.site)
+        setPlantProgress(session.bomb.plantProgress / 3)
+        setDefuseProgress(session.bomb.defuseProgress > 5 ? session.bomb.defuseProgress / 10 : session.bomb.defuseProgress / 5)
+      }
       setRespawnIn(session.respawnQueue.isPending(session.localId) ? session.respawnQueue.remaining(session.localId) : null)
       if (session.config.mode !== 'coop') setMatchScores(session.scoreboard.snapshot())
 
@@ -714,6 +759,13 @@ function App() {
       const meState = snap.players.find(p => p.id === client.playerId)
       setRespawnIn(meState?.respawnIn ?? null)
       setMatchScores(snap.scores)
+      if (snap.bomb) {
+        setBombState(snap.bomb.state as BombState)
+        setBombTimer(snap.bomb.timer ?? 40)
+        setBombSite(snap.bomb.site ?? null)
+        if (snap.bomb.plantProgress !== undefined) setPlantProgress(snap.bomb.plantProgress / 3)
+        if (snap.bomb.defuseProgress !== undefined) setDefuseProgress(snap.bomb.defuseProgress > 5 ? snap.bomb.defuseProgress / 10 : snap.bomb.defuseProgress / 5)
+      }
       if (snap.scores.matchOver && gameStateRef.current === 'playing') {
         document.exitPointerLock()
         updateGameState('matchover')
@@ -920,6 +972,11 @@ function App() {
             money={gameDataRef.current.session.economy?.money}
             ctScore={gameDataRef.current.session.roundManager?.ctScore}
             tScore={gameDataRef.current.session.roundManager?.tScore}
+            bombState={bombState}
+            bombTimer={bombTimer}
+            bombSite={bombSite}
+            plantProgress={plantProgress}
+            defuseProgress={defuseProgress}
           />
           <Crosshair runtime={crosshairRef} />
           <Minimap
@@ -927,6 +984,8 @@ function App() {
             playerRotation={playerRot}
             enemies={enemyPositions}
             arenaSize={ARENA_SIZE}
+            bombsites={gameDataRef.current.session.bombsites.map(s => ({ id: s.id, position: s.center }))}
+            bombPosition={gameDataRef.current.session.bomb.position ?? undefined}
           />
           <WaveAnnounce wave={wave} visible={showWaveAnnounce} />
           <DamageOverlay indicator={damageIndicator} />

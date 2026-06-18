@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest'
 import { Bombsite } from '../Bombsite'
-import type { Vec3 } from '../../types'
 
 describe('Bombsite', () => {
   it('creates with id and center', () => {
