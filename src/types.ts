@@ -24,9 +24,11 @@ export type WeaponType =
   // primary
   | 'm4' | 'aug' | 'ak' | 'galil' | 'mp5' | 'shotgun' | 'awp' | 'rifle'
 
+export type GrenadeType = 'he' | 'flash' | 'smoke'
+
 export type Team = 'ct' | 't'
 
-export type ItemKind = 'weapon' | 'armor' | 'health' | 'speed' | 'upgrade' | 'objective' | 'gear'
+export type ItemKind = 'weapon' | 'armor' | 'health' | 'speed' | 'upgrade' | 'objective' | 'gear' | 'grenade'
 
 export interface WeaponUpgrade {
   ammoMult?: number    // multiplies maxAmmo (and refills)
