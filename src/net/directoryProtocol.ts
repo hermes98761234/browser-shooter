@@ -13,6 +13,7 @@ export interface DirectoryEntry {
   players: number
   maxPlayers: number
   status: ServerStatus
+  mode?: string
 }
 
 /** Messages carried on the directory channel (distinct from the game NetMessage protocol). */
