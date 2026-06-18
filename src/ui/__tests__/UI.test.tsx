@@ -352,6 +352,91 @@ describe('GameOver', () => {
   })
 })
 
+describe('competitive HUD', () => {
+  it('shows round timer when provided', () => {
+    render(
+      <HUD
+        health={100}
+        maxHealth={100}
+        ammo={30}
+        maxAmmo={60}
+        weaponName="Pistol"
+        score={0}
+        wave={1}
+        waveActive={true}
+        enemiesRemaining={3}
+        round={5}
+        roundTimer={90}
+        buyPhase={false}
+        money={4200}
+        ctScore={3}
+        tScore={2}
+      />
+    )
+    expect(screen.getByText('Round 5 | CT: 3 - T: 2')).toBeInTheDocument()
+    expect(screen.getByText('90s')).toBeInTheDocument()
+  })
+
+  it('shows buy phase timer when in buy phase', () => {
+    render(
+      <HUD
+        health={100}
+        maxHealth={100}
+        ammo={30}
+        maxAmmo={60}
+        weaponName="Pistol"
+        score={0}
+        wave={1}
+        waveActive={true}
+        enemiesRemaining={3}
+        round={1}
+        roundTimer={115}
+        buyPhase={true}
+        buyPhaseTimer={12}
+        money={800}
+        ctScore={0}
+        tScore={0}
+      />
+    )
+    expect(screen.getByText('BUY PHASE: 12s')).toBeInTheDocument()
+  })
+
+  it('shows money when provided', () => {
+    render(
+      <HUD
+        health={100}
+        maxHealth={100}
+        ammo={30}
+        maxAmmo={60}
+        weaponName="Pistol"
+        score={0}
+        wave={1}
+        waveActive={true}
+        enemiesRemaining={3}
+        money={4200}
+      />
+    )
+    expect(screen.getByText('$4200')).toBeInTheDocument()
+  })
+
+  it('does not show round info when round is undefined', () => {
+    render(
+      <HUD
+        health={100}
+        maxHealth={100}
+        ammo={30}
+        maxAmmo={60}
+        weaponName="Pistol"
+        score={0}
+        wave={1}
+        waveActive={true}
+        enemiesRemaining={3}
+      />
+    )
+    expect(screen.queryByText(/Round/)).not.toBeInTheDocument()
+  })
+})
+
 describe('PauseMenu', () => {
   it('renders paused title', () => {
     render(<PauseMenu onResume={() => {}} onMainMenu={() => {}} />)

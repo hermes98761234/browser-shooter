@@ -10,6 +10,13 @@ interface HUDProps {
   wave: number
   waveActive: boolean
   enemiesRemaining: number
+  round?: number
+  roundTimer?: number
+  buyPhase?: boolean
+  buyPhaseTimer?: number
+  money?: number
+  ctScore?: number
+  tScore?: number
 }
 
 export const HUD: React.FC<HUDProps> = ({
@@ -22,6 +29,13 @@ export const HUD: React.FC<HUDProps> = ({
   wave,
   waveActive,
   enemiesRemaining,
+  round,
+  roundTimer,
+  buyPhase,
+  buyPhaseTimer,
+  money,
+  ctScore,
+  tScore,
 }) => {
   const healthPercent = maxHealth > 0 ? (health / maxHealth) * 100 : 0
   const healthColor = healthPercent > 60 ? '#00ff00' : healthPercent > 30 ? '#ffff00' : '#ff0000'
@@ -36,6 +50,31 @@ export const HUD: React.FC<HUDProps> = ({
     }}>
       {/* Crosshair is rendered separately (see <Crosshair/> in App) so it can animate
           its dynamic bloom without re-rendering the HUD every frame. */}
+
+      {/* Round info (competitive mode) */}
+      {round !== undefined && (
+        <div style={{ position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)', textAlign: 'center' }}>
+          <div style={{ fontSize: 18, fontFamily: 'monospace', color: '#fff' }}>
+            Round {round} | CT: {ctScore} - T: {tScore}
+          </div>
+          {buyPhase ? (
+            <div style={{ fontSize: 16, color: '#ffcc00', textAlign: 'center' }}>
+              BUY PHASE: {Math.ceil(buyPhaseTimer ?? 0)}s
+            </div>
+          ) : (
+            <div style={{ fontSize: 16, color: '#fff', textAlign: 'center' }}>
+              {Math.ceil(roundTimer ?? 0)}s
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Money (competitive mode) */}
+      {money !== undefined && (
+        <div style={{ position: 'absolute', top: 10, right: 10, fontSize: 18, fontFamily: 'monospace', color: '#00ff00' }}>
+          ${money}
+        </div>
+      )}
 
       {/* Health bar */}
       <div style={{
