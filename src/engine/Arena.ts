@@ -78,5 +78,22 @@ export function createArena(scene: THREE.Scene): CollisionWorld {
   sun.shadow.camera.bottom = -45
   scene.add(sun)
 
+  // Add bombsite markers
+  const siteA = new THREE.Mesh(
+    new THREE.RingGeometry(3, 4, 32),
+    new THREE.MeshBasicMaterial({ color: 0xff3333, transparent: true, opacity: 0.5 })
+  )
+  siteA.rotation.x = -Math.PI / 2
+  siteA.position.set(0, 0.01, -25)
+  scene.add(siteA)
+
+  const siteB = new THREE.Mesh(
+    new THREE.RingGeometry(3, 4, 32),
+    new THREE.MeshBasicMaterial({ color: 0x3333ff, transparent: true, opacity: 0.5 })
+  )
+  siteB.rotation.x = -Math.PI / 2
+  siteB.position.set(0, 0.01, 25)
+  scene.add(siteB)
+
   return world
 }
