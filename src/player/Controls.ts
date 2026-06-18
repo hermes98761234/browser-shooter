@@ -19,6 +19,9 @@ export class Controls {
   onToggleStore: (() => void) | null = null
   /** Fired on Tab down (true) / up (false) to show/hide the scoreboard. */
   onScoreboard: ((show: boolean) => void) | null = null
+  onThrowGrenade: ((mode: 'long' | 'short') => void) | null = null
+  onSelectGrenade: ((type: 'he' | 'flash' | 'smoke') => void) | null = null
+  onCycleGrenade: (() => void) | null = null
   private scoreboardHeld = false
 
   constructor(element: HTMLElement, getGameState: () => GameState) {
@@ -60,6 +63,10 @@ export class Controls {
         if (!this.scoreboardHeld) { this.scoreboardHeld = true; this.onScoreboard?.(true) }
         break
       case 'KeyB': e.preventDefault(); this.onToggleStore?.(); break
+      case 'Digit4': this.onSelectGrenade?.('he'); break
+      case 'Digit5': this.onSelectGrenade?.('flash'); break
+      case 'Digit6': this.onSelectGrenade?.('smoke'); break
+      case 'KeyG': this.onCycleGrenade?.(); break
     }
   }
 
@@ -90,6 +97,10 @@ export class Controls {
       if (this.getGameState() === 'playing' && document.pointerLockElement !== this.element) {
         this.element.requestPointerLock()
       }
+      this.onThrowGrenade?.('long')
+    }
+    if (e.button === 2) {
+      this.onThrowGrenade?.('short')
     }
   }
 
