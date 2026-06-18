@@ -82,7 +82,7 @@ export class Viewmodel {
     this.recoil = 1
   }
 
-  setGrenade(type: 'he' | 'flash' | 'smoke') {
+  setGrenade() {
     // Placeholder: show grenade model in hand
     this.setWeapon('pistol')
   }

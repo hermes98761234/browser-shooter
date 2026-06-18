@@ -274,7 +274,7 @@ export class GameSession {
           const lookDir = new THREE.Vector3(0, 0, -1).applyEuler(entity.player.rotation)
           const dot = dirToGrenade.dot(lookDir)
           if (dot > 0) {
-            const duration = calcFlashBlindDuration(dist)
+            calcFlashBlindDuration(dist)
             affectedPlayers.push(entity.id)
           }
         }
