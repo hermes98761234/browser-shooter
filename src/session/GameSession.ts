@@ -19,6 +19,9 @@ import { raycastPlayerCapsule } from './PlayerHit'
 import type { HitZone } from '../systems/DamageZones'
 import { Bombsite } from './Bombsite'
 import { BombCarrier, BombState } from './BombCarrier'
+import { Grenade } from '../weapons/Grenade'
+import { GRENADE_DEFS, calcHeDamage, calcFlashBlindDuration } from '../weapons/GrenadeDefs'
+import { SmokeCloud } from '../effects/SmokeCloud'
 
 export const ARENA_SIZE = 30
 const LOCAL_ID = 'local'
@@ -53,6 +56,8 @@ export class GameSession {
   economy: Economy | null = null
   bombsites: Bombsite[] = []
   bomb: BombCarrier = new BombCarrier()
+  activeGrenades: Grenade[] = []
+  smokeClouds: SmokeCloud[] = []
 
   private shootRaycaster = new THREE.Raycaster()
   private cameraQuat = new THREE.Quaternion()
@@ -209,6 +214,85 @@ export class GameSession {
     return true
   }
 
+  throwGrenade(playerId: string, type: 'he' | 'flash' | 'smoke', mode: 'long' | 'short'): boolean {
+    const entity = this.playerMap.get(playerId)
+    if (!entity || entity.player.isDead) return false
+
+    const def = GRENADE_DEFS[type]
+    const speed = mode === 'long' ? def.longThrowSpeed : def.shortThrowSpeed
+
+    const cameraQuat = new THREE.Quaternion().setFromEuler(entity.player.rotation)
+    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(cameraQuat)
+    const velocity = forward.multiplyScalar(speed)
+    if (mode === 'short') velocity.y = 3
+
+    const position = entity.player.position.clone().add(forward.clone().multiplyScalar(0.5))
+    const grenade = new Grenade(type, { x: position.x, y: position.y, z: position.z },
+      { x: velocity.x, y: velocity.y, z: velocity.z })
+
+    this.activeGrenades.push(grenade)
+    return true
+  }
+
+  private detonateGrenade(grenade: Grenade, pos: Vec3, events: SessionEvent[]): void {
+    const position = new THREE.Vector3(pos.x, pos.y, pos.z)
+    const affectedPlayers: string[] = []
+
+    if (grenade.type === 'he') {
+      for (const entity of this.playerMap.values()) {
+        if (entity.player.isDead) continue
+        const dist = entity.player.position.distanceTo(position)
+        if (dist <= grenade.def.effectRadius) {
+          const damage = calcHeDamage(dist)
+          entity.player.takeDamage(damage)
+          affectedPlayers.push(entity.id)
+          if (entity.player.isDead) {
+            events.push({ type: 'playerDied', playerId: entity.id })
+            this.handleDeath(entity.id)
+          }
+        }
+      }
+      for (const enemy of this.enemies) {
+        if (enemy.isDead) continue
+        const dist = enemy.mesh.position.distanceTo(position)
+        if (dist <= grenade.def.effectRadius) {
+          const damage = calcHeDamage(dist)
+          enemy.takeDamage(damage)
+          if (enemy.isDead) {
+            this.scoreSystem.addKill(enemy.def.scoreValue)
+            this.waveManager.onEnemyKilled()
+            events.push({ type: 'enemyKilled', enemyType: enemy.type, pos: toVec3(enemy.mesh.position), scoreValue: enemy.def.scoreValue })
+          }
+        }
+      }
+    } else if (grenade.type === 'flash') {
+      for (const entity of this.playerMap.values()) {
+        if (entity.player.isDead) continue
+        const dist = entity.player.position.distanceTo(position)
+        if (dist <= grenade.def.effectRadius) {
+          const dirToGrenade = position.clone().sub(entity.player.position).normalize()
+          const lookDir = new THREE.Vector3(0, 0, -1).applyEuler(entity.player.rotation)
+          const dot = dirToGrenade.dot(lookDir)
+          if (dot > 0) {
+            const duration = calcFlashBlindDuration(dist)
+            affectedPlayers.push(entity.id)
+          }
+        }
+      }
+    } else if (grenade.type === 'smoke') {
+      const smoke = new SmokeCloud(position)
+      this.smokeClouds.push(smoke)
+    }
+
+    events.push({
+      type: 'grenadeDetonated',
+      id: grenade.id,
+      position: pos,
+      grenadeType: grenade.type,
+      affectedPlayers,
+    })
+  }
+
   nearestPlayer(point: THREE.Vector3): PlayerEntity | null {
     let best: PlayerEntity | null = null
     let bestDist = Infinity
@@ -247,7 +331,18 @@ export class GameSession {
       isDead: e.isDead,
     }))
     return {
-      tick: this.tick, seq: 0, ack: {}, players, enemies, events: [],
+      tick: this.tick, seq: 0, ack: {}, players, enemies,
+      grenades: this.activeGrenades.map(g => ({
+        id: g.id,
+        type: g.type,
+        position: { x: g.position.x, y: g.position.y, z: g.position.z },
+        velocity: { x: g.velocity.x, y: g.velocity.y, z: g.velocity.z },
+        rotation: { x: g.rotation.x, y: g.rotation.y, z: g.rotation.z },
+        bounces: g.bounces,
+        fuseTimer: g.fuseTimer,
+        thrownBy: 'local',
+      })),
+      events: [],
       scores: this.scoreboard.snapshot(),
       round: this.roundManager?.round,
       roundTimer: this.roundManager?.roundTimer,
@@ -388,6 +483,28 @@ export class GameSession {
           this.pickups.splice(i, 1)
           break
         }
+      }
+    }
+
+    // Update active grenades
+    for (let i = this.activeGrenades.length - 1; i >= 0; i--) {
+      const grenade = this.activeGrenades[i]
+      grenade.update(dt)
+
+      if (grenade.isExpired()) {
+        const pos = grenade.detonate()
+        this.detonateGrenade(grenade, pos, events)
+        this.activeGrenades.splice(i, 1)
+        grenade.dispose()
+      }
+    }
+
+    // Update smoke clouds
+    for (let i = this.smokeClouds.length - 1; i >= 0; i--) {
+      this.smokeClouds[i].update(dt)
+      if (this.smokeClouds[i].isExpired()) {
+        this.smokeClouds[i].dispose()
+        this.smokeClouds.splice(i, 1)
       }
     }
 
