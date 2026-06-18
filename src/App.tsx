@@ -974,7 +974,7 @@ function App() {
             tScore={gameDataRef.current.session.roundManager?.tScore}
             bombState={bombState}
             bombTimer={bombTimer}
-            bombSite={bombSite}
+            bombSite={bombSite ?? undefined}
             plantProgress={plantProgress}
             defuseProgress={defuseProgress}
           />

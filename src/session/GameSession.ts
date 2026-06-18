@@ -305,7 +305,7 @@ export class GameSession {
       const afterState = this.bomb.state as BombState
 
       if (wasPlanting && afterState === BombState.Planted) {
-        events.push({ type: 'bombPlanted', site: this.bomb.site! })
+        events.push({ type: 'bombPlanted', site: this.bomb.site!, planterId: this.bomb.carrier ?? 'unknown', timer: this.bomb.timer })
       }
       if (afterState === BombState.Exploded) {
         events.push({ type: 'bombExploded', site: this.bomb.site! })
