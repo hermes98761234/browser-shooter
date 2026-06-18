@@ -17,6 +17,8 @@ import { RespawnQueue } from './RespawnQueue'
 import { pickSpawn } from './Spawns'
 import { raycastPlayerCapsule } from './PlayerHit'
 import type { HitZone } from '../systems/DamageZones'
+import { Bombsite } from './Bombsite'
+import { BombCarrier, BombState } from './BombCarrier'
 
 export const ARENA_SIZE = 30
 const LOCAL_ID = 'local'
@@ -49,6 +51,8 @@ export class GameSession {
   respawnQueue = new RespawnQueue()
   roundManager: RoundManager | null = null
   economy: Economy | null = null
+  bombsites: Bombsite[] = []
+  bomb: BombCarrier = new BombCarrier()
 
   private shootRaycaster = new THREE.Raycaster()
   private cameraQuat = new THREE.Quaternion()
@@ -62,6 +66,10 @@ export class GameSession {
     if (config.mode === 'competitive') {
       this.roundManager = new RoundManager()
       this.economy = new Economy(800)
+      this.bombsites = [
+        new Bombsite('A', { x: 0, y: 0, z: -25 }),
+        new Bombsite('B', { x: 0, y: 0, z: 25 }),
+      ]
     }
   }
 
@@ -117,6 +125,15 @@ export class GameSession {
       const entity = this.playerMap.get(playerId)
       if (entity) {
         entity.weapons.reset()
+      }
+    }
+  }
+
+  assignBomb(): void {
+    for (const entity of this.playerMap.values()) {
+      if (entity.team === 't') {
+        this.bomb.assign(entity.id)
+        return
       }
     }
   }
@@ -258,6 +275,25 @@ export class GameSession {
           this.pickups.splice(i, 1)
           break
         }
+      }
+    }
+
+    // Update bomb state
+    if (this.bomb.state === BombState.Planting ||
+        this.bomb.state === BombState.Planted ||
+        this.bomb.state === BombState.Defusing) {
+      const wasPlanting = this.bomb.state === BombState.Planting
+      this.bomb.update(dt)
+      const afterState = this.bomb.state as BombState
+
+      if (wasPlanting && afterState === BombState.Planted) {
+        events.push({ type: 'bombPlanted', site: this.bomb.site! })
+      }
+      if (afterState === BombState.Exploded) {
+        events.push({ type: 'bombExploded', site: this.bomb.site! })
+      }
+      if (afterState === BombState.Defused) {
+        events.push({ type: 'bombDefused', site: this.bomb.site! })
       }
     }
 
