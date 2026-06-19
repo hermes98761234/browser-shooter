@@ -13,6 +13,10 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # Needed so the build step can read the github-pages Environment variables
+    # (VITE_PEER_*). Without this, those vars are only visible to the deploy job,
+    # which never compiles the bundle.
+    environment: github-pages
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -22,6 +26,12 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
+        env:
+          VITE_PEER_HOST: ${{ vars.VITE_PEER_HOST }}
+          VITE_PEER_PORT: ${{ vars.VITE_PEER_PORT }}
+          VITE_PEER_PATH: ${{ vars.VITE_PEER_PATH }}
+          VITE_PEER_SECURE: ${{ vars.VITE_PEER_SECURE }}
+          VITE_PEER_KEY: ${{ vars.VITE_PEER_KEY }}
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
