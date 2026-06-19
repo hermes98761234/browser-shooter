@@ -1,5 +1,5 @@
 /** Global, shared directory id on the public PeerJS broker. Bump the suffix to rotate. */
-export const DIRECTORY_PEER_ID = 'browser-shooter-directory-v1'
+export const DIRECTORY_PEER_ID = 'browser-shooter-directory-v2'
 /** A roster entry is dropped if it has not been refreshed within this window. */
 export const ENTRY_TTL_MS = 15_000
 /** Hosts re-announce themselves on this interval. */
