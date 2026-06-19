@@ -1,7 +1,11 @@
 import * as THREE from 'three'
 import type { GrenadeType, Vec3 } from '../types'
+import type { CollisionWorld } from '../engine/CollisionWorld'
 import { GRENADE_DEFS, type GrenadeDef } from './GrenadeDefs'
 import { createGrenadeModel } from './GrenadeModel'
+
+/** Collision radius of a grenade, treated as a small sphere. */
+const GRENADE_RADIUS = 0.15
 
 export class Grenade {
   type: GrenadeType
@@ -33,7 +37,7 @@ export class Grenade {
     return this.mesh
   }
 
-  update(dt: number): void {
+  update(dt: number, world?: CollisionWorld): void {
     if (this.settled) {
       this.fuseTimer -= dt
       return
@@ -44,6 +48,9 @@ export class Grenade {
     this.position.x += this.velocity.x * dt
     this.position.y += this.velocity.y * dt
     this.position.z += this.velocity.z * dt
+
+    // Bounce off the walls and cover boxes of the map (not just the floor plane).
+    if (world) this.resolveBoxes(world)
 
     if (this.position.y <= 0.15) {
       this.position.y = 0.15
@@ -65,6 +72,58 @@ export class Grenade {
     this.mesh.rotation.copy(this.rotation)
 
     this.fuseTimer -= dt
+  }
+
+  /**
+   * Push the grenade out of any map box it has penetrated and reflect its velocity off
+   * the contacted face (restitution along the normal, friction on the tangent). Treats
+   * the grenade as a sphere of {@link GRENADE_RADIUS}.
+   */
+  private resolveBoxes(world: CollisionWorld): void {
+    for (const box of world.boxes) {
+      const closestX = THREE.MathUtils.clamp(this.position.x, box.min.x, box.max.x)
+      const closestY = THREE.MathUtils.clamp(this.position.y, box.min.y, box.max.y)
+      const closestZ = THREE.MathUtils.clamp(this.position.z, box.min.z, box.max.z)
+      const dx = this.position.x - closestX
+      const dy = this.position.y - closestY
+      const dz = this.position.z - closestZ
+      const distSq = dx * dx + dz * dz + dy * dy
+
+      if (distSq >= GRENADE_RADIUS * GRENADE_RADIUS) continue
+
+      const normal = new THREE.Vector3()
+      if (distSq > 1e-8) {
+        // Outside the box: normal points from the nearest surface point to the grenade.
+        const dist = Math.sqrt(distSq)
+        normal.set(dx / dist, dy / dist, dz / dist)
+        const push = GRENADE_RADIUS - dist
+        this.position.addScaledVector(normal, push)
+      } else {
+        // Centre inside the box: eject along the axis of least penetration.
+        const pen = [
+          { n: new THREE.Vector3(-1, 0, 0), d: this.position.x - box.min.x },
+          { n: new THREE.Vector3(1, 0, 0), d: box.max.x - this.position.x },
+          { n: new THREE.Vector3(0, -1, 0), d: this.position.y - box.min.y },
+          { n: new THREE.Vector3(0, 1, 0), d: box.max.y - this.position.y },
+          { n: new THREE.Vector3(0, 0, -1), d: this.position.z - box.min.z },
+          { n: new THREE.Vector3(0, 0, 1), d: box.max.z - this.position.z },
+        ].reduce((a, b) => (b.d < a.d ? b : a))
+        normal.copy(pen.n)
+        if (normal.x !== 0) this.position.x += normal.x * (pen.d + GRENADE_RADIUS)
+        else if (normal.y !== 0) this.position.y += normal.y * (pen.d + GRENADE_RADIUS)
+        else this.position.z += normal.z * (pen.d + GRENADE_RADIUS)
+      }
+
+      const vn = this.velocity.dot(normal)
+      if (vn < 0) {
+        // Split into normal/tangent, bounce the normal part, apply friction to the tangent.
+        const vNormal = normal.clone().multiplyScalar(vn)
+        const vTangent = this.velocity.clone().sub(vNormal)
+        this.velocity
+          .copy(vTangent.multiplyScalar(0.8))
+          .addScaledVector(vNormal, -this.def.restitution)
+      }
+    }
   }
 
   isExpired(): boolean {

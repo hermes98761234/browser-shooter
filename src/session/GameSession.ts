@@ -546,7 +546,7 @@ export class GameSession {
     // Update active grenades
     for (let i = this.activeGrenades.length - 1; i >= 0; i--) {
       const grenade = this.activeGrenades[i]
-      grenade.update(dt)
+      grenade.update(dt, this.collisionWorld ?? undefined)
 
       if (grenade.isExpired()) {
         const pos = grenade.detonate()
