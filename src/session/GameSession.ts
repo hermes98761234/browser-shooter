@@ -262,6 +262,7 @@ export class GameSession {
   private detonateGrenade(grenade: Grenade, pos: Vec3, events: SessionEvent[]): void {
     const position = new THREE.Vector3(pos.x, pos.y, pos.z)
     const affectedPlayers: string[] = []
+    const blindDurations: Record<string, number> = {}
 
     if (grenade.type === 'he') {
       const thrower = this.playerMap.get(grenade.thrownBy) ?? null
@@ -310,8 +311,11 @@ export class GameSession {
           const lookDir = new THREE.Vector3(0, 0, -1).applyEuler(entity.player.rotation)
           const dot = dirToGrenade.dot(lookDir)
           if (dot > 0) {
-            calcFlashBlindDuration(dist)
-            affectedPlayers.push(entity.id)
+            const duration = calcFlashBlindDuration(dist)
+            if (duration > 0) {
+              blindDurations[entity.id] = duration
+              affectedPlayers.push(entity.id)
+            }
           }
         }
       }
@@ -326,6 +330,7 @@ export class GameSession {
       position: pos,
       grenadeType: grenade.type,
       affectedPlayers,
+      blindDurations: grenade.type === 'flash' ? blindDurations : undefined,
     })
   }
 
