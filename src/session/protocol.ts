@@ -54,6 +54,12 @@ export interface GrenadeState {
   thrownBy: string
 }
 
+export interface VoiceRosterEntry {
+  playerId: string
+  peerId: string   // PeerJS id used for the direct voice mesh
+  name: string
+}
+
 export interface Snapshot {
   tick: number
   seq: number
@@ -135,4 +141,7 @@ export type NetMessage =
   | { type: 'setTeam'; playerId: string; team: Team }
   | { type: 'plantBomb'; playerId: string }
   | { type: 'defuseBomb'; playerId: string; hasKit: boolean }
+  | { type: 'voiceRoster'; teammates: VoiceRosterEntry[] }
+  | { type: 'voiceStart'; playerId: string; name: string }
+  | { type: 'voiceStop'; playerId: string }
   | { type: 'start' }
