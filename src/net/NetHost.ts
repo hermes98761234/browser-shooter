@@ -1,12 +1,12 @@
 import type { GameSession } from '../session/GameSession'
 import type { Transport } from '../session/Transport'
-import type { NetMessage, SessionEvent, Snapshot } from '../session/protocol'
+import type { NetMessage, SessionEvent, Snapshot, VoiceRosterEntry } from '../session/protocol'
 import type { MatchConfig } from '../session/MatchConfig'
 import type { Team } from '../types'
 import { applyItem } from '../player/applyPurchase'
 import { findItem } from '../weapons/StoreCatalog'
 
-interface ClientLink { playerId: string; transport: Transport }
+interface ClientLink { playerId: string; transport: Transport; voicePeerId?: string }
 
 /** Host-authoritative driver: owns the session, ingests client input, broadcasts snapshots. */
 export class NetHost {
@@ -18,6 +18,75 @@ export class NetHost {
   /** Monotonically increasing snapshot sequence number. */
   private snapSeq = 0
   private started = false
+  private hostVoice: { playerId: string; peerId: string } | null = null
+  private hostRosterCb: ((teammates: VoiceRosterEntry[]) => void) | null = null
+  private remoteVoiceStartCb: ((playerId: string, name: string) => void) | null = null
+  private remoteVoiceStopCb: ((playerId: string) => void) | null = null
+
+  setHostVoice(playerId: string, peerId: string): void {
+    this.hostVoice = { playerId, peerId }
+    this.refreshVoiceRoster()
+  }
+  onHostRoster(cb: (teammates: VoiceRosterEntry[]) => void): void { this.hostRosterCb = cb }
+  onRemoteVoiceStart(cb: (playerId: string, name: string) => void): void { this.remoteVoiceStartCb = cb }
+  onRemoteVoiceStop(cb: (playerId: string) => void): void { this.remoteVoiceStopCb = cb }
+
+  /** All voice participants (host + connected clients) with team + peer id. */
+  private voiceParticipants(): { playerId: string; peerId: string; name: string; team: Team }[] {
+    const out: { playerId: string; peerId: string; name: string; team: Team }[] = []
+    if (this.hostVoice) {
+      const p = this.session.getPlayer(this.hostVoice.playerId)
+      if (p) out.push({ playerId: this.hostVoice.playerId, peerId: this.hostVoice.peerId, name: p.name, team: p.team })
+    }
+    for (const link of this.links) {
+      const p = this.session.getPlayer(link.playerId)
+      if (p && link.voicePeerId) out.push({ playerId: link.playerId, peerId: link.voicePeerId, name: p.name, team: p.team })
+    }
+    return out
+  }
+
+  private voiceTeammatesFor(playerId: string): VoiceRosterEntry[] {
+    const all = this.voiceParticipants()
+    const me = all.find(p => p.playerId === playerId)
+    if (!me) return []
+    return all
+      .filter(p => p.playerId !== playerId && p.team === me.team)
+      .map(p => ({ playerId: p.playerId, peerId: p.peerId, name: p.name }))
+  }
+
+  /** Recompute and push the team-scoped roster to every client and the host. */
+  refreshVoiceRoster(): void {
+    for (const link of this.links) {
+      link.transport.send({ type: 'voiceRoster', teammates: this.voiceTeammatesFor(link.playerId) })
+    }
+    if (this.hostVoice) this.hostRosterCb?.(this.voiceTeammatesFor(this.hostVoice.playerId))
+  }
+
+  private relayVoice(msg: Extract<NetMessage, { type: 'voiceStart' | 'voiceStop' }>, speakerId: string): void {
+    const all = this.voiceParticipants()
+    const speaker = all.find(p => p.playerId === speakerId)
+    if (!speaker) return
+    for (const p of all) {
+      if (p.playerId === speakerId || p.team !== speaker.team) continue
+      if (this.hostVoice && p.playerId === this.hostVoice.playerId) {
+        if (msg.type === 'voiceStart') this.remoteVoiceStartCb?.(speakerId, msg.name)
+        else this.remoteVoiceStopCb?.(speakerId)
+      } else {
+        this.links.find(l => l.playerId === p.playerId)?.transport.send(msg)
+      }
+    }
+  }
+
+  /** The host itself started/stopped talking — relay to teammate clients. */
+  localVoiceStart(): void {
+    if (!this.hostVoice) return
+    const p = this.session.getPlayer(this.hostVoice.playerId)
+    this.relayVoice({ type: 'voiceStart', playerId: this.hostVoice.playerId, name: p?.name ?? '' }, this.hostVoice.playerId)
+  }
+  localVoiceStop(): void {
+    if (!this.hostVoice) return
+    this.relayVoice({ type: 'voiceStop', playerId: this.hostVoice.playerId }, this.hostVoice.playerId)
+  }
 
   constructor(private session: GameSession, private config: MatchConfig) {}
 
@@ -27,7 +96,7 @@ export class NetHost {
     return !want || want === pw
   }
 
-  addClient(playerId: string, name: string, transport: Transport, team: Team = 'ct'): void {
+  addClient(playerId: string, name: string, transport: Transport, team: Team = 'ct', voicePeerId?: string): void {
     this.session.addPlayer(playerId, name, team)
     this.lastSeq.set(playerId, 0)
     transport.onMessage((msg) => {
@@ -44,17 +113,22 @@ export class NetHost {
         if (this.config.mode !== 'pvp') this.session.waveManager.spawnNextWave()
       } else if (msg.type === 'setTeam' && msg.playerId === playerId) {
         const entity = this.session.getPlayer(playerId)
-        if (entity && (msg.team === 'ct' || msg.team === 't')) entity.team = msg.team
+        if (entity && (msg.team === 'ct' || msg.team === 't')) { entity.team = msg.team; this.refreshVoiceRoster() }
       } else if (msg.type === 'plantBomb' && msg.playerId === playerId) {
         this.session.tryPlant(playerId)
       } else if (msg.type === 'defuseBomb' && msg.playerId === playerId) {
         this.session.tryDefuse(playerId, msg.hasKit)
+      } else if (msg.type === 'voiceStart' && msg.playerId === playerId) {
+        this.relayVoice(msg, playerId)
+      } else if (msg.type === 'voiceStop' && msg.playerId === playerId) {
+        this.relayVoice(msg, playerId)
       }
     })
     const players = this.links.map(l => this.session.getPlayer(l.playerId)?.name ?? l.playerId)
     transport.send({ type: 'welcome', playerId, mode: this.config.mode, config: this.config, players, started: this.started })
-    this.links.push({ playerId, transport })
+    this.links.push({ playerId, transport, voicePeerId })
     this.broadcast({ type: 'playerJoined', playerId, name })
+    this.refreshVoiceRoster()
     // Free game already running: drop the new client straight into the live match.
     if (this.started && this.config.joinPolicy === 'free') {
       transport.send({ type: 'start' })
@@ -73,6 +147,7 @@ export class NetHost {
     this.lastSeq.delete(playerId)
     this.session.removePlayer(playerId)
     this.broadcast({ type: 'playerLeft', playerId })
+    this.refreshVoiceRoster()
   }
 
   /** Send a latency probe to every client; replies update the ping map. */

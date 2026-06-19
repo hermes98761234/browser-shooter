@@ -54,6 +54,12 @@ import type { MatchScores } from './session/protocol'
 import { BombState } from './session/BombCarrier'
 import { Matchmaker } from './net/Matchmaker'
 import { GrenadeManager } from './weapons/GrenadeManager'
+import type Peer from 'peerjs'
+import { VoiceChat } from './voice/VoiceChat'
+import { BrowserMicProvider, PeerJsVoicePeer } from './voice/VoiceTransport'
+import { AudioSink } from './voice/AudioSink'
+import { VoiceIndicator } from './ui/VoiceIndicator'
+import type { Speaker } from './voice/SpeakerRegistry'
 
 function moveToTeam(roster: { ct: string[]; t: string[] }, name: string, team: 'ct' | 't') {
   const ct = roster.ct.filter(n => n !== name)
@@ -108,6 +114,8 @@ function App() {
   const [defuseProgress, setDefuseProgress] = useState(0)
   const [grenadeInventory, setGrenadeInventory] = useState({ he: 0, flash: 0, smoke: 0 })
   const [selectedGrenade, setSelectedGrenade] = useState<GrenadeType | null>(null)
+  const [speakers, setSpeakers] = useState<Speaker[]>([])
+  const [voiceNotice, setVoiceNotice] = useState<string | null>(null)
 
   const lastWaveRef = useRef(0)
   const ownedRef = useRef<string[]>([])
@@ -167,6 +175,9 @@ function App() {
     matchConfig: defaultMatchConfig() as MatchConfig,
     killSeq: 0,
     grenadeManager: null as GrenadeManager | null,
+    voiceChat: null as VoiceChat | null,
+    audioSink: new AudioSink(),
+    micProvider: new BrowserMicProvider(),
   })
 
   const pushKill = useCallback((attacker: string, victim: string, teamkill: boolean) => {
@@ -188,7 +199,35 @@ function App() {
       ;(mesh.material as THREE.Material).dispose()
     }
     data.clientEnemies.clear()
+    data.voiceChat?.dispose(); data.voiceChat = null
+    data.audioSink.dispose(); data.audioSink = new AudioSink()
+    data.micProvider = new BrowserMicProvider()
+    setSpeakers([])
     data.role = 'single'
+  }, [])
+
+  const startVoice = useCallback((localPlayerId: string, peer: Peer) => {
+    const data = gameDataRef.current
+    data.voiceChat?.dispose()
+    const chat = new VoiceChat({
+      peer: new PeerJsVoicePeer(peer),
+      mic: data.micProvider,
+      localPlayerId,
+      localName: settingsRef.current.playerName,
+      sendStart: (id, name) => {
+        if (data.role === 'host') data.netHost?.localVoiceStart()
+        else data.netClient?.sendVoiceStart(id, name)
+      },
+      sendStop: (id) => {
+        if (data.role === 'host') data.netHost?.localVoiceStop()
+        else data.netClient?.sendVoiceStop(id)
+      },
+      onSpeakersChanged: (list) => setSpeakers(list),
+      playStream: (peerId, stream) => data.audioSink.play(peerId, stream),
+      stopStream: (peerId) => data.audioSink.stop(peerId),
+    })
+    data.voiceChat = chat
+    return chat
   }, [])
 
   const startGame = useCallback(() => {
@@ -281,7 +320,7 @@ function App() {
           const id = 'player-' + (data.nextClientNum++)
           assignedId = id
           const joinTeam = msg.team === 't' ? 't' : 'ct'
-          netHost.addClient(id, msg.name, transport, joinTeam)
+          netHost.addClient(id, msg.name, transport, joinTeam, transport.remotePeerId)
           setLobbyPlayers((prev) => {
             const next = [...prev, msg.name]
             data.hostDirectory?.setPlayers(next.length)
@@ -423,6 +462,13 @@ function App() {
       setRoomCode(code)
       setLobbyPlayers(players)
       setRoster({ ct: players, t: [] })
+      const peer = data.peerClient?.peer
+      if (peer && client.playerId) {
+        const chat = startVoice(client.playerId, peer)
+        client.onVoiceRoster((r) => chat.setRoster(r))
+        client.onVoiceStart((id, name) => chat.remoteStart(id, name))
+        client.onVoiceStop((id) => chat.remoteStop(id))
+      }
       void mode; void _started
     })
     client.onStart(() => startNetGame('client'))
@@ -441,7 +487,8 @@ function App() {
     client.onPlayerJoined((_id, name) => {
       setLobbyPlayers((prev) => prev.includes(name) ? prev : [...prev, name])
     })
-    client.onPlayerLeft(() => {
+    client.onPlayerLeft((id) => {
+      gameDataRef.current.voiceChat?.peerDisconnected(id)
       setLobbyPlayers((prev) => prev.slice(0, -1))
     })
     client.transport.send({
@@ -544,6 +591,19 @@ function App() {
       }
     }
 
+    data.controls.onTalkStart = () => {
+      if (gameStateRef.current !== 'playing') return
+      const chat = gameDataRef.current.voiceChat
+      if (!chat) return
+      chat.startTalking().catch(() => {
+        setVoiceNotice('Microphone unavailable — push-to-talk disabled')
+        setTimeout(() => setVoiceNotice(null), 4000)
+      })
+    }
+    data.controls.onTalkStop = () => {
+      gameDataRef.current.voiceChat?.stopTalking()
+    }
+
     data.controls.onThrowGrenade = (mode: 'long' | 'short') => {
       if (gameStateRef.current !== 'playing') return
       const gm = data.grenadeManager
@@ -599,6 +659,7 @@ function App() {
     }
 
     engine.onUpdate((dt) => {
+      gameDataRef.current.voiceChat?.tick(performance.now())
       if (data.role === 'client') { updateClient(dt); return }
 
       const session = data.session
@@ -1082,9 +1143,18 @@ function App() {
             joinError={joinError}
             onCancelJoin={() => setJoinError(null)}
             onStart={() => {
-              gameDataRef.current.hostDirectory?.setStatus('in-progress')
-              gameDataRef.current.netHost?.startMatch()
+              const data = gameDataRef.current
+              data.hostDirectory?.setStatus('in-progress')
+              data.netHost?.startMatch()
               startNetGame('host')
+              const hostPeer = data.peerHost?.peer
+              if (data.netHost && hostPeer && roomCode) {
+                const chat = startVoice(data.session.localId, hostPeer)
+                data.netHost.onHostRoster((r) => chat.setRoster(r))
+                data.netHost.onRemoteVoiceStart((id, name) => chat.remoteStart(id, name))
+                data.netHost.onRemoteVoiceStop((id) => chat.remoteStop(id))
+                data.netHost.setHostVoice(data.session.localId, roomCode)
+              }
             }}
             onBack={leaveMultiplayer}
             onRefresh={refreshServers}
@@ -1159,6 +1229,14 @@ function App() {
           <WaveAnnounce wave={wave} visible={showWaveAnnounce} />
           <DamageOverlay indicator={damageIndicator} />
           <KillFeed lines={killFeed} />
+          <VoiceIndicator speakers={speakers} />
+          {voiceNotice && (
+            <div style={{ position: 'absolute', left: 16, bottom: 64, zIndex: 60,
+              background: 'rgba(95,29,29,0.85)', color: '#fff', padding: '6px 12px',
+              borderRadius: 6, fontFamily: 'monospace', fontSize: 13, pointerEvents: 'none' }}>
+              {voiceNotice}
+            </div>
+          )}
           {respawnIn !== null && <RespawnOverlay seconds={respawnIn} />}
           {showScoreboard && <Scoreboard players={scoreboardPlayers} roomCode={roomCode} scores={matchScores ?? undefined} />}
           {mobileControlsActive(settings) && gameDataRef.current.controls && (

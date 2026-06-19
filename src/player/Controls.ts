@@ -1,5 +1,7 @@
 import type { GameState } from '../types'
 
+export const PUSH_TO_TALK_KEY = 'KeyK'
+
 export class Controls {
   forward = false
   backward = false
@@ -22,6 +24,10 @@ export class Controls {
   onThrowGrenade: ((mode: 'long' | 'short') => void) | null = null
   onSelectGrenade: ((type: 'he' | 'flash' | 'smoke') => void) | null = null
   onCycleGrenade: (() => void) | null = null
+  /** Fired on push-to-talk key down / up (hold to transmit voice). */
+  onTalkStart: (() => void) | null = null
+  onTalkStop: (() => void) | null = null
+  private talkHeld = false
   private scoreboardHeld = false
 
   constructor(element: HTMLElement, getGameState: () => GameState) {
@@ -67,6 +73,9 @@ export class Controls {
       case 'Digit5': this.onSelectGrenade?.('flash'); break
       case 'Digit6': this.onSelectGrenade?.('smoke'); break
       case 'KeyG': this.onCycleGrenade?.(); break
+      case PUSH_TO_TALK_KEY:
+        if (!this.talkHeld) { this.talkHeld = true; this.onTalkStart?.() }
+        break
     }
   }
 
@@ -81,6 +90,10 @@ export class Controls {
         e.preventDefault()
         this.scoreboardHeld = false
         this.onScoreboard?.(false)
+        break
+      case PUSH_TO_TALK_KEY:
+        this.talkHeld = false
+        this.onTalkStop?.()
         break
     }
   }

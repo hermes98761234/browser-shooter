@@ -2,7 +2,7 @@ import * as THREE from 'three'
 import { Player } from '../player/Player'
 import { ARENA_SIZE } from '../session/GameSession'
 import type { Transport } from '../session/Transport'
-import type { GameMode, NetMessage, PlayerInput, SessionEvent, Snapshot } from '../session/protocol'
+import type { GameMode, NetMessage, PlayerInput, SessionEvent, Snapshot, VoiceRosterEntry } from '../session/protocol'
 import type { MatchConfig } from '../session/MatchConfig'
 
 interface InterpEntry {
@@ -31,6 +31,9 @@ export class NetClient {
   private startCb: (() => void) | null = null
   private playerJoinedCb: ((playerId: string, name: string) => void) | null = null
   private playerLeftCb: ((playerId: string) => void) | null = null
+  private voiceRosterCb: ((teammates: VoiceRosterEntry[]) => void) | null = null
+  private voiceStartCb: ((playerId: string, name: string) => void) | null = null
+  private voiceStopCb: ((playerId: string) => void) | null = null
   private interpBuffers = new Map<string, InterpEntry[]>()
 
   constructor(public transport: Transport) {
@@ -123,6 +126,11 @@ export class NetClient {
   onStart(cb: () => void): void { this.startCb = cb }
   onPlayerJoined(cb: (playerId: string, name: string) => void): void { this.playerJoinedCb = cb }
   onPlayerLeft(cb: (playerId: string) => void): void { this.playerLeftCb = cb }
+  onVoiceRoster(cb: (teammates: VoiceRosterEntry[]) => void): void { this.voiceRosterCb = cb }
+  onVoiceStart(cb: (playerId: string, name: string) => void): void { this.voiceStartCb = cb }
+  onVoiceStop(cb: (playerId: string) => void): void { this.voiceStopCb = cb }
+  sendVoiceStart(playerId: string, name: string): void { this.transport.send({ type: 'voiceStart', playerId, name }) }
+  sendVoiceStop(playerId: string): void { this.transport.send({ type: 'voiceStop', playerId }) }
 
   private handle(msg: NetMessage): void {
     if (msg.type === 'welcome') {
@@ -146,6 +154,12 @@ export class NetClient {
       this.playerJoinedCb?.(msg.playerId, msg.name)
     } else if (msg.type === 'playerLeft') {
       this.playerLeftCb?.(msg.playerId)
+    } else if (msg.type === 'voiceRoster') {
+      this.voiceRosterCb?.(msg.teammates)
+    } else if (msg.type === 'voiceStart') {
+      this.voiceStartCb?.(msg.playerId, msg.name)
+    } else if (msg.type === 'voiceStop') {
+      this.voiceStopCb?.(msg.playerId)
     }
   }
 

@@ -4,6 +4,8 @@ export interface Transport {
   send(msg: NetMessage): void
   onMessage(cb: (msg: NetMessage) => void): void
   onClose(cb: () => void): void
+  /** Optional: the remote endpoint's PeerJS id (set by PeerConnection only). */
+  remotePeerId?: string
   /** Optional: invoked locally to simulate/trigger a close (test + loopback use). */
   close?(): void
 }

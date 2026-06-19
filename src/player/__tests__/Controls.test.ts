@@ -143,6 +143,26 @@ describe('Controls', () => {
     expect(controls.jump).toBe(false)
   })
 
+  it('fires onTalkStart once on KeyK down even with auto-repeat', () => {
+    const start = vi.fn()
+    controls.onTalkStart = start
+    document.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyK' }))
+    document.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyK' })) // OS auto-repeat
+    expect(start).toHaveBeenCalledTimes(1)
+  })
+
+  it('fires onTalkStop on KeyK up and allows talking again', () => {
+    const start = vi.fn()
+    const stop = vi.fn()
+    controls.onTalkStart = start
+    controls.onTalkStop = stop
+    document.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyK' }))
+    document.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyK' }))
+    document.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyK' }))
+    expect(stop).toHaveBeenCalledTimes(1)
+    expect(start).toHaveBeenCalledTimes(2)
+  })
+
   it('calls onMouseMove when pointer is locked and mouse moves', () => {
     const handler = vi.fn()
     controls.onMouseMove = handler

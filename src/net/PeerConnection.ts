@@ -4,7 +4,10 @@ import type { NetMessage } from '../session/protocol'
 
 /** Adapts a single peerjs DataConnection to the Transport interface. */
 export class PeerConnection implements Transport {
-  constructor(private conn: DataConnection) {}
+  readonly remotePeerId: string
+  constructor(private conn: DataConnection) {
+    this.remotePeerId = conn.peer
+  }
 
   send(msg: NetMessage): void {
     this.conn.send(msg)
