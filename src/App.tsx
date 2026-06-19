@@ -10,6 +10,7 @@ import { ParticleSystem } from './effects/ParticleSystem'
 import { AudioManager } from './audio/AudioManager'
 import { SoundEffects } from './audio/SoundEffects'
 import { createDamageIndicatorState, triggerDamage, updateDamageIndicator, type DamageIndicatorState } from './effects/DamageIndicator'
+import { createFlashEffect, triggerFlash, updateFlash, type FlashEffectState } from './effects/FlashEffect'
 import type { GameState, Team, GrenadeType } from './types'
 import { GameSession, ARENA_SIZE } from './session/GameSession'
 import { emptyInput, type EntityState } from './session/protocol'
@@ -32,6 +33,7 @@ import { SettingsMenu } from './ui/SettingsMenu'
 import { GameOver } from './ui/GameOver'
 import { PauseMenu } from './ui/PauseMenu'
 import { DamageOverlay } from './ui/DamageOverlay'
+import { FlashOverlay } from './ui/FlashOverlay'
 import { AboutModal } from './ui/AboutModal'
 import { HelpModal } from './ui/HelpModal'
 import { BuyMenu } from './ui/BuyMenu'
@@ -84,6 +86,7 @@ function App() {
   const [enemyPositions, setEnemyPositions] = useState<THREE.Vector3[]>([])
   const [highScore, setHighScore] = useState(0)
   const [damageIndicator, setDamageIndicator] = useState<DamageIndicatorState | null>(null)
+  const [flashEffect, setFlashEffect] = useState<FlashEffectState | null>(null)
   const [showWaveAnnounce, setShowWaveAnnounce] = useState(false)
   const [storeOpen, setStoreOpen] = useState(false)
   const [money, setMoney] = useState(16000)
@@ -162,6 +165,7 @@ function App() {
     viewmodel: null as Viewmodel | null,
     audio: new SoundEffects(new AudioManager()),
     damageIndicator: createDamageIndicatorState(),
+    flashEffect: createFlashEffect(),
     money: 16000, // local stub for the buy store (Phase 3 makes this real)
     role: 'single' as 'single' | 'host' | 'client',
     netHost: null as NetHost | null,
@@ -258,6 +262,7 @@ function App() {
 
     if (data.particleSystem) data.particleSystem.clear()
     data.damageIndicator = createDamageIndicatorState()
+    data.flashEffect = createFlashEffect()
 
     setScore(0); setWave(0); setHealth(100); setAmmo(60); setWeaponName('Pistol')
     setMoney(16000); setStoreOpen(false)
@@ -266,7 +271,7 @@ function App() {
     data.session.weaponManager.reset()
     data.session.player.resetLoadout()
     data.viewmodel?.setWeapon('pistol')
-    setWaveActive(false); setEnemiesRemaining(0); setEnemyPositions([]); setDamageIndicator(null)
+    setWaveActive(false); setEnemiesRemaining(0); setEnemyPositions([]); setDamageIndicator(null); setFlashEffect(null)
 
     engineRef.current?.start()
     data.audio.init(); data.audio.loadSounds()
@@ -469,6 +474,14 @@ function App() {
         case 'bombPickedUp':
           setBombState(BombState.Carried)
           break
+        case 'grenadeDetonated': {
+          const localId = data.netClient?.playerId
+          if (ev.grenadeType === 'flash' && localId && ev.affectedPlayers.includes(localId)) {
+            data.flashEffect = triggerFlash(data.flashEffect, ev.blindDurations?.[localId] ?? 0)
+            setFlashEffect({ ...data.flashEffect })
+          }
+          break
+        }
       }
     })
     client.onWelcome((_, mode, players, _started) => {
@@ -814,6 +827,13 @@ function App() {
           case 'bombPickedUp':
             setBombState(BombState.Carried)
             break
+          case 'grenadeDetonated': {
+            if (ev.grenadeType === 'flash' && ev.affectedPlayers.includes(session.localId)) {
+              data.flashEffect = triggerFlash(data.flashEffect, ev.blindDurations?.[session.localId] ?? 0)
+              setFlashEffect({ ...data.flashEffect })
+            }
+            break
+          }
         }
       }
 
@@ -878,6 +898,10 @@ function App() {
       data.damageIndicator = updateDamageIndicator(data.damageIndicator, dt)
       if (data.damageIndicator.active) setDamageIndicator({ ...data.damageIndicator })
       else if (damageIndicator !== null) setDamageIndicator(null)
+
+      data.flashEffect = updateFlash(data.flashEffect, dt)
+      if (data.flashEffect.active) setFlashEffect({ ...data.flashEffect })
+      else if (flashEffect !== null) setFlashEffect(null)
 
       // Host: broadcast the locally-simulated snapshot and render remote players.
       if (data.role === 'host' && data.netHost && data.remotePlayers) {
@@ -1005,6 +1029,10 @@ function App() {
       renderClientEnemies(snap.enemies)
       data.remotePlayers?.update(dt)
       particleSystem.update(dt)
+
+      data.flashEffect = updateFlash(data.flashEffect, dt)
+      if (data.flashEffect.active) setFlashEffect({ ...data.flashEffect })
+      else if (flashEffect !== null) setFlashEffect(null)
     }
 
     function renderClientEnemies(enemies: EntityState[]) {
@@ -1267,6 +1295,7 @@ function App() {
           />
           <WaveAnnounce wave={wave} visible={showWaveAnnounce} />
           <DamageOverlay indicator={damageIndicator} />
+          <FlashOverlay flash={flashEffect} />
           <KillFeed lines={killFeed} />
           <VoiceIndicator speakers={speakers} />
           {voiceNotice && (

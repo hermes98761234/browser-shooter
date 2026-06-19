@@ -121,7 +121,7 @@ export type SessionEvent =
   | { type: 'bombExploded'; site: 'A' | 'B' }
   | { type: 'bombDefused'; site: 'A' | 'B' }
   | { type: 'grenadeThrown'; playerId: string; grenadeType: 'he' | 'flash' | 'smoke'; position: Vec3; velocity: Vec3; id: string }
-  | { type: 'grenadeDetonated'; id: string; position: Vec3; grenadeType: 'he' | 'flash' | 'smoke'; affectedPlayers: string[] }
+  | { type: 'grenadeDetonated'; id: string; position: Vec3; grenadeType: 'he' | 'flash' | 'smoke'; affectedPlayers: string[]; blindDurations?: Record<string, number> }
 
 /** Network envelope carried by Transport. */
 export type NetMessage =

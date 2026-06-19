@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { GameSession } from './GameSession'
 import { RESPAWN_DELAY } from './GameSession'
+import { emptyInput } from './protocol'
 
 /**
  * Detonate the session's first active grenade exactly on `target` this tick.
@@ -60,6 +61,50 @@ describe('GameSession HE grenade kills', () => {
     const { s, b } = setup('friendly', 'ct')
     detonateOn(s, b.player.position)
     expect(b.player.isDead).toBe(true)
+  })
+})
+
+describe('GameSession flash grenade blinding', () => {
+  /** Detonate the first active grenade exactly on `target`, returning the step events. */
+  function detonateOnReturning(s: GameSession, target: { x: number; y: number; z: number }) {
+    const g = s.activeGrenades[0]
+    g.position.set(target.x, target.y, target.z)
+    g.velocity.set(0, 0, 0)
+    g.fuseTimer = 0.001
+    return s.step(1 / 30)
+  }
+
+  it('reports the computed blind duration for a player looking at the flash', () => {
+    const s = new GameSession({ mode: 'pvp', damagePolicy: 'ffa', fragLimit: 0 })
+    const a = s.getPlayer(s.localId)!
+    a.player.position.set(0, 2, 0)
+    s.applyInput(a.id, { ...emptyInput(), yaw: 0 }) // facing -Z (step() drives rotation from input)
+    s.throwGrenade(a.id, 'flash', 'long')
+
+    // Detonate 4 units directly in front of A (within the 8u radius, in view).
+    const events = detonateOnReturning(s, { x: 0, y: 2, z: -4 })
+    const detonated = events.find((e) => e.type === 'grenadeDetonated')
+    expect(detonated).toBeDefined()
+    if (detonated?.type !== 'grenadeDetonated') throw new Error('not a detonation event')
+    expect(detonated.affectedPlayers).toContain(a.id)
+    // A close, in-view flash blinds for a positive, distance-scaled duration
+    // (the value used to be computed and discarded).
+    expect(detonated.blindDurations?.[a.id]).toBeGreaterThan(0)
+    expect(detonated.blindDurations?.[a.id]).toBeLessThanOrEqual(5)
+  })
+
+  it('does not blind a player looking away from the flash', () => {
+    const s = new GameSession({ mode: 'pvp', damagePolicy: 'ffa', fragLimit: 0 })
+    const a = s.getPlayer(s.localId)!
+    a.player.position.set(0, 2, 0)
+    s.applyInput(a.id, { ...emptyInput(), yaw: Math.PI }) // facing +Z, away from a flash at -Z
+    s.throwGrenade(a.id, 'flash', 'long')
+
+    const events = detonateOnReturning(s, { x: 0, y: 2, z: -4 })
+    const detonated = events.find((e) => e.type === 'grenadeDetonated')
+    if (detonated?.type !== 'grenadeDetonated') throw new Error('not a detonation event')
+    expect(detonated.affectedPlayers).not.toContain(a.id)
+    expect(detonated.blindDurations?.[a.id]).toBeUndefined()
   })
 })
 
