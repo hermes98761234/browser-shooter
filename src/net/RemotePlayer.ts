@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { buildCharacter } from '../entities/CharacterModel'
+import { animateCharacter, buildCharacter } from '../entities/CharacterModel'
 import { EYE_HEIGHT } from '../player/Player'
 import type { EntityState } from '../session/protocol'
 import type { Team, WeaponType } from '../types'
@@ -25,6 +25,8 @@ export class RemotePlayer {
   hasHelmet = false
   private vestMesh: THREE.Mesh | null = null
   private helmetMesh: THREE.Mesh | null = null
+  private readonly prevPos = new THREE.Vector3()
+  private hasPrevPos = false
 
   constructor(readonly id: string, name: string, tint = 0x3399ff) {
     this.group = buildCharacter({ tint, name })
@@ -94,12 +96,22 @@ export class RemotePlayer {
     return a.rotationY + (b.rotationY - a.rotationY) * frac
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  update(_dt: number): void {
+  update(dt: number): void {
     const pos = this.getInterpolatedPosition(performance.now())
-    if (pos) this.setFeet(pos)
+    let speed = 0
+    if (pos) {
+      if (this.hasPrevPos && dt > 0) {
+        const dx = pos.x - this.prevPos.x
+        const dz = pos.z - this.prevPos.z
+        speed = Math.hypot(dx, dz) / dt
+      }
+      this.prevPos.copy(pos)
+      this.hasPrevPos = true
+      this.setFeet(pos)
+    }
     this.group.rotation.y = this.getInterpolatedRotation(performance.now())
     this.group.visible = !this.isDead
+    if (!this.isDead) animateCharacter(this.group, speed, dt)
   }
 
   private applyTeamColor(color: number): void {
