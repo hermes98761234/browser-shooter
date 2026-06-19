@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import type { MatchConfig, DamagePolicy } from '../session/MatchConfig'
+import type { MatchConfig, DamagePolicy, JoinPolicy } from '../session/MatchConfig'
 import { defaultCompetitiveConfig } from '../session/MatchConfig'
 import type { GameMode } from '../session/protocol'
 
@@ -26,6 +26,8 @@ export function MatchSetup({ onConfirm, onBack }: { onConfirm: (c: MatchConfig) 
   const [mode, setMode] = useState<GameMode>('pvp')
   const [policy, setPolicy] = useState<DamagePolicy>('team')
   const [frag, setFrag] = useState(30)
+  const [joinPolicy, setJoinPolicy] = useState<JoinPolicy>('lobby')
+  const [password, setPassword] = useState('')
 
   return (
     <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
@@ -55,11 +57,31 @@ export function MatchSetup({ onConfirm, onBack }: { onConfirm: (c: MatchConfig) 
         </div>
       )}
 
+      <div><div style={{ opacity: 0.6, marginBottom: 6 }}>JOIN POLICY</div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button style={btn(joinPolicy === 'lobby')} onClick={() => setJoinPolicy('lobby')}>Lobby</button>
+          <button style={btn(joinPolicy === 'free')} onClick={() => setJoinPolicy('free')}>Free</button>
+        </div>
+        {joinPolicy === 'free' && (
+          <input
+            placeholder="Password (optional)"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            style={{ marginTop: 8, padding: 8, fontFamily: 'monospace', fontSize: 14,
+              background: '#1d1d2a', color: '#fff', border: '1px solid #3a3a55', width: 220 }}
+          />
+        )}
+      </div>
+
       <div style={{ display: 'flex', gap: 12, marginTop: 12 }}>
         <button style={btn(false)} onClick={onBack}>Back</button>
-        <button style={btn(true)} onClick={() => onConfirm(
-          mode === 'competitive' ? { ...defaultCompetitiveConfig(), damagePolicy: policy } : { mode, damagePolicy: policy, fragLimit: frag }
-        )}>Create Room</button>
+        <button style={btn(true)} onClick={() => onConfirm({
+          ...(mode === 'competitive'
+            ? { ...defaultCompetitiveConfig(), damagePolicy: policy }
+            : { mode, damagePolicy: policy, fragLimit: frag }),
+          joinPolicy,
+          ...(joinPolicy === 'free' && password ? { password } : {}),
+        })}>Create Room</button>
       </div>
     </div>
   )
