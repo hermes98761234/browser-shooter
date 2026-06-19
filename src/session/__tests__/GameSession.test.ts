@@ -96,8 +96,9 @@ describe('bomb mechanics', () => {
   it('updates bomb state during step when planting', () => {
     const config = defaultCompetitiveConfig()
     const session = new GameSession(config)
-    session.addPlayer('t1', 'TPlayer', 't')
+    const t = session.addPlayer('t1', 'TPlayer', 't')
     session.assignBomb()
+    t.player.position.set(0, 2, -25) // stay inside site A so the plant progresses
     session.bomb.startPlant('A')
     session.step(1)
     expect(session.bomb.state).toBe(BombState.Planting)
@@ -107,8 +108,9 @@ describe('bomb mechanics', () => {
   it('emits bombPlanted when plant completes', () => {
     const config = defaultCompetitiveConfig()
     const session = new GameSession(config)
-    session.addPlayer('t1', 'TPlayer', 't')
+    const t = session.addPlayer('t1', 'TPlayer', 't')
     session.assignBomb()
+    t.player.position.set(0, 2, -25)
     session.bomb.startPlant('A')
     const events = session.step(3)
     expect(session.bomb.state).toBe(BombState.Planted)
@@ -118,8 +120,9 @@ describe('bomb mechanics', () => {
   it('emits bombExploded when timer runs out', () => {
     const config = defaultCompetitiveConfig()
     const session = new GameSession(config)
-    session.addPlayer('t1', 'TPlayer', 't')
+    const t = session.addPlayer('t1', 'TPlayer', 't')
     session.assignBomb()
+    t.player.position.set(0, 2, -25)
     session.bomb.startPlant('A')
     session.step(3) // plant
     const events = session.step(40) // explode
@@ -130,11 +133,13 @@ describe('bomb mechanics', () => {
   it('emits bombDefused when defuse completes', () => {
     const config = defaultCompetitiveConfig()
     const session = new GameSession(config)
-    session.addPlayer('t1', 'TPlayer', 't')
+    const t = session.addPlayer('t1', 'TPlayer', 't')
     session.assignBomb()
+    t.player.position.set(0, 2, -25)
     session.bomb.startPlant('A')
     session.step(3) // plant
-    session.bomb.startDefuse(true)
+    session.player.position.set(0, 2, -25) // local CT stands on the site to defuse
+    session.tryDefuse('local', true)
     const events = session.step(5) // defuse
     expect(session.bomb.state).toBe(BombState.Defused)
     expect(events.some(e => e.type === 'bombDefused')).toBe(true)
@@ -233,7 +238,8 @@ describe('round resolution', () => {
     s.bomb.state = BombState.Planted
     s.bomb.site = 'A'
     s.bomb.timer = 40
-    s.bomb.startDefuse(true)
+    s.player.position.set(0, 2, -25) // local CT on the site to defuse
+    s.bomb.startDefuse(true, 'local')
     s.step(5) // defuse completes this tick
     expect(s.bomb.state).toBe(BombState.Defused)
     s.step(1) // resolution: CT wins the round
@@ -264,5 +270,60 @@ describe('round resolution', () => {
     s.roundManager!.roundTimer = 0.01
     s.step(1) // round ends -> next round
     expect(t.player.isDead).toBe(false)
+  })
+})
+
+describe('plant/defuse interruption', () => {
+  function comp(): GameSession {
+    return new GameSession(defaultCompetitiveConfig())
+  }
+
+  /** Plant the bomb at site A so we have a Planted bomb to defuse. */
+  function planted(s: GameSession) {
+    const t = s.addPlayer('t1', 'T', 't')
+    s.assignBomb()
+    t.player.position.set(0, 2, -25) // inside site A
+    s.tryPlant('t1')
+    s.step(3) // complete plant
+  }
+
+  it('cancels an in-progress defuse when the defuser dies', () => {
+    const s = comp()
+    planted(s)
+    const ct = s.getPlayer('local')!
+    ct.player.position.set(0, 2, -25)
+    expect(s.tryDefuse('local', true)).toBe(true)
+
+    ct.player.takeDamage(1000) // defuser killed mid-defuse
+    s.step(5) // would have completed a 5s defuse
+
+    expect(ct.player.isDead).toBe(true)
+    expect(s.bomb.state).toBe(BombState.Planted) // defuse cancelled, bomb NOT defused
+  })
+
+  it('cancels an in-progress defuse when the defuser leaves the bombsite', () => {
+    const s = comp()
+    planted(s)
+    const ct = s.getPlayer('local')!
+    ct.player.position.set(0, 2, -25)
+    expect(s.tryDefuse('local', true)).toBe(true)
+
+    ct.player.position.set(0, 2, 0) // walk off the site mid-defuse
+    s.step(5)
+
+    expect(s.bomb.state).toBe(BombState.Planted) // defuse cancelled
+  })
+
+  it('cancels an in-progress plant when the planter leaves the bombsite', () => {
+    const s = comp()
+    const t = s.addPlayer('t1', 'T', 't')
+    s.assignBomb()
+    t.player.position.set(0, 2, -25)
+    expect(s.tryPlant('t1')).toBe(true)
+
+    t.player.position.set(0, 2, 0) // leave the site before the plant completes
+    s.step(0.5)
+
+    expect(s.bomb.state).toBe(BombState.Carried) // plant cancelled, still carrying
   })
 })

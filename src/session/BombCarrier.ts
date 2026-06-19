@@ -14,6 +14,7 @@ export enum BombState {
 export class BombCarrier {
   state: BombState = BombState.None
   carrier: string | null = null
+  defuser: string | null = null
   position: Vec3 | null = null
   site: 'A' | 'B' | null = null
   timer: number = 40
@@ -27,6 +28,7 @@ export class BombCarrier {
   reset(): void {
     this.state = BombState.None
     this.carrier = null
+    this.defuser = null
     this.position = null
     this.site = null
     this.timer = 40
@@ -37,6 +39,7 @@ export class BombCarrier {
   assign(playerId: string): void {
     this.state = BombState.Carried
     this.carrier = playerId
+    this.defuser = null
     this.position = null
     this.site = null
     this.timer = 40
@@ -71,9 +74,10 @@ export class BombCarrier {
     this.site = null
   }
 
-  startDefuse(hasKit: boolean = true): void {
+  startDefuse(hasKit: boolean = true, defuserId: string | null = null): void {
     if (this.state !== BombState.Planted) return
     this.state = BombState.Defusing
+    this.defuser = defuserId
     this.defuseProgress = 0
     this.defuseDuration = hasKit ? 5 : this.defuseDurationNoKit
   }
@@ -81,6 +85,7 @@ export class BombCarrier {
   cancelDefuse(): void {
     if (this.state !== BombState.Defusing) return
     this.state = BombState.Planted
+    this.defuser = null
     this.defuseProgress = 0
   }
 

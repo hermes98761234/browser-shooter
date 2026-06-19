@@ -235,8 +235,17 @@ export class GameSession {
     if (this.bomb.state !== BombState.Planted) return false
     const site = this.bombsites.find((s) => s.id === this.bomb.site)
     if (!site || !site.isInside(toVec3(entity.player.position))) return false
-    this.bomb.startDefuse(hasKit)
+    this.bomb.startDefuse(hasKit, playerId)
     return true
+  }
+
+  /** True if `playerId` is alive, on `team`, and still standing on the bomb's site. */
+  private canContinueAt(playerId: string | null, team: Team): boolean {
+    if (!playerId) return false
+    const entity = this.playerMap.get(playerId)
+    if (!entity || entity.player.isDead || entity.team !== team) return false
+    const site = this.bombsites.find((s) => s.id === this.bomb.site)
+    return !!site && site.isInside(toVec3(entity.player.position))
   }
 
   throwGrenade(playerId: string, type: 'he' | 'flash' | 'smoke', mode: 'long' | 'short'): boolean {
@@ -563,6 +572,17 @@ export class GameSession {
           break
         }
       }
+    }
+
+    // A plant/defuse only progresses while the actor is alive and still standing on
+    // the site. If they die or walk off mid-action, interrupt it (CS-style) instead
+    // of letting it auto-complete. Death also drops the bomb (handled above), so by
+    // here a dead planter has usually already flipped the bomb to Dropped.
+    if (this.bomb.state === BombState.Planting && !this.canContinueAt(this.bomb.carrier, 't')) {
+      this.bomb.cancelPlant()
+    }
+    if (this.bomb.state === BombState.Defusing && !this.canContinueAt(this.bomb.defuser, 'ct')) {
+      this.bomb.cancelDefuse()
     }
 
     // Update bomb state
