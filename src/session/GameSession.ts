@@ -139,6 +139,31 @@ export class GameSession {
     }
   }
 
+  /**
+   * Common bookkeeping when a player dies to another player (non-coop): score the
+   * kill/death, award the attacker's economy in competitive, queue a respawn in
+   * respawn modes, and surface match end. Mirrors the bullet-kill path so grenade
+   * kills behave consistently. `attacker` is null/self for suicides.
+   */
+  private registerPlayerKill(
+    victim: PlayerEntity, attacker: PlayerEntity | null, weaponType: string, events: SessionEvent[],
+  ): void {
+    if (this.config.mode === 'coop') return
+    const isKillCredit = !!attacker && attacker.id !== victim.id
+    if (isKillCredit) {
+      this.scoreboard.recordKill(attacker!.id, attacker!.team, victim.id, victim.team, this.config.damagePolicy)
+    } else {
+      this.scoreboard.recordDeath(victim.id)
+    }
+    // Competitive: no mid-round respawn — players revive at the next round start.
+    if (this.config.mode !== 'competitive') this.respawnQueue.enqueue(victim.id, RESPAWN_DELAY)
+    if (isKillCredit && this.config.mode === 'competitive' && this.economy) {
+      this.economy.recordKillReward(weaponType)
+      events.push({ type: 'moneyUpdate', playerId: attacker!.id, amount: this.economy.money })
+    }
+    if (this.scoreboard.matchOver) events.push({ type: 'matchOver', winningTeam: this.scoreboard.winningTeam! })
+  }
+
   /** Determine round winner when the timer expires (no bomb explosion/defuse). */
   private resolveRoundWinner(): 'ct' | 't' | 'draw' {
     // If bomb was planted but not yet exploded/defused when time runs out, T wins
@@ -228,7 +253,7 @@ export class GameSession {
 
     const position = entity.player.position.clone().add(forward.clone().multiplyScalar(0.5))
     const grenade = new Grenade(type, { x: position.x, y: position.y, z: position.z },
-      { x: velocity.x, y: velocity.y, z: velocity.z })
+      { x: velocity.x, y: velocity.y, z: velocity.z }, undefined, playerId)
 
     this.activeGrenades.push(grenade)
     return true
@@ -239,16 +264,27 @@ export class GameSession {
     const affectedPlayers: string[] = []
 
     if (grenade.type === 'he') {
+      const thrower = this.playerMap.get(grenade.thrownBy) ?? null
       for (const entity of this.playerMap.values()) {
         if (entity.player.isDead) continue
+        // Respect the match's damage policy like bullets do; a thrower always
+        // takes damage from their own grenade.
+        const isSelf = entity.id === grenade.thrownBy
+        if (!isSelf && thrower && !canDamage(thrower.team, entity.team, this.config.damagePolicy)) continue
         const dist = entity.player.position.distanceTo(position)
         if (dist <= grenade.def.effectRadius) {
           const damage = calcHeDamage(dist)
+          if (damage <= 0) continue
           entity.player.takeDamage(damage)
           affectedPlayers.push(entity.id)
           if (entity.player.isDead) {
             events.push({ type: 'playerDied', playerId: entity.id })
+            const wasCarrier = this.bomb.carrier === entity.id
             this.handleDeath(entity.id)
+            if (wasCarrier && this.bomb.state === BombState.Dropped) {
+              events.push({ type: 'bombDropped', position: this.bomb.position!, playerId: entity.id })
+            }
+            this.registerPlayerKill(entity, thrower, grenade.type, events)
           }
         }
       }
@@ -340,7 +376,7 @@ export class GameSession {
         rotation: { x: g.rotation.x, y: g.rotation.y, z: g.rotation.z },
         bounces: g.bounces,
         fuseTimer: g.fuseTimer,
-        thrownBy: 'local',
+        thrownBy: g.thrownBy,
       })),
       events: [],
       scores: this.scoreboard.snapshot(),

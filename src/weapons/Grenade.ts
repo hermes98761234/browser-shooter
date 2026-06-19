@@ -7,6 +7,7 @@ export class Grenade {
   type: GrenadeType
   def: GrenadeDef
   id: string
+  thrownBy: string
   position: THREE.Vector3
   velocity: THREE.Vector3
   rotation: THREE.Euler
@@ -15,10 +16,11 @@ export class Grenade {
   private mesh: THREE.Group
   private settled: boolean = false
 
-  constructor(type: GrenadeType, position: Vec3, velocity: Vec3, id?: string) {
+  constructor(type: GrenadeType, position: Vec3, velocity: Vec3, id?: string, thrownBy: string = 'local') {
     this.type = type
     this.def = { ...GRENADE_DEFS[type] }
     this.id = id ?? `${type}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
+    this.thrownBy = thrownBy
     this.position = new THREE.Vector3(position.x, position.y, position.z)
     this.velocity = new THREE.Vector3(velocity.x, velocity.y, velocity.z)
     this.rotation = new THREE.Euler(0, 0, 0)
