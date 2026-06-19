@@ -32,12 +32,12 @@ describe('MultiplayerMenu', () => {
   it('renders the server list and joins a listed game', () => {
     const onJoin = vi.fn()
     const servers: ServerRow[] = [
-      { roomCode: 'ROOM1', hostName: 'Alice', players: 1, maxPlayers: 8, status: 'lobby', mode: 'pvp', joinPolicy: 'free', protected: false, ping: 30 },
+      { roomCode: 'ROOM1', hostName: 'Alice', players: 1, maxPlayers: 8, status: 'lobby', mode: 'pvp', joinPolicy: 'lobby', protected: false, ping: 30 },
     ]
     render(<MultiplayerMenu {...baseProps} servers={servers} onJoin={onJoin} />)
     expect(screen.getByText('Alice')).toBeInTheDocument()
     fireEvent.click(screen.getAllByRole('button', { name: /^join$/i })[0])
-    expect(onJoin).toHaveBeenCalledWith(expect.objectContaining({ roomCode: 'ROOM1' }))
+    expect(onJoin).toHaveBeenCalledWith('ROOM1')
   })
 
   it('shows three connection options on the main menu', () => {
@@ -50,5 +50,29 @@ describe('MultiplayerMenu', () => {
     render(<MultiplayerMenu {...baseProps} />)
     expect(screen.getByText('Mode')).toBeInTheDocument()
     expect(screen.getByText('Status')).toBeInTheDocument()
+  })
+
+  it('opens the pre-join prompt for a free server and submits via onJoinFree', () => {
+    const onJoinFree = vi.fn()
+    const servers = [{
+      roomCode: 'FREE1', hostName: 'Ann', players: 1, maxPlayers: 8,
+      status: 'in-progress' as const, mode: 'pvp', joinPolicy: 'free' as const, protected: true, ping: 10,
+    }]
+    render(<MultiplayerMenu {...baseProps} servers={servers} onJoinFree={onJoinFree} />)
+    fireEvent.click(screen.getByText('Join'))                 // open prompt
+    fireEvent.change(screen.getByPlaceholderText(/password/i), { target: { value: 'pw' } })
+    fireEvent.click(screen.getByText(/join match/i))
+    expect(onJoinFree).toHaveBeenCalledWith('FREE1', 'ct', 'pw')
+  })
+
+  it('joins a lobby server directly via onJoin', () => {
+    const onJoin = vi.fn()
+    const servers = [{
+      roomCode: 'LOB1', hostName: 'Ann', players: 1, maxPlayers: 8,
+      status: 'lobby' as const, mode: 'pvp', joinPolicy: 'lobby' as const, ping: 10,
+    }]
+    render(<MultiplayerMenu {...baseProps} servers={servers} onJoin={onJoin} />)
+    fireEvent.click(screen.getByText('Join'))
+    expect(onJoin).toHaveBeenCalledWith('LOB1')
   })
 })

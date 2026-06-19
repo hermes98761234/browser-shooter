@@ -1,6 +1,8 @@
 import React, { useState } from 'react'
 import { ServerList, type ServerRow } from './ServerList'
+import { PreJoinPrompt } from './PreJoinPrompt'
 import { MatchmakingButton } from './MatchmakingButton'
+import type { Team } from '../types'
 
 interface MultiplayerMenuProps {
   roomCode: string | null      // set once hosting; null while choosing/joining
@@ -16,6 +18,9 @@ interface MultiplayerMenuProps {
   myTeam?: import('../types').Team
   onSelectTeam?: (team: import('../types').Team) => void
   roster?: { ct: string[]; t: string[] }
+  onJoinFree?: (code: string, team: Team, password: string) => void
+  joinError?: string | null
+  onCancelJoin?: () => void
 }
 
 const panel: React.CSSProperties = {
@@ -35,6 +40,7 @@ const btn: React.CSSProperties = {
 export const MultiplayerMenu: React.FC<MultiplayerMenuProps> = (p) => {
   const [code, setCode] = useState('')
   const [queuing, setQueuing] = useState(false)
+  const [joining, setJoining] = useState<ServerRow | null>(null)
   const inLobby = p.roomCode !== null || p.players.length > 0
 
   if (inLobby) {
@@ -99,7 +105,14 @@ export const MultiplayerMenu: React.FC<MultiplayerMenuProps> = (p) => {
 
         {/* Browse Servers */}
         <div style={{ width: '100%', maxWidth: 600 }}>
-          <ServerList servers={p.servers} onJoin={p.onJoin} onRefresh={p.onRefresh} />
+          <ServerList
+            servers={p.servers}
+            onJoin={(server) => {
+              if (server.joinPolicy === 'free') setJoining(server)
+              else p.onJoin(server.roomCode)
+            }}
+            onRefresh={p.onRefresh}
+          />
         </div>
 
         {/* Create Room */}
@@ -114,11 +127,20 @@ export const MultiplayerMenu: React.FC<MultiplayerMenuProps> = (p) => {
         <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
           <input placeholder="Room code" value={code} onChange={(e) => setCode(e.target.value)}
             style={{ padding: 10, fontSize: 16 }} />
-          <button style={btn} onClick={() => onJoinClick()}>Join</button>
+          {code.trim() && <button style={btn} onClick={() => onJoinClick()}>Join</button>}
         </div>
 
         <button style={{ ...btn, background: '#555' }} onClick={p.onBack}>Back</button>
       </div>
+
+      {joining && (
+        <PreJoinPrompt
+          protected={joining.protected}
+          error={p.joinError}
+          onSubmit={(team, password) => p.onJoinFree?.(joining.roomCode, team, password)}
+          onCancel={() => { setJoining(null); p.onCancelJoin?.() }}
+        />
+      )}
     </div>
   )
 
