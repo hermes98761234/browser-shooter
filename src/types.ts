@@ -38,6 +38,7 @@ export interface WeaponUpgrade {
 
 export interface StatEffect {
   armor?: number       // +armor points
+  helmet?: boolean     // grants a helmet (head protection / visual)
   maxHealth?: number   // +max HP (and full heal)
   speedMult?: number   // multiplies move speed
   weapon?: WeaponUpgrade // applied to the equipped weapon

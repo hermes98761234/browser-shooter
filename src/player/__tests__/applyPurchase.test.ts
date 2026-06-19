@@ -28,6 +28,29 @@ describe('applyItem', () => {
     expect(player.armor).toBe(50)
   })
 
+  it('kevlar sets the armor flag but not the helmet flag', () => {
+    const { player, wm } = ctx()
+    applyItem(findItem('kevlar')!, player, wm)
+    expect(player.hasArmor).toBe(true)
+    expect(player.hasHelmet).toBe(false)
+  })
+
+  it('kevlar + helmet sets both the armor and helmet flags', () => {
+    const { player, wm } = ctx()
+    applyItem(findItem('kevlar_helmet')!, player, wm)
+    expect(player.armor).toBe(100)
+    expect(player.hasArmor).toBe(true)
+    expect(player.hasHelmet).toBe(true)
+  })
+
+  it('heavy armor grants armor points and equips a helmet', () => {
+    const { player, wm } = ctx()
+    applyItem(findItem('heavy_armor')!, player, wm)
+    expect(player.armor).toBe(100)
+    expect(player.hasArmor).toBe(true)
+    expect(player.hasHelmet).toBe(true)
+  })
+
   it('medkit raises max health', () => {
     const { player, wm } = ctx()
     applyItem(findItem('medkit')!, player, wm)

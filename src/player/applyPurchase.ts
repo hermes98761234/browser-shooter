@@ -11,6 +11,8 @@ export function applyItem(item: StoreItem, player: Player, wm: WeaponManager): v
       break
     case 'armor':
       if (item.effects?.armor) player.addArmor(item.effects.armor)
+      player.hasArmor = true
+      if (item.effects?.helmet) player.hasHelmet = true
       break
     case 'health':
       if (item.effects?.maxHealth) player.addMaxHealth(item.effects.maxHealth)
