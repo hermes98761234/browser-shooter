@@ -62,26 +62,26 @@ test.describe('free games, passwords, disconnect', () => {
         await expect(join.getByText('Free').first()).toBeVisible({ timeout: 3_000 })
         await expect(join.getByRole('button', { name: /^join$/i }).first()).toBeVisible({ timeout: 3_000 })
       }).toPass({ timeout: 30_000 })
-
-      // Click Join on the free game row — PreJoinPrompt appears (no password field)
-      await join.getByRole('button', { name: /^join$/i }).first().click({ force: true })
-
-      // Pre-join prompt heading confirms we're in the flow
-      await expect(join.getByText(/select team/i)).toBeVisible({ timeout: 5_000 })
-      // No password field expected for a free (unprotected) game
-      await expect(join.getByPlaceholder(/^password$/i)).not.toBeVisible()
-
-      // Pick CT team and confirm — should drop in without waiting for a lobby Start
-      await join.getByRole('button', { name: /^ct$/i }).click({ force: true })
-      await join.getByRole('button', { name: /join match/i }).click({ force: true })
-
-      // Client reaches the canvas (in-game)
-      await expect(join.locator('canvas').first()).toBeVisible({ timeout: 20_000 })
     } catch {
       await hostCtx.close()
       await joinCtx.close()
       test.skip(true, 'WebRTC peer connection did not establish in this environment')
     }
+
+    // Click Join on the free game row — PreJoinPrompt appears (no password field)
+    await join.getByRole('button', { name: /^join$/i }).first().click({ force: true })
+
+    // Pre-join prompt heading confirms we're in the flow
+    await expect(join.getByText(/select team/i)).toBeVisible({ timeout: 5_000 })
+    // No password field expected for a free (unprotected) game
+    await expect(join.getByPlaceholder(/^password$/i)).not.toBeVisible()
+
+    // Pick CT team and confirm — should drop in without waiting for a lobby Start
+    await join.getByRole('button', { name: /^ct$/i }).click({ force: true })
+    await join.getByRole('button', { name: /join match/i }).click({ force: true })
+
+    // Client reaches the canvas (in-game)
+    await expect(join.locator('canvas').first()).toBeVisible({ timeout: 20_000 })
 
     await hostCtx.close()
     await joinCtx.close()
@@ -136,33 +136,33 @@ test.describe('free games, passwords, disconnect', () => {
         await expect(join.getByText('🔒').first()).toBeVisible({ timeout: 3_000 })
         await expect(join.getByRole('button', { name: /^join$/i }).first()).toBeVisible({ timeout: 3_000 })
       }).toPass({ timeout: 30_000 })
-
-      // Click Join on the protected game row
-      await join.getByRole('button', { name: /^join$/i }).first().click({ force: true })
-
-      // Pre-join prompt appears with a password input
-      await expect(join.getByText(/select team/i)).toBeVisible({ timeout: 5_000 })
-      await expect(join.getByPlaceholder(/^password$/i)).toBeVisible()
-
-      // Enter wrong password and submit
-      await join.getByPlaceholder(/^password$/i).fill('nope')
-      await join.getByRole('button', { name: /join match/i }).click({ force: true })
-
-      // "Wrong password" error appears; client remains on the pre-join prompt
-      await expect(join.getByText(/wrong password/i)).toBeVisible({ timeout: 10_000 })
-      await expect(join.getByText(/select team/i)).toBeVisible()
-
-      // Correct password — clear input and retry
-      await join.getByPlaceholder(/^password$/i).fill('s3cret')
-      await join.getByRole('button', { name: /join match/i }).click({ force: true })
-
-      // Client now reaches the canvas
-      await expect(join.locator('canvas').first()).toBeVisible({ timeout: 20_000 })
     } catch {
       await hostCtx.close()
       await joinCtx.close()
       test.skip(true, 'WebRTC peer connection did not establish in this environment')
     }
+
+    // Click Join on the protected game row
+    await join.getByRole('button', { name: /^join$/i }).first().click({ force: true })
+
+    // Pre-join prompt appears with a password input
+    await expect(join.getByText(/select team/i)).toBeVisible({ timeout: 5_000 })
+    await expect(join.getByPlaceholder(/^password$/i)).toBeVisible()
+
+    // Enter wrong password and submit
+    await join.getByPlaceholder(/^password$/i).fill('nope')
+    await join.getByRole('button', { name: /join match/i }).click({ force: true })
+
+    // "Wrong password" error appears; client remains on the pre-join prompt
+    await expect(join.getByText(/wrong password/i)).toBeVisible({ timeout: 10_000 })
+    await expect(join.getByText(/select team/i)).toBeVisible()
+
+    // Correct password — clear input and retry
+    await join.getByPlaceholder(/^password$/i).fill('s3cret')
+    await join.getByRole('button', { name: /join match/i }).click({ force: true })
+
+    // Client now reaches the canvas
+    await expect(join.locator('canvas').first()).toBeVisible({ timeout: 20_000 })
 
     await hostCtx.close()
     await joinCtx.close()
