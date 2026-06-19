@@ -163,6 +163,7 @@ function App() {
     lastPlayers: [] as EntityState[],
     pingTimer: 0,
     matchConfig: defaultMatchConfig() as MatchConfig,
+    matchStarted: false,
     killSeq: 0,
     grenadeManager: null as GrenadeManager | null,
   })
@@ -268,9 +269,15 @@ function App() {
     setLobbyPlayers([settingsRef.current.playerName])
     setRoster({ ct: myTeam === 'ct' ? [settingsRef.current.playerName] : [], t: myTeam === 't' ? [settingsRef.current.playerName] : [] })
     peerHost.onClientConnect((transport) => {
+      let assignedId: string | null = null
       transport.onMessage((msg) => {
         if (msg.type === 'join') {
+          if (!netHost.passwordOk(msg.password)) {
+            transport.send({ type: 'joinRejected', reason: 'badPassword' })
+            return
+          }
           const id = 'player-' + (data.nextClientNum++)
+          assignedId = id
           const joinTeam = msg.team === 't' ? 't' : 'ct'
           netHost.addClient(id, msg.name, transport, joinTeam)
           setLobbyPlayers((prev) => {
@@ -283,12 +290,33 @@ function App() {
           transport.send({ type: 'probeAck', t: msg.t })
         }
       })
+      transport.onClose(() => {
+        if (!assignedId) return
+        const name = data.session.getPlayer(assignedId)?.name
+        netHost.removeClient(assignedId)
+        setLobbyPlayers((prev) => {
+          const next = name ? prev.filter((n) => n !== name) : prev.slice(0, -1)
+          data.hostDirectory?.setPlayers(Math.max(1, next.length))
+          return next
+        })
+        if (name) setRoster((prev) => ({
+          ct: prev.ct.filter((n) => n !== name),
+          t: prev.t.filter((n) => n !== name),
+        }))
+        assignedId = null
+      })
     })
     const code = await peerHost.start()
     setRoomCode(code)
+    data.matchStarted = false
     const hostDirectory = new HostDirectory()
     data.hostDirectory = hostDirectory
-    await hostDirectory.start({ roomCode: code, hostName: settingsRef.current.playerName, players: 1, maxPlayers: 8, status: 'lobby', mode: config.mode })
+    await hostDirectory.start({
+      roomCode: code, hostName: settingsRef.current.playerName, players: 1, maxPlayers: 8,
+      status: 'lobby', mode: config.mode,
+      joinPolicy: config.joinPolicy ?? 'lobby',
+      protected: !!config.password,
+    })
   }, [myTeam])
 
   const joinGame = useCallback(async (code: string) => {
@@ -1030,6 +1058,7 @@ function App() {
           onHost={() => setShowMatchSetup(true)}
           onJoin={joinGame}
           onStart={() => {
+            gameDataRef.current.matchStarted = true
             gameDataRef.current.hostDirectory?.setStatus('in-progress')
             gameDataRef.current.netHost?.startMatch()
             startNetGame('host')
