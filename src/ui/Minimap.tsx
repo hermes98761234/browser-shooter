@@ -19,6 +19,14 @@ export const Minimap: React.FC<MinimapProps> = ({
   bombPosition,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const [isMobile, setIsMobile] = React.useState(() => window.matchMedia('(max-width: 767px)').matches)
+
+  React.useEffect(() => {
+    const mql = window.matchMedia('(max-width: 767px)')
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches)
+    mql.addEventListener('change', handler)
+    return () => mql.removeEventListener('change', handler)
+  }, [])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -26,7 +34,7 @@ export const Minimap: React.FC<MinimapProps> = ({
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
-    const size = 150
+    const size = isMobile ? 80 : 150
     const scale = size / (arenaSize * 2.5)
 
     ctx.fillStyle = 'rgba(0, 0, 0, 0.6)'
@@ -85,13 +93,13 @@ export const Minimap: React.FC<MinimapProps> = ({
         ctx.fill()
       }
     }
-  }, [playerPosition, playerRotation, enemies, arenaSize, bombsites, bombPosition])
+  }, [playerPosition, playerRotation, enemies, arenaSize, bombsites, bombPosition, isMobile])
 
   return (
     <canvas
       ref={canvasRef}
-      width={150}
-      height={150}
+      width={isMobile ? 80 : 150}
+      height={isMobile ? 80 : 150}
       style={{
         position: 'absolute',
         top: 20,
