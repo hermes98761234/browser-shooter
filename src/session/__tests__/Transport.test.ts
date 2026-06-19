@@ -34,3 +34,22 @@ describe('createLinkedTransports', () => {
     expect(aGot).toEqual([])
   })
 })
+
+describe('Transport onClose', () => {
+  it('LoopbackTransport fires onClose callbacks when close() is called', () => {
+    const t = new LoopbackTransport()
+    const cb = vi.fn()
+    t.onClose(cb)
+    t.close()
+    expect(cb).toHaveBeenCalledTimes(1)
+  })
+
+  it('linked transports notify their own close listeners when closed', () => {
+    const [a, b] = createLinkedTransports()
+    const aClosed = vi.fn(); const bClosed = vi.fn()
+    a.onClose(aClosed); b.onClose(bClosed)
+    a.close!()
+    expect(aClosed).toHaveBeenCalledTimes(1)
+    expect(bClosed).toHaveBeenCalledTimes(1)
+  })
+})
