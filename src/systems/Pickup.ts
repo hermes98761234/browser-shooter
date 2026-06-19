@@ -23,8 +23,8 @@ export class Pickup {
   }
 
   update(dt: number, time: number) {
-    this.mesh.position.y = 1 + Math.sin(time * 2 + this.bobOffset) * 0.2
-    this.mesh.rotation.y += dt * 2
+    this.mesh.position.y = 1 + Math.sin(time * 0.7 + this.bobOffset) * 0.2
+    this.mesh.rotation.y += dt * 0.8
   }
 
   checkCollision(playerPosition: THREE.Vector3, radius: number = 1.5): boolean {
