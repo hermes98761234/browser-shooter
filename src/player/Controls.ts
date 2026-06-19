@@ -107,14 +107,18 @@ export class Controls {
 
   private onMouseDown(e: MouseEvent) {
     if (e.button === 0) {
-      this.shoot = true
-      if (this.getGameState() === 'playing' && document.pointerLockElement !== this.element && !this.onIsStoreOpen?.()) {
-        this.element.requestPointerLock()
+      if (this.getGameState() === 'playing' && !this.onIsStoreOpen?.()) {
+        this.shoot = true
+        if (document.pointerLockElement !== this.element) {
+          this.element.requestPointerLock()
+        }
+        this.onThrowGrenade?.('long')
       }
-      this.onThrowGrenade?.('long')
     }
     if (e.button === 2) {
-      this.onThrowGrenade?.('short')
+      if (this.getGameState() === 'playing' && !this.onIsStoreOpen?.()) {
+        this.onThrowGrenade?.('short')
+      }
     }
   }
 

@@ -20,6 +20,8 @@ export const Minimap: React.FC<MinimapProps> = ({
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [isMobile, setIsMobile] = React.useState(() => window.matchMedia('(max-width: 767px)').matches)
+  const propsRef = useRef({ playerPosition, playerRotation, enemies, arenaSize, bombsites, bombPosition })
+  propsRef.current = { playerPosition, playerRotation, enemies, arenaSize, bombsites, bombPosition }
 
   React.useEffect(() => {
     const mql = window.matchMedia('(max-width: 767px)')
@@ -33,67 +35,76 @@ export const Minimap: React.FC<MinimapProps> = ({
     if (!canvas) return
     const ctx = canvas.getContext('2d')
     if (!ctx) return
+    let raf: number
 
-    const size = isMobile ? 80 : 150
-    const scale = size / (arenaSize * 2.5)
+    const draw = () => {
+      const { playerPosition, playerRotation, enemies, arenaSize, bombsites, bombPosition } = propsRef.current
+      const size = isMobile ? 80 : 150
+      const scale = size / (arenaSize * 2.5)
 
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)'
-    ctx.fillRect(0, 0, size, size)
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.6)'
+      ctx.fillRect(0, 0, size, size)
 
-    ctx.strokeStyle = '#444'
-    ctx.strokeRect(10, 10, size - 20, size - 20)
+      ctx.strokeStyle = '#444'
+      ctx.strokeRect(10, 10, size - 20, size - 20)
 
-    const cx = size / 2
-    const cy = size / 2
+      const cx = size / 2
+      const cy = size / 2
 
-    ctx.save()
-    ctx.translate(cx, cy)
-    ctx.rotate(-playerRotation)
-    ctx.fillStyle = '#00ff00'
-    ctx.beginPath()
-    ctx.moveTo(0, -5)
-    ctx.lineTo(-3, 3)
-    ctx.lineTo(3, 3)
-    ctx.closePath()
-    ctx.fill()
-    ctx.restore()
+      ctx.save()
+      ctx.translate(cx, cy)
+      ctx.rotate(-playerRotation)
+      ctx.fillStyle = '#00ff00'
+      ctx.beginPath()
+      ctx.moveTo(0, -5)
+      ctx.lineTo(-3, 3)
+      ctx.lineTo(3, 3)
+      ctx.closePath()
+      ctx.fill()
+      ctx.restore()
 
-    for (const enemy of enemies) {
-      const ex = cx + (enemy.x - playerPosition.x) * scale
-      const ey = cy + (enemy.z - playerPosition.z) * scale
-      if (ex > 5 && ex < size - 5 && ey > 5 && ey < size - 5) {
-        ctx.fillStyle = '#ff0000'
-        ctx.beginPath()
-        ctx.arc(ex, ey, 2, 0, Math.PI * 2)
-        ctx.fill()
-      }
-    }
-
-    if (bombsites) {
-      for (const site of bombsites) {
-        const sx = cx + (site.position.x - playerPosition.x) * scale
-        const sy = cy + (site.position.z - playerPosition.z) * scale
-        if (sx > 5 && sx < size - 5 && sy > 5 && sy < size - 5) {
-          ctx.fillStyle = site.id === 'A' ? '#ff3333' : '#3333ff'
-          ctx.font = 'bold 12px sans-serif'
-          ctx.textAlign = 'center'
-          ctx.textBaseline = 'middle'
-          ctx.fillText(site.id, sx, sy)
+      for (const enemy of enemies) {
+        const ex = cx + (enemy.x - playerPosition.x) * scale
+        const ey = cy + (enemy.z - playerPosition.z) * scale
+        if (ex > 5 && ex < size - 5 && ey > 5 && ey < size - 5) {
+          ctx.fillStyle = '#ff0000'
+          ctx.beginPath()
+          ctx.arc(ex, ey, 2, 0, Math.PI * 2)
+          ctx.fill()
         }
       }
+
+      if (bombsites) {
+        for (const site of bombsites) {
+          const sx = cx + (site.position.x - playerPosition.x) * scale
+          const sy = cy + (site.position.z - playerPosition.z) * scale
+          if (sx > 5 && sx < size - 5 && sy > 5 && sy < size - 5) {
+            ctx.fillStyle = site.id === 'A' ? '#ff3333' : '#3333ff'
+            ctx.font = 'bold 12px sans-serif'
+            ctx.textAlign = 'center'
+            ctx.textBaseline = 'middle'
+            ctx.fillText(site.id, sx, sy)
+          }
+        }
+      }
+
+      if (bombPosition) {
+        const bx = cx + (bombPosition.x - playerPosition.x) * scale
+        const by = cy + (bombPosition.z - playerPosition.z) * scale
+        if (bx > 5 && bx < size - 5 && by > 5 && by < size - 5) {
+          ctx.fillStyle = '#ff0000'
+          ctx.beginPath()
+          ctx.arc(bx, by, 3, 0, Math.PI * 2)
+          ctx.fill()
+        }
+      }
+
+      raf = requestAnimationFrame(draw)
     }
 
-    if (bombPosition) {
-      const bx = cx + (bombPosition.x - playerPosition.x) * scale
-      const by = cy + (bombPosition.z - playerPosition.z) * scale
-      if (bx > 5 && bx < size - 5 && by > 5 && by < size - 5) {
-        ctx.fillStyle = '#ff0000'
-        ctx.beginPath()
-        ctx.arc(bx, by, 3, 0, Math.PI * 2)
-        ctx.fill()
-      }
-    }
-  }, [playerPosition, playerRotation, enemies, arenaSize, bombsites, bombPosition, isMobile])
+    raf = requestAnimationFrame(draw)
+    return () => cancelAnimationFrame(raf)
+  }, [isMobile, arenaSize])
 
   return (
     <canvas

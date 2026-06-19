@@ -94,6 +94,7 @@ function App() {
   const [joinError, setJoinError] = useState<string | null>(null)
   const [hostNotice, setHostNotice] = useState<string | null>(null)
   const [lobbyPlayers, setLobbyPlayers] = useState<string[]>([])
+  const playerIdToNameRef = useRef<Map<string, string>>(new Map())
   const [isHost, setIsHost] = useState(false)
   const [servers, setServers] = useState<ServerRow[]>([])
   const [settings, setSettings] = useState<Settings>(() => loadSettings())
@@ -494,11 +495,14 @@ function App() {
       updateGameState('mpmenu')
     })
     client.onPlayerJoined((_id, name) => {
+      playerIdToNameRef.current.set(_id, name)
       setLobbyPlayers((prev) => prev.includes(name) ? prev : [...prev, name])
     })
     client.onPlayerLeft((id) => {
       gameDataRef.current.voiceChat?.peerDisconnected(id)
-      setLobbyPlayers((prev) => prev.slice(0, -1))
+      const name = playerIdToNameRef.current.get(id)
+      playerIdToNameRef.current.delete(id)
+      setLobbyPlayers((prev) => name ? prev.filter((n) => n !== name) : prev.slice(0, -1))
     })
     client.transport.send({
       type: 'join',
