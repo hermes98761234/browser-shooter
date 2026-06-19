@@ -1,7 +1,18 @@
 # Free (drop-in) games, password protection, and disconnect handling
 
 **Date:** 2026-06-19
-**Status:** Approved design, ready for implementation planning
+**Status:** Implemented. Disconnect handling covers **graceful** closes only — see Known
+Limitation below.
+
+## Known Limitation (disconnect detection)
+
+The disconnect handling below relies on the transport `onClose` hook (peerjs's
+`DataConnection` `'close'` event). That event does **not** fire on the surviving peer when
+the remote disappears **abruptly** (tab/window close, crash, network drop), so abrupt
+disconnects are not yet detected. Graceful in-app closes are handled. The robust fix
+(heartbeat/timeout liveness) is specced as a tracked follow-up:
+`2026-06-19-disconnect-heartbeat-followup.md`. The e2e
+`host disconnect returns the client to the menu` is marked `test.fixme` until that lands.
 
 ## Problem
 
