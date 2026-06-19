@@ -32,11 +32,14 @@ export class VoiceChat {
   private now: () => number
   private heartbeatMs: number
 
+  private incomingCallHandler?: (call: VoiceCall) => void
+
   constructor(private deps: VoiceChatDeps) {
     this.now = deps.now ?? (() => performance.now())
     this.heartbeatMs = deps.heartbeatMs ?? 1000
     this.registry = new SpeakerRegistry(deps.ttlMs ?? 2500)
-    deps.peer.onIncomingCall((call) => this.handleIncoming(call))
+    this.incomingCallHandler = (call) => this.handleIncoming(call)
+    deps.peer.onIncomingCall(this.incomingCallHandler)
   }
 
   setRoster(teammates: VoiceRosterEntry[]): void {
@@ -46,8 +49,8 @@ export class VoiceChat {
 
   async startTalking(): Promise<void> {
     if (this.talking) return
-    if (!this.activated) await this.activate()
     this.talking = true
+    if (!this.activated) await this.activate()
     this.setMicEnabled(true)
     this.registry.start(this.deps.localPlayerId, this.deps.localName, this.now())
     this.deps.sendStart(this.deps.localPlayerId, this.deps.localName)
@@ -81,9 +84,8 @@ export class VoiceChat {
     this.emit()
   }
 
-  /** Drive each frame: self-heal the mesh, resend talk heartbeats, prune stale speakers. */
+  /** Drive each frame: resend talk heartbeats, prune stale speakers. */
   tick(now: number): void {
-    if (this.activated) this.reconcile()
     if (this.talking && now - this.lastSent >= this.heartbeatMs) {
       this.registry.start(this.deps.localPlayerId, this.deps.localName, now)
       this.deps.sendStart(this.deps.localPlayerId, this.deps.localName)
@@ -98,6 +100,9 @@ export class VoiceChat {
     for (const peerId of [...this.calls.keys()]) this.closeCall(peerId)
     this.mic?.getAudioTracks().forEach(t => t.stop())
     this.mic = null
+    if (this.incomingCallHandler) {
+      this.deps.peer.offIncomingCall(this.incomingCallHandler)
+    }
   }
 
   private async activate(): Promise<void> {

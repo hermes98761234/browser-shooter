@@ -11,6 +11,9 @@ export class AudioSink {
       el.style.display = 'none'
       document.body.appendChild(el)
       this.els.set(peerId, el)
+    } else {
+      const old = el.srcObject as MediaStream | null
+      old?.getTracks().forEach(t => t.stop())
     }
     el.srcObject = stream
     void el.play().catch(() => {})

@@ -20,6 +20,7 @@ export interface VoicePeer {
   readonly id: string
   call(peerId: string, stream: MediaStream): VoiceCall
   onIncomingCall(cb: (call: VoiceCall) => void): void
+  offIncomingCall(cb: (call: VoiceCall) => void): void
 }
 
 export class BrowserMicProvider implements MicProvider {
@@ -29,6 +30,9 @@ export class BrowserMicProvider implements MicProvider {
     if (!this.stream) {
       this.stream = navigator.mediaDevices.getUserMedia({
         audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      }).catch((err) => {
+        this.stream = null
+        throw err
       })
     }
     return this.stream
@@ -47,12 +51,22 @@ class PeerJsVoiceCall implements VoiceCall {
 }
 
 export class PeerJsVoicePeer implements VoicePeer {
+  private callbacks = new Map<(call: VoiceCall) => void, (conn: MediaConnection) => void>()
   constructor(private peer: Peer) {}
   get id(): string { return this.peer.id }
   call(peerId: string, stream: MediaStream): VoiceCall {
     return new PeerJsVoiceCall(this.peer.call(peerId, stream))
   }
   onIncomingCall(cb: (call: VoiceCall) => void): void {
-    this.peer.on('call', (conn: MediaConnection) => cb(new PeerJsVoiceCall(conn)))
+    const wrapper = (conn: MediaConnection) => cb(new PeerJsVoiceCall(conn))
+    this.callbacks.set(cb, wrapper)
+    this.peer.on('call', wrapper)
+  }
+  offIncomingCall(cb: (call: VoiceCall) => void): void {
+    const wrapper = this.callbacks.get(cb)
+    if (wrapper) {
+      this.peer.removeListener('call', wrapper)
+      this.callbacks.delete(cb)
+    }
   }
 }

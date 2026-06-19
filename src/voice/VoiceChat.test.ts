@@ -22,11 +22,12 @@ class FakeCall implements VoiceCall {
 
 class FakePeer implements VoicePeer {
   calls: FakeCall[] = []
-  private incomingCb: ((call: VoiceCall) => void) | null = null
+  private incomingCbs = new Map<(call: VoiceCall) => void, (call: VoiceCall) => void>()
   constructor(public id: string) {}
   call(peerId: string): VoiceCall { const c = new FakeCall(peerId); this.calls.push(c); return c }
-  onIncomingCall(cb: (call: VoiceCall) => void): void { this.incomingCb = cb }
-  fireIncoming(call: FakeCall): void { this.incomingCb?.(call) }
+  onIncomingCall(cb: (call: VoiceCall) => void): void { this.incomingCbs.set(cb, cb) }
+  offIncomingCall(cb: (call: VoiceCall) => void): void { this.incomingCbs.delete(cb) }
+  fireIncoming(call: FakeCall): void { this.incomingCbs.forEach(cb => cb(call)) }
 }
 
 function setup(myId: string) {
