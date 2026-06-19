@@ -29,6 +29,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({
         textShadow: '0 0 30px #ff6600, 0 0 60px #ff3300',
         marginBottom: 10,
         color: '#ff6600',
+        textAlign: 'center',
       }}>
         BROWSER SHOOTER
       </h1>
