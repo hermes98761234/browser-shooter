@@ -479,8 +479,17 @@ function App() {
     })
     client.onDisconnect(() => {
       if (data.role !== 'client') return
+
+      if (data.matchConfig.mode === 'coop') {
+        resetNetworking()
+        setHostNotice('Host disconnected')
+        setRoomCode(null); setLobbyPlayers([]); setIsHost(false)
+        updateGameState('mpmenu')
+        return
+      }
+
       resetNetworking()
-      setHostNotice('Host disconnected')
+      setHostNotice('Host disconnected - returning to menu')
       setRoomCode(null); setLobbyPlayers([]); setIsHost(false)
       updateGameState('mpmenu')
     })
