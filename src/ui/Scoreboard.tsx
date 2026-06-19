@@ -12,8 +12,11 @@ const overlay: React.CSSProperties = {
   pointerEvents: 'none', zIndex: 60, fontFamily: 'monospace',
 }
 const panel: React.CSSProperties = {
-  minWidth: 480, maxWidth: '90%', background: 'rgba(10,10,25,0.92)', border: '1px solid #2a2a3f',
-  borderRadius: 12, padding: 24, color: '#e0e0f0', boxShadow: '0 0 40px rgba(0,0,0,0.6)',
+  width: 'min(480px, calc(100vw - 24px))', maxWidth: 'calc(100vw - 24px)',
+  maxHeight: 'calc(100vh - 24px)', overflow: 'auto',
+  background: 'rgba(10,10,25,0.92)', border: '1px solid #2a2a3f',
+  borderRadius: 12, padding: 'clamp(14px, 4vw, 24px)', color: '#e0e0f0',
+  boxShadow: '0 0 40px rgba(0,0,0,0.6)',
 }
 function pingColor(ping: number): string {
   if (ping < 60) return '#00ff88'
@@ -41,11 +44,11 @@ export const Scoreboard: React.FC<ScoreboardProps> = ({ players, roomCode, score
           </span>}
           {roomCode && <span style={{ opacity: 0.5, fontSize: 13 }}>Room {roomCode}</span>}
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto auto auto', gap: '6px 24px',
-          fontSize: 13, opacity: 0.5, marginBottom: 6 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto auto auto', gap: '6px clamp(10px, 3vw, 24px)',
+          fontSize: 13, opacity: 0.6, marginBottom: 6 }}>
           <span>PLAYER</span><span>K</span><span>D</span><span>STATUS</span><span style={{ textAlign: 'right' }}>PING</span>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto auto auto', gap: '8px 24px', fontSize: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto auto auto', gap: '8px clamp(10px, 3vw, 24px)', fontSize: 16 }}>
           {rows.map((p) => {
             const ps = scores?.players[p.id]
             return (

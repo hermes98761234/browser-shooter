@@ -9,9 +9,35 @@
   --accent-soft: rgba(0, 255, 136, 0.15);
   font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
   -webkit-font-smoothing: antialiased;
+
+  /* Device safe-area insets (notch / home indicator). Fall back to 0 on
+     browsers that don't support env(). Consumed by HUD and touch controls. */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
 }
 
 body {
   background: var(--bg);
   color: var(--text);
 }
+
+/* On-screen touch-control buttons get a tactile pressed state, since inline
+   styles can't express :active. Used by TouchControls. */
+.tc-btn {
+  transition: transform 0.06s ease, filter 0.06s ease;
+}
+.tc-btn:active {
+  transform: scale(0.9);
+  filter: brightness(1.4);
+}
+
+/* Touch-friendly pressed feedback for menu buttons (replaces hover-only JS). */
+.ui-btn {
+  transition: transform 0.12s ease, filter 0.12s ease, background 0.12s ease;
+}
+@media (hover: hover) {
+  .ui-btn:hover { filter: brightness(1.15); transform: translateY(-1px); }
+}
+.ui-btn:active { transform: scale(0.97); filter: brightness(0.95); }

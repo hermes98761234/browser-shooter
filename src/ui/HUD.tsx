@@ -24,6 +24,9 @@ interface HUDProps {
   defuseProgress?: number
   grenadeInventory?: { he: number; flash: number; smoke: number }
   selectedGrenade?: string | null
+  /** When the on-screen touch controls are active, relocate HUD clusters so
+      they don't sit underneath the joystick / fire button. */
+  mobile?: boolean
 }
 
 export const HUD: React.FC<HUDProps> = ({
@@ -50,9 +53,20 @@ export const HUD: React.FC<HUDProps> = ({
   defuseProgress,
   grenadeInventory,
   selectedGrenade,
+  mobile,
 }) => {
   const healthPercent = maxHealth > 0 ? (health / maxHealth) * 100 : 0
   const healthColor = healthPercent > 60 ? '#00ff00' : healthPercent > 30 ? '#ffff00' : '#ff0000'
+
+  // On touch devices the bottom corners belong to the joystick (left) and fire
+  // button (right), so move the health bar to the bottom-centre and the ammo
+  // readout just above the fire button. Safe-area vars are 0 on desktop.
+  const healthPos: React.CSSProperties = mobile
+    ? { bottom: 'calc(16px + var(--safe-bottom))', left: '50%', transform: 'translateX(-50%)', width: 'min(200px, 46vw)' }
+    : { bottom: 'calc(20px + var(--safe-bottom))', left: 'calc(20px + var(--safe-left))', width: 'min(200px, 40vw)' }
+  const ammoPos: React.CSSProperties = mobile
+    ? { bottom: 'calc(78px + var(--safe-bottom))', left: '50%', transform: 'translateX(-50%)', textAlign: 'center' }
+    : { bottom: 'calc(20px + var(--safe-bottom))', right: 'calc(20px + var(--safe-right))', textAlign: 'right' }
 
   return (
     <div style={{
@@ -67,7 +81,7 @@ export const HUD: React.FC<HUDProps> = ({
 
       {/* Round info (competitive mode) */}
       {round !== undefined && (
-        <div style={{ position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)', textAlign: 'center' }}>
+        <div style={{ position: 'absolute', top: 'calc(10px + var(--safe-top))', left: '50%', transform: 'translateX(-50%)', textAlign: 'center' }}>
           <div style={{ fontSize: 18, fontFamily: 'monospace', color: '#fff' }}>
             Round {round} | CT: {ctScore} - T: {tScore}
           </div>
@@ -83,9 +97,10 @@ export const HUD: React.FC<HUDProps> = ({
         </div>
       )}
 
-      {/* Money (competitive mode) */}
+      {/* Money (competitive mode) — inset on touch to clear the grenade row and
+          the right-edge action column. */}
       {money !== undefined && (
-        <div style={{ position: 'absolute', top: 10, right: 10, fontSize: 18, fontFamily: 'monospace', color: '#00ff00' }}>
+        <div style={{ position: 'absolute', top: mobile ? 'calc(74px + var(--safe-top))' : 'calc(10px + var(--safe-top))', right: mobile ? 'calc(86px + var(--safe-right))' : 'calc(10px + var(--safe-right))', fontSize: 18, fontFamily: 'monospace', color: '#00ff00' }}>
           ${money}
         </div>
       )}
@@ -93,9 +108,7 @@ export const HUD: React.FC<HUDProps> = ({
       {/* Health bar */}
       <div style={{
         position: 'absolute',
-        bottom: 20,
-        left: 20,
-        width: 200,
+        ...healthPos,
       }}>
         <div style={{ fontSize: 12, marginBottom: 4 }}>HP</div>
         <div style={{
@@ -118,9 +131,7 @@ export const HUD: React.FC<HUDProps> = ({
       {/* Ammo */}
       <div style={{
         position: 'absolute',
-        bottom: 20,
-        right: 20,
-        textAlign: 'right',
+        ...ammoPos,
       }}>
         <div style={{ fontSize: 14, opacity: 0.7 }}>{weaponName}</div>
         <div style={{ fontSize: 32, fontWeight: 'bold', textShadow: '0 0 10px black' }}>
@@ -129,8 +140,8 @@ export const HUD: React.FC<HUDProps> = ({
         <div style={{ fontSize: 12, opacity: 0.5 }}>/ {maxAmmo}</div>
       </div>
 
-      {/* Grenade inventory */}
-      {grenadeInventory && (
+      {/* Grenade inventory — hidden on touch, where TouchControls shows its own selector */}
+      {grenadeInventory && !mobile && (
         <div style={{ position: 'absolute', bottom: 80, right: 20, display: 'flex', gap: 8 }}>
           {grenadeInventory.he > 0 && (
             <div style={{ 
@@ -171,11 +182,16 @@ export const HUD: React.FC<HUDProps> = ({
         </div>
       )}
 
-      {/* Score */}
-      <div style={{
+      {/* Score — moved to top-centre on touch, where the right edge is taken by
+          the action column / fire button. */}
+      <div style={mobile ? {
         position: 'absolute',
-        top: 20,
-        right: 20,
+        top: 'calc(74px + var(--safe-top))',
+        left: '50%', transform: 'translateX(-50%)', textAlign: 'center',
+      } : {
+        position: 'absolute',
+        top: 'calc(20px + var(--safe-top))',
+        right: 'calc(20px + var(--safe-right))',
         textAlign: 'right',
       }}>
         <div style={{ fontSize: 12, opacity: 0.7 }}>SCORE</div>
@@ -185,7 +201,7 @@ export const HUD: React.FC<HUDProps> = ({
       {/* Wave info */}
       <div style={{
         position: 'absolute',
-        top: 20,
+        top: mobile && round !== undefined ? 'calc(54px + var(--safe-top))' : 'calc(20px + var(--safe-top))',
         left: '50%',
         transform: 'translateX(-50%)',
         textAlign: 'center',
@@ -239,7 +255,7 @@ export const HUD: React.FC<HUDProps> = ({
           bottom: 100,
           left: '50%',
           transform: 'translateX(-50%)',
-          width: 200,
+          width: 'min(200px, 60vw)',
           height: 10,
           background: '#333',
         }}>
@@ -258,7 +274,7 @@ export const HUD: React.FC<HUDProps> = ({
           bottom: 100,
           left: '50%',
           transform: 'translateX(-50%)',
-          width: 200,
+          width: 'min(200px, 60vw)',
           height: 10,
           background: '#333',
         }}>

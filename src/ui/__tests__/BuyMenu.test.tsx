@@ -53,10 +53,10 @@ describe('BuyMenu', () => {
       expect(screen.getByText('Select an item')).toBeTruthy()
     })
 
-    it('shows preview item name when hovered', () => {
+    it('shows preview item name on pointer enter (mouse hover or touch)', () => {
       render(<BuyMenu team="ct" money={16000} owned={[]} onBuy={vi.fn()} onClose={vi.fn()} />)
       const m4 = screen.getByText('M4').closest('button') as HTMLButtonElement
-      fireEvent.mouseEnter(m4)
+      fireEvent.pointerEnter(m4)
       expect(screen.queryByText('Select an item')).toBeNull()
     })
   })

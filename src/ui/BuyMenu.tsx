@@ -56,8 +56,9 @@ export function BuyMenu({ team, money, owned, onBuy, onClose, buyPhase, buyPhase
       background: 'rgba(0,0,0,0.6)', zIndex: 50, fontFamily: 'monospace', color: '#fff',
     }}>
       <div style={{
-        background: '#15151f', border: '1px solid #3a3a55', padding: 24,
-        minWidth: isMobile ? 320 : 600, maxHeight: '80vh', overflowY: 'auto',
+        background: '#15151f', border: '1px solid #3a3a55', padding: isMobile ? 16 : 24,
+        width: isMobile ? 'calc(100vw - 16px)' : 600,
+        maxWidth: 'calc(100vw - 16px)', maxHeight: '85vh', overflowY: 'auto',
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
           <h2 style={{ margin: 0 }}>BUY MENU · {team === 'ct' ? 'CT' : 'T'}</h2>
@@ -76,8 +77,8 @@ export function BuyMenu({ team, money, owned, onBuy, onClose, buyPhase, buyPhase
           </div>
         )}
 
-        <div style={{ display: 'flex', gap: 16 }}>
-          <div style={{ flex: 1 }}>
+        <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 16 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
             {SECTIONS.map((section) => {
               const items = catalog.filter(
                 (i) => section.kinds.includes(i.kind) && (section.slot ? i.slot === section.slot : true),
@@ -88,7 +89,7 @@ export function BuyMenu({ team, money, owned, onBuy, onClose, buyPhase, buyPhase
                   <div style={{ color: '#8a8aad', fontSize: 12, margin: '8px 0 4px' }}>{section.title}</div>
                   <div style={{
                     display: 'grid',
-                    gridTemplateColumns: isMobile ? '1fr' : 'repeat(5, 1fr)',
+                    gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(5, 1fr)',
                     gap: 8,
                   }}>
                     {items.map((item) => {
@@ -113,10 +114,10 @@ export function BuyMenu({ team, money, owned, onBuy, onClose, buyPhase, buyPhase
                           key={item.id}
                           disabled={disabled}
                           onClick={() => onBuy(item.id)}
-                          onMouseEnter={() => setSelectedItem(item)}
+                          onPointerEnter={() => setSelectedItem(item)}
                           style={{
                             display: 'flex', flexDirection: 'column', alignItems: 'center',
-                            padding: '12px 8px', background: disabled ? '#1a1a24' : '#23233a',
+                            padding: '14px 8px', minHeight: 96, background: disabled ? '#1a1a24' : '#23233a',
                             color: disabled ? '#666' : '#fff', border: '1px solid #3a3a55',
                             cursor: disabled ? 'not-allowed' : 'pointer',
                           }}
@@ -135,7 +136,12 @@ export function BuyMenu({ team, money, owned, onBuy, onClose, buyPhase, buyPhase
             })}
           </div>
 
-          <div style={{ width: 220, borderLeft: '1px solid #3a3a55', paddingLeft: 16 }}>
+          <div style={{
+            width: isMobile ? '100%' : 220,
+            borderLeft: isMobile ? 'none' : '1px solid #3a3a55',
+            borderTop: isMobile ? '1px solid #3a3a55' : 'none',
+            paddingLeft: isMobile ? 0 : 16, paddingTop: isMobile ? 16 : 0,
+          }}>
             <BuyPreview item={selectedItem} />
           </div>
         </div>
