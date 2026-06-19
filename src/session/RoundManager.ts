@@ -62,10 +62,9 @@ export class RoundManager {
       return
     }
 
-    // Check halftime
-    if (this.round === 15) {
-      this.isHalftime = true
-    }
+    // Halftime is only the boundary round (15 -> 16); clear it for every other
+    // round so the second half doesn't repeatedly trigger a halftime economy reset.
+    this.isHalftime = this.round === 15
 
     // Advance round
     this.round++

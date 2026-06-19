@@ -54,6 +54,15 @@ describe('RoundManager', () => {
     expect(rm.isHalftime).toBe(true)
   })
 
+  it('clears isHalftime once the second half is underway', () => {
+    const rm = new RoundManager()
+    rm.setRound(15)
+    rm.endRound('ct') // round 15 -> 16: this is the halftime boundary
+    expect(rm.isHalftime).toBe(true)
+    rm.endRound('t') // round 16 -> 17: no longer halftime
+    expect(rm.isHalftime).toBe(false)
+  })
+
   it('match ends at round 30 or first to 16', () => {
     const rm = new RoundManager()
     rm.setRound(29)

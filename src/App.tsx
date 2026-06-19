@@ -516,7 +516,7 @@ function App() {
       gameDataRef.current.voiceChat?.peerDisconnected(id)
       const name = playerIdToNameRef.current.get(id)
       playerIdToNameRef.current.delete(id)
-      setLobbyPlayers((prev) => name ? prev.filter((n) => n !== name) : prev.slice(0, -1))
+      setLobbyPlayers((prev) => name ? prev.filter((n) => n !== name) : prev)
     })
     client.transport.send({
       type: 'join',
