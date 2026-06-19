@@ -81,6 +81,36 @@ const icons: Record<string, React.FC<{ size: number }>> = {
       <path d="M16 12h12v36H16z M36 12h12v28H36z M12 48h40v8H12z"/>
     </svg>
   ),
+  heavy_armor: ({ size }) => (
+    <svg width={size} height={size} viewBox="0 0 64 64" fill="currentColor">
+      <path d="M14 6h36v22H14z M18 28h28v8H18z M28 36h8v16h-8z M22 12h20v4H22z M22 18h20v4H22z"/>
+    </svg>
+  ),
+  he_grenade: ({ size }) => (
+    <svg width={size} height={size} viewBox="0 0 64 64" fill="currentColor">
+      <path d="M28 8h8v6h-8z M30 14h4l6 6v4H24v-4z M20 24h24v24a12 12 0 0 1-24 0z M40 10h10v4H40z"/>
+    </svg>
+  ),
+  flashbang: ({ size }) => (
+    <svg width={size} height={size} viewBox="0 0 64 64" fill="currentColor">
+      <path d="M28 8h8v8h-8z M22 16h20v8H22z M24 24h16v24a8 8 0 0 1-16 0z M40 10h8v4h-8z"/>
+    </svg>
+  ),
+  smoke_grenade: ({ size }) => (
+    <svg width={size} height={size} viewBox="0 0 64 64" fill="currentColor">
+      <path d="M27 8h10v6H27z M24 14h16v6H24z M22 20h20v22a10 10 0 0 1-20 0z M40 10h9v4h-9z"/>
+    </svg>
+  ),
+  bomb: ({ size }) => (
+    <svg width={size} height={size} viewBox="0 0 64 64" fill="currentColor">
+      <path d="M12 20h40v24H12z M16 24h32v4H16z M20 32h10v6H20z M34 32h10v6H34z M24 12h16v8H24z"/>
+    </svg>
+  ),
+  defuse_kit: ({ size }) => (
+    <svg width={size} height={size} viewBox="0 0 64 64" fill="currentColor">
+      <path d="M16 8l10 18-6 4-10-18z M48 8l-10 18 6 4 10-18z M24 28h16v6H24z M26 34h12v22H26z"/>
+    </svg>
+  ),
 }
 
 export const WeaponIcon: React.FC<IconProps> = ({ name, size = 64 }) => {

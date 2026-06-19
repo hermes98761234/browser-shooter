@@ -61,6 +61,51 @@ describe('BuyMenu', () => {
     })
   })
 
+  describe('grenades and equipment', () => {
+    it('shows the Grenades section with all three grenades', () => {
+      render(<BuyMenu team="ct" money={16000} owned={[]} onBuy={vi.fn()} onClose={vi.fn()} />)
+      expect(screen.getByText('Grenades')).toBeTruthy()
+      expect(screen.getByText('HE Grenade')).toBeTruthy()
+      expect(screen.getByText('Flashbang')).toBeTruthy()
+      expect(screen.getByText('Smoke Grenade')).toBeTruthy()
+    })
+
+    it('shows the Defuse Kit in Equipment for CT only', () => {
+      render(<BuyMenu team="ct" money={16000} owned={[]} onBuy={vi.fn()} onClose={vi.fn()} />)
+      expect(screen.getByText('Equipment')).toBeTruthy()
+      expect(screen.getByText('Defuse Kit')).toBeTruthy()
+      expect(screen.queryByText('C4 Bomb')).toBeNull()
+    })
+
+    it('shows the C4 Bomb in Equipment for T only', () => {
+      render(<BuyMenu team="t" money={16000} owned={[]} onBuy={vi.fn()} onClose={vi.fn()} />)
+      expect(screen.getByText('C4 Bomb')).toBeTruthy()
+      expect(screen.queryByText('Defuse Kit')).toBeNull()
+    })
+
+    it('keeps a grenade buyable until the carry limit is reached', () => {
+      const onBuy = vi.fn()
+      // flashbang carryLimit is 2: one owned should still be buyable
+      render(
+        <BuyMenu team="ct" money={16000} owned={['flashbang']} onBuy={onBuy}
+          onClose={vi.fn()} grenadeInventory={{ he: 0, flash: 1, smoke: 0 }} />,
+      )
+      const flash = screen.getByText('Flashbang').closest('button') as HTMLButtonElement
+      expect(flash.disabled).toBe(false)
+      fireEvent.click(flash)
+      expect(onBuy).toHaveBeenCalledWith('flashbang')
+    })
+
+    it('disables a grenade once the carry limit is reached', () => {
+      render(
+        <BuyMenu team="ct" money={16000} owned={['flashbang']} onBuy={vi.fn()}
+          onClose={vi.fn()} grenadeInventory={{ he: 0, flash: 2, smoke: 0 }} />,
+      )
+      const flash = screen.getByText('Flashbang').closest('button') as HTMLButtonElement
+      expect(flash.disabled).toBe(true)
+    })
+  })
+
   describe('buy phase', () => {
     it('shows buy phase warning when not in buy phase', () => {
       render(<BuyMenu team="ct" money={800} owned={[]} onBuy={vi.fn()} onClose={vi.fn()} buyPhase={false} />)

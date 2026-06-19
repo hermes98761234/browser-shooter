@@ -56,6 +56,14 @@ import type { MatchScores } from './session/protocol'
 import { BombState } from './session/BombCarrier'
 import { Matchmaker } from './net/Matchmaker'
 import { GrenadeManager } from './weapons/GrenadeManager'
+import { GRENADE_DEFS } from './weapons/GrenadeDefs'
+
+/** Maps a grenade store item id to its grenade type/inventory key. */
+const GRENADE_ITEM_KEY: Record<string, GrenadeType> = {
+  he_grenade: 'he',
+  flashbang: 'flash',
+  smoke_grenade: 'smoke',
+}
 import type Peer from 'peerjs'
 import { VoiceChat } from './voice/VoiceChat'
 import { BrowserMicProvider, PeerJsVoicePeer } from './voice/VoiceTransport'
@@ -1332,57 +1340,66 @@ function App() {
           team={team}
           money={money}
           owned={owned}
+          grenadeInventory={grenadeInventory}
           onBuy={(id) => {
             const data = gameDataRef.current
             const item = findItem(id)
-            if (item && !owned.includes(id) && canAffordItem(data.money, id)) {
-              data.money -= item.price
-              setMoney(data.money)
-              if (data.role === 'client' && data.netClient) {
-                data.netClient.transport.send({ type: 'buy', playerId: data.netClient.playerId!, item: id })
-              } else {
-                applyItem(item, data.session.player, data.session.weaponManager)
-              }
+            if (!item || !canAffordItem(data.money, id)) return
+            const grenadeKey = GRENADE_ITEM_KEY[id]
+            if (grenadeKey) {
+              // Grenades are stackable: block at the carry limit, ignore owned.
+              if ((data.grenadeManager?.getCount(grenadeKey) ?? 0) >= GRENADE_DEFS[grenadeKey].carryLimit) return
+            } else if (owned.includes(id)) {
+              return
+            }
+            data.money -= item.price
+            setMoney(data.money)
+            if (data.role === 'client' && data.netClient) {
+              data.netClient.transport.send({ type: 'buy', playerId: data.netClient.playerId!, item: id })
+            } else {
+              applyItem(item, data.session.player, data.session.weaponManager)
+            }
+            if (!grenadeKey) {
               setOwned((prev) => { const next = [...prev, id]; ownedRef.current = next; return next })
-              setMaxHealth(data.session.player.maxHealth)
-              const wm = data.session.weaponManager
-              setWeaponName(wm.current.def.name)
-              setAmmo(wm.current.ammo)
-              switch (id) {
-                case 'bomb':
-                  data.viewmodel?.setObjective('bomb')
-                  break
-                case 'defuse_kit':
-                  data.viewmodel?.setObjective('defuse_kit')
-                  break
-                case 'he_grenade':
-                  data.grenadeManager?.add('he')
-                  setGrenadeInventory({
-                    he: data.grenadeManager?.getCount('he') ?? 0,
-                    flash: data.grenadeManager?.getCount('flash') ?? 0,
-                    smoke: data.grenadeManager?.getCount('smoke') ?? 0,
-                  })
-                  break
-                case 'flashbang':
-                  data.grenadeManager?.add('flash')
-                  setGrenadeInventory({
-                    he: data.grenadeManager?.getCount('he') ?? 0,
-                    flash: data.grenadeManager?.getCount('flash') ?? 0,
-                    smoke: data.grenadeManager?.getCount('smoke') ?? 0,
-                  })
-                  break
-                case 'smoke_grenade':
-                  data.grenadeManager?.add('smoke')
-                  setGrenadeInventory({
-                    he: data.grenadeManager?.getCount('he') ?? 0,
-                    flash: data.grenadeManager?.getCount('flash') ?? 0,
-                    smoke: data.grenadeManager?.getCount('smoke') ?? 0,
-                  })
-                  break
-                default:
-                  data.viewmodel?.setWeapon(weaponVisual(wm.current.type))
-                  break
-              }
+            }
+            setMaxHealth(data.session.player.maxHealth)
+            const wm = data.session.weaponManager
+            setWeaponName(wm.current.def.name)
+            setAmmo(wm.current.ammo)
+            switch (id) {
+              case 'bomb':
+                data.viewmodel?.setObjective('bomb')
+                break
+              case 'defuse_kit':
+                data.viewmodel?.setObjective('defuse_kit')
+                break
+              case 'he_grenade':
+                data.grenadeManager?.add('he')
+                setGrenadeInventory({
+                  he: data.grenadeManager?.getCount('he') ?? 0,
+                  flash: data.grenadeManager?.getCount('flash') ?? 0,
+                  smoke: data.grenadeManager?.getCount('smoke') ?? 0,
+                })
+                break
+              case 'flashbang':
+                data.grenadeManager?.add('flash')
+                setGrenadeInventory({
+                  he: data.grenadeManager?.getCount('he') ?? 0,
+                  flash: data.grenadeManager?.getCount('flash') ?? 0,
+                  smoke: data.grenadeManager?.getCount('smoke') ?? 0,
+                })
+                break
+              case 'smoke_grenade':
+                data.grenadeManager?.add('smoke')
+                setGrenadeInventory({
+                  he: data.grenadeManager?.getCount('he') ?? 0,
+                  flash: data.grenadeManager?.getCount('flash') ?? 0,
+                  smoke: data.grenadeManager?.getCount('smoke') ?? 0,
+                })
+                break
+              default:
+                data.viewmodel?.setWeapon(weaponVisual(wm.current.type))
+                break
             }
           }}
           onClose={() => setStoreOpen(false)}

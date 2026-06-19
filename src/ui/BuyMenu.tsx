@@ -1,8 +1,15 @@
 import { useState, useEffect } from 'react'
 import { catalogForTeam, canAffordItem } from '../weapons/StoreCatalog'
+import { GRENADE_DEFS } from '../weapons/GrenadeDefs'
 import { WeaponIcon } from './icons/weapons'
 import { BuyPreview } from './BuyPreview'
-import type { ItemKind, StoreItem, Team } from '../types'
+import type { GrenadeType, ItemKind, StoreItem, Team } from '../types'
+
+export interface GrenadeInventory {
+  he: number
+  flash: number
+  smoke: number
+}
 
 interface BuyMenuProps {
   team: Team
@@ -12,16 +19,26 @@ interface BuyMenuProps {
   onClose: () => void
   buyPhase?: boolean
   buyPhaseTimer?: number
+  grenadeInventory?: GrenadeInventory
 }
 
 const SECTIONS: { title: string; kinds: ItemKind[]; slot?: 'primary' | 'secondary' }[] = [
   { title: 'Pistols', kinds: ['weapon'], slot: 'secondary' },
   { title: 'Primary', kinds: ['weapon'], slot: 'primary' },
   { title: 'Gear', kinds: ['armor', 'health', 'speed'] },
+  { title: 'Grenades', kinds: ['grenade'] },
+  { title: 'Equipment', kinds: ['objective', 'gear'] },
   { title: 'Upgrades', kinds: ['upgrade'] },
 ]
 
-export function BuyMenu({ team, money, owned, onBuy, onClose, buyPhase, buyPhaseTimer }: BuyMenuProps) {
+/** Maps a grenade store item id to its inventory/def key. */
+const GRENADE_KEY: Record<string, GrenadeType> = {
+  he_grenade: 'he',
+  flashbang: 'flash',
+  smoke_grenade: 'smoke',
+}
+
+export function BuyMenu({ team, money, owned, onBuy, onClose, buyPhase, buyPhaseTimer, grenadeInventory }: BuyMenuProps) {
   const catalog = catalogForTeam(team)
   const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 767px)').matches)
   const [selectedItem, setSelectedItem] = useState<StoreItem | null>(null)
@@ -75,9 +92,22 @@ export function BuyMenu({ team, money, owned, onBuy, onClose, buyPhase, buyPhase
                     gap: 8,
                   }}>
                     {items.map((item) => {
-                      const isOwned = owned.includes(item.id)
+                      const grenadeKey = GRENADE_KEY[item.id]
                       const affordable = canAffordItem(money, item.id)
-                      const disabled = isOwned || !affordable
+                      let disabled: boolean
+                      let label: string
+                      if (grenadeKey) {
+                        // Grenades are stackable up to a per-type carry limit.
+                        const count = grenadeInventory?.[grenadeKey] ?? 0
+                        const limit = GRENADE_DEFS[grenadeKey].carryLimit
+                        const atLimit = count >= limit
+                        disabled = atLimit || !affordable
+                        label = atLimit ? `${count}/${limit}` : `$${item.price} · ${count}/${limit}`
+                      } else {
+                        const isOwned = owned.includes(item.id)
+                        disabled = isOwned || !affordable
+                        label = isOwned ? 'OWNED' : item.price === 0 ? 'FREE' : `$${item.price}`
+                      }
                       return (
                         <button
                           key={item.id}
@@ -94,7 +124,7 @@ export function BuyMenu({ team, money, owned, onBuy, onClose, buyPhase, buyPhase
                           {item.icon && <WeaponIcon name={item.icon} size={48} />}
                           <span style={{ fontSize: 12, marginTop: 8 }}>{item.name}</span>
                           <span style={{ fontSize: 11, opacity: 0.7 }}>
-                            {isOwned ? 'OWNED' : item.price === 0 ? 'FREE' : `$${item.price}`}
+                            {label}
                           </span>
                         </button>
                       )
