@@ -40,6 +40,7 @@ import { BuyMenu } from './ui/BuyMenu'
 import { TeamSelect } from './ui/TeamSelect'
 import { Scoreboard } from './ui/Scoreboard'
 import { TouchControls } from './ui/TouchControls'
+import { RotateHint } from './ui/RotateHint'
 import { findItem, canAffordItem } from './weapons/StoreCatalog'
 import { applyItem } from './player/applyPurchase'
 import { weaponVisual } from './weapons/WeaponDefs'
@@ -1291,6 +1292,7 @@ function App() {
             defuseProgress={defuseProgress}
             grenadeInventory={grenadeInventory}
             selectedGrenade={selectedGrenade}
+            mobile={mobileControlsActive(settings)}
           />
           <Crosshair runtime={crosshairRef} />
           <Minimap
@@ -1328,6 +1330,7 @@ function App() {
               activeGrenade={selectedGrenade}
             />
           )}
+          <RotateHint enabled={mobileControlsActive(settings)} />
         </>
       )}
 

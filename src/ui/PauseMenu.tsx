@@ -21,7 +21,7 @@ export const PauseMenu: React.FC<PauseMenuProps> = ({ onResume, onMainMenu, onHe
       zIndex: 30,
     }}>
       <h1 style={{
-        fontSize: 48,
+        fontSize: 'clamp(32px, 10vw, 48px)',
         fontWeight: 'bold',
         marginBottom: 10,
         color: '#ff6600',
@@ -29,11 +29,12 @@ export const PauseMenu: React.FC<PauseMenuProps> = ({ onResume, onMainMenu, onHe
       }}>
         PAUSED
       </h1>
-      <p style={{ fontSize: 14, opacity: 0.5, marginBottom: 40 }}>
-        Press ESC to resume
+      <p style={{ fontSize: 14, opacity: 0.5, marginBottom: 40, textAlign: 'center' }}>
+        Press ESC or tap RESUME to continue
       </p>
 
       <button
+        className="ui-btn"
         onClick={onResume}
         style={{
           padding: '14px 48px',
@@ -45,21 +46,14 @@ export const PauseMenu: React.FC<PauseMenuProps> = ({ onResume, onMainMenu, onHe
           borderRadius: 8,
           cursor: 'pointer',
           marginBottom: 16,
-          transition: 'all 0.2s',
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.background = '#ff8800'
-          e.currentTarget.style.transform = 'scale(1.05)'
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.background = '#ff6600'
-          e.currentTarget.style.transform = 'scale(1)'
+          minWidth: 'min(240px, calc(100vw - 48px))',
         }}
       >
         RESUME
       </button>
 
       <button
+        className="ui-btn"
         onClick={onHelp}
         style={{
           padding: '12px 36px',
@@ -70,19 +64,14 @@ export const PauseMenu: React.FC<PauseMenuProps> = ({ onResume, onMainMenu, onHe
           borderRadius: 8,
           cursor: 'pointer',
           marginBottom: 16,
-          transition: 'all 0.2s',
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.background = 'rgba(255,255,255,0.2)'
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.background = 'rgba(255,255,255,0.1)'
+          minWidth: 'min(240px, calc(100vw - 48px))',
         }}
       >
         HELP
       </button>
 
       <button
+        className="ui-btn"
         onClick={onMainMenu}
         style={{
           padding: '12px 36px',
@@ -92,13 +81,7 @@ export const PauseMenu: React.FC<PauseMenuProps> = ({ onResume, onMainMenu, onHe
           border: '1px solid #555',
           borderRadius: 8,
           cursor: 'pointer',
-          transition: 'all 0.2s',
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.background = 'rgba(255,255,255,0.2)'
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.background = 'rgba(255,255,255,0.1)'
+          minWidth: 'min(240px, calc(100vw - 48px))',
         }}
       >
         MAIN MENU

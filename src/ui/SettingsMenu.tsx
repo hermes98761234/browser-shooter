@@ -11,13 +11,15 @@ interface SettingsMenuProps {
 
 const panel: React.CSSProperties = {
   position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
-  alignItems: 'center', justifyContent: 'flex-start', gap: 24, padding: '40px 0',
+  alignItems: 'center', justifyContent: 'flex-start', gap: 24,
+  padding: 'calc(40px + var(--safe-top)) 16px calc(40px + var(--safe-bottom))',
   boxSizing: 'border-box', overflowY: 'auto',
   background: 'linear-gradient(180deg,#0a0a1a,#1a1a3e)', color: 'white', fontFamily: 'monospace',
 }
 const card: React.CSSProperties = {
-  background: 'rgba(255,255,255,0.05)', borderRadius: 12, padding: 28,
-  display: 'flex', flexDirection: 'column', gap: 22, minWidth: 360,
+  background: 'rgba(255,255,255,0.05)', borderRadius: 12, padding: 'clamp(18px, 5vw, 28px)',
+  display: 'flex', flexDirection: 'column', gap: 22,
+  width: 'min(360px, calc(100vw - 32px))', boxSizing: 'border-box',
 }
 const label: React.CSSProperties = { fontSize: 13, opacity: 0.6, marginBottom: 8, display: 'block' }
 const btn: React.CSSProperties = {

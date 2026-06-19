@@ -83,10 +83,10 @@ test.describe('UI - HUD and Overlays', () => {
     await expect(page.getByText('ESC - Pause')).toBeVisible()
   })
 
-  test('pause menu shows "Press ESC to resume" hint', async ({ page }) => {
+  test('pause menu shows the resume hint', async ({ page }) => {
     await startSingleplayer(page)
     await page.keyboard.press('Escape')
-    await expect(page.getByText('Press ESC to resume')).toBeVisible()
+    await expect(page.getByText(/Press ESC or tap RESUME/)).toBeVisible()
   })
 
   test('wave number is displayed during gameplay', async ({ page }) => {

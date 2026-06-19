@@ -108,9 +108,15 @@ export const TouchControls: React.FC<TouchControlsProps> = ({
   }
 
   // ---- Action buttons ----
+  // Safe-area-aware edge offsets so controls clear notches / the home indicator.
+  const padBottom = 'calc(20px + var(--safe-bottom))'
+  const padLeft = 'calc(20px + var(--safe-left))'
+  const padRight = 'calc(20px + var(--safe-right))'
+  const padTop = 'calc(16px + var(--safe-top))'
+
   const actionBtn: React.CSSProperties = {
     pointerEvents: 'auto', touchAction: 'none', userSelect: 'none', WebkitUserSelect: 'none',
-    width: 60, height: 60, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.4)',
+    width: 62, height: 62, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.4)',
     background: 'rgba(255,255,255,0.12)', color: 'white', fontSize: 13, fontWeight: 'bold',
     fontFamily: 'monospace', display: 'flex', alignItems: 'center', justifyContent: 'center',
   }
@@ -133,7 +139,7 @@ export const TouchControls: React.FC<TouchControlsProps> = ({
       <div
         onTouchStart={joyStart} onTouchMove={joyMove} onTouchEnd={joyEnd} onTouchCancel={joyEnd}
         style={{
-          position: 'absolute', left: 28, bottom: 28, width: JOY_SIZE, height: JOY_SIZE,
+          position: 'absolute', left: padLeft, bottom: padBottom, width: JOY_SIZE, height: JOY_SIZE,
           borderRadius: '50%', border: '2px solid rgba(255,255,255,0.3)',
           background: 'rgba(255,255,255,0.08)', pointerEvents: 'auto', touchAction: 'none',
         }}
@@ -146,37 +152,44 @@ export const TouchControls: React.FC<TouchControlsProps> = ({
 
       {/* Shoot (large, bottom-right) */}
       <div
+        className="tc-btn"
         {...hold((v) => { controls.shoot = v })}
         style={{
-          ...actionBtn, position: 'absolute', right: 32, bottom: 40, width: 96, height: 96,
+          ...actionBtn, position: 'absolute', right: padRight, bottom: 'calc(28px + var(--safe-bottom))',
+          width: 96, height: 96,
           fontSize: 16, background: 'rgba(255,80,40,0.35)', border: '2px solid rgba(255,120,80,0.7)',
         }}
       >FIRE</div>
 
       {/* Jump (above-left of fire) */}
-      <div {...hold((v) => { controls.jump = v })}
-        style={{ ...actionBtn, position: 'absolute', right: 140, bottom: 56 }}>JUMP</div>
+      <div className="tc-btn" {...hold((v) => { controls.jump = v })}
+        style={{ ...actionBtn, position: 'absolute', right: 'calc(128px + var(--safe-right))', bottom: 'calc(44px + var(--safe-bottom))' }}>JUMP</div>
 
-      {/* Right-side action column */}
+      {/* Right-side action column — compact buttons anchored in the clear band
+          above the fire button, so on short landscape screens it never collides
+          with the fire button below or the grenade/TAB row above. */}
       <div style={{
-        position: 'absolute', right: 32, bottom: 150, display: 'flex', flexDirection: 'column', gap: 14,
+        position: 'absolute', right: padRight, bottom: 'calc(132px + var(--safe-bottom))',
+        display: 'flex', flexDirection: 'column', gap: 10,
       }}>
-        <div style={actionBtn} onTouchStart={tap(onReload)}>RELOAD</div>
-        <div style={actionBtn} onTouchStart={tap(onCycleWeapon)}>WEAP</div>
-        <div style={actionBtn} onTouchStart={tap(onToggleStore)}>BUY</div>
+        <div className="tc-btn" style={{ ...actionBtn, width: 52, height: 52 }} onTouchStart={tap(onReload)}>RELOAD</div>
+        <div className="tc-btn" style={{ ...actionBtn, width: 52, height: 52 }} onTouchStart={tap(onCycleWeapon)}>WEAP</div>
+        <div className="tc-btn" style={{ ...actionBtn, width: 52, height: 52 }} onTouchStart={tap(onToggleStore)}>BUY</div>
       </div>
 
-      {/* Grenade selector (above action column) */}
+      {/* Grenade selector — horizontal row top-centre-right so it never overflows */}
       <div style={{
-        position: 'absolute', right: 32, bottom: 350, display: 'flex', flexDirection: 'column', gap: 10,
+        position: 'absolute', right: 'calc(96px + var(--safe-right))', top: padTop,
+        display: 'flex', flexDirection: 'row', gap: 10,
       }}>
         {(['he', 'flash', 'smoke'] as const).map((type) => (
           <div
             key={type}
+            className="tc-btn"
             style={{
               ...actionBtn,
-              width: 52,
-              height: 52,
+              width: 54,
+              height: 54,
               fontSize: 11,
               background: activeGrenade === type
                 ? 'rgba(255,200,0,0.4)'
@@ -193,7 +206,8 @@ export const TouchControls: React.FC<TouchControlsProps> = ({
       </div>
 
       {/* Scoreboard toggle (top-right) */}
-      <div style={{ ...actionBtn, position: 'absolute', right: 24, top: 24, width: 64, height: 40, borderRadius: 10 }}
+      <div className="tc-btn"
+        style={{ ...actionBtn, position: 'absolute', right: padRight, top: padTop, width: 68, height: 46, borderRadius: 10 }}
         onTouchStart={tap(onToggleScoreboard)}>TAB</div>
     </div>
   )

@@ -7,10 +7,11 @@ export const AboutModal = ({ onClose }: AboutModalProps) => {
     <div style={{
       position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
       background: 'rgba(0,0,0,0.7)', zIndex: 100, fontFamily: 'monospace', color: '#fff',
+      padding: 16, boxSizing: 'border-box',
     }}>
       <div style={{
-        background: '#15151f', border: '1px solid #3a3a55', padding: 32,
-        minWidth: 320, maxWidth: 400,
+        background: '#15151f', border: '1px solid #3a3a55', padding: 'clamp(20px, 6vw, 32px)',
+        width: 'min(400px, calc(100vw - 32px))', maxHeight: 'calc(100vh - 32px)', overflowY: 'auto',
       }}>
         <h2 style={{ margin: '0 0 20px', color: '#ff6600' }}>About</h2>
         
