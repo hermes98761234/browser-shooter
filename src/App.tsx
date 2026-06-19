@@ -165,7 +165,6 @@ function App() {
     lastPlayers: [] as EntityState[],
     pingTimer: 0,
     matchConfig: defaultMatchConfig() as MatchConfig,
-    matchStarted: false,
     killSeq: 0,
     grenadeManager: null as GrenadeManager | null,
   })
@@ -274,6 +273,7 @@ function App() {
       let assignedId: string | null = null
       transport.onMessage((msg) => {
         if (msg.type === 'join') {
+          if (assignedId) return   // already joined on this connection; ignore duplicate
           if (!netHost.passwordOk(msg.password)) {
             transport.send({ type: 'joinRejected', reason: 'badPassword' })
             return
@@ -310,7 +310,6 @@ function App() {
     })
     const code = await peerHost.start()
     setRoomCode(code)
-    data.matchStarted = false
     const hostDirectory = new HostDirectory()
     data.hostDirectory = hostDirectory
     await hostDirectory.start({
@@ -429,8 +428,8 @@ function App() {
     client.onStart(() => startNetGame('client'))
     client.onJoinRejected((reason) => {
       setJoinError(reason === 'full' ? 'Game is full' : 'Wrong password')
-      data.peerClient?.stop(); data.peerClient = null; data.netClient = null
       data.role = 'single'
+      data.peerClient?.stop(); data.peerClient = null; data.netClient = null
     })
     client.onDisconnect(() => {
       if (data.role !== 'client') return
@@ -1083,7 +1082,6 @@ function App() {
             joinError={joinError}
             onCancelJoin={() => setJoinError(null)}
             onStart={() => {
-              gameDataRef.current.matchStarted = true
               gameDataRef.current.hostDirectory?.setStatus('in-progress')
               gameDataRef.current.netHost?.startMatch()
               startNetGame('host')

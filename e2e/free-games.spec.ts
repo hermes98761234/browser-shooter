@@ -215,16 +215,12 @@ test.describe('free games, passwords, disconnect', () => {
     // Close the host context — simulates host disconnecting
     await hostCtx.close()
 
-    // Client should see the "Host disconnected" banner
-    try {
-      await expect(join.getByText(/host disconnected/i)).toBeVisible({ timeout: 15_000 })
-      // Clicking the notice dismisses it; client should be back on the multiplayer menu
-      await join.getByText(/host disconnected/i).click({ force: true })
-      await expect(join.getByText(/multiplayer/i)).toBeVisible({ timeout: 10_000 })
-    } catch {
-      await joinCtx.close()
-      test.skip(true, 'WebRTC peer connection did not establish in this environment')
-    }
+    // Client should see the "Host disconnected" banner. The WebRTC connection was
+    // already established above, so a failure here is a real regression, not a skip.
+    await expect(join.getByText(/host disconnected/i)).toBeVisible({ timeout: 15_000 })
+    // Clicking the notice dismisses it; client should be back on the multiplayer menu
+    await join.getByText(/host disconnected/i).click({ force: true })
+    await expect(join.getByText(/multiplayer/i)).toBeVisible({ timeout: 10_000 })
 
     await joinCtx.close()
   })
