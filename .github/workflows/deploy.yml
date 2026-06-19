@@ -32,6 +32,7 @@ jobs:
           VITE_PEER_PATH: ${{ vars.VITE_PEER_PATH }}
           VITE_PEER_SECURE: ${{ vars.VITE_PEER_SECURE }}
           VITE_PEER_KEY: ${{ vars.VITE_PEER_KEY }}
+          VITE_PEER_ICE: ${{ vars.VITE_PEER_ICE }}
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
