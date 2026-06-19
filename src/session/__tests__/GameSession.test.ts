@@ -250,6 +250,50 @@ describe('round resolution', () => {
     expect(s.roundManager!.ctScore).toBe(1) // does NOT re-fire
   })
 
+  it('does not end the round on the round timer once the bomb is planted', () => {
+    const s = comp()
+    s.roundManager!.state = RoundState.Active
+    s.roundManager!.roundTimer = 5 // about to expire
+    s.bomb.state = BombState.Planted
+    s.bomb.site = 'A'
+    s.bomb.timer = 40 // bomb fuse still has plenty of time
+    s.step(6) // round timer would expire, but a planted bomb keeps the round live
+    expect(s.roundManager!.state).toBe(RoundState.Active)
+    expect(s.bomb.state).toBe(BombState.Planted)
+    expect(s.roundManager!.tScore).toBe(0)
+    expect(s.roundManager!.ctScore).toBe(0)
+  })
+
+  it('awards T when the planted bomb explodes after the round timer would have expired', () => {
+    const s = comp()
+    s.roundManager!.state = RoundState.Active
+    s.roundManager!.roundTimer = 5 // round timer expires well before the fuse
+    s.bomb.state = BombState.Planted
+    s.bomb.site = 'A'
+    s.bomb.timer = 40
+    s.step(41) // bomb fuse elapses -> Exploded at end of step
+    expect(s.bomb.state).toBe(BombState.Exploded)
+    s.step(1) // next tick concludes the round
+    expect(s.roundManager!.tScore).toBe(1)
+    expect(s.bomb.state).toBe(BombState.None) // reset for next round
+  })
+
+  it('awards CT when the bomb is defused after the round timer would have expired', () => {
+    const s = comp()
+    s.roundManager!.state = RoundState.Active
+    s.roundManager!.roundTimer = 2 // round timer would expire mid-defuse
+    s.bomb.state = BombState.Planted
+    s.bomb.site = 'A'
+    s.bomb.timer = 40
+    s.player.position.set(0, 2, -25) // local CT on the site to defuse
+    s.bomb.startDefuse(true, 'local')
+    s.step(5) // defuse completes this tick despite the round timer being "expired"
+    expect(s.bomb.state).toBe(BombState.Defused)
+    s.step(1) // next tick concludes the round
+    expect(s.roundManager!.ctScore).toBe(1)
+    expect(s.bomb.state).toBe(BombState.None)
+  })
+
   it('resets economy money to 800 at halftime', () => {
     const s = comp()
     s.economy!.money = 5000

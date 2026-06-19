@@ -419,7 +419,11 @@ export class GameSession {
 
     if (this.roundManager) {
       const prevState = this.roundManager.state
-      this.roundManager.update(dt)
+      // Once the bomb is planted, freeze the round timer — only the bomb's fuse
+      // (explosion → T win) or a defuse (→ CT win) can end the round from here.
+      const bombActive =
+        this.bomb.state === BombState.Planted || this.bomb.state === BombState.Defusing
+      this.roundManager.update(dt, bombActive)
       // Hand the bomb to a T player when the round goes live.
       if (prevState === RoundState.Buying && this.roundManager.state === RoundState.Active && this.bomb.state === BombState.None) {
         this.assignBomb()

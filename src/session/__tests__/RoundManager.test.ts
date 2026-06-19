@@ -35,6 +35,22 @@ describe('RoundManager', () => {
     expect(rm.roundTimer).toBe(105) // 115 - 10 = 105
   })
 
+  it('freezes the round timer while the bomb is planted', () => {
+    const rm = new RoundManager()
+    rm.update(16) // enter active
+    rm.update(50, true) // bomb planted: round timer no longer counts down
+    expect(rm.roundTimer).toBe(115)
+    expect(rm.state).toBe(RoundState.Active)
+  })
+
+  it('does not end the round on the timer while the bomb is planted', () => {
+    const rm = new RoundManager()
+    rm.update(16) // enter active
+    rm.roundTimer = 5
+    rm.update(10, true) // would expire if not frozen; bomb planted keeps round live
+    expect(rm.state).toBe(RoundState.Active)
+  })
+
   it('advances to next round after over state', () => {
     const rm = new RoundManager()
     rm.update(16) // buying -> active

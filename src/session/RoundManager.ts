@@ -24,7 +24,15 @@ export class RoundManager {
     return this.state === RoundState.Buying
   }
 
-  update(dt: number): void {
+  /**
+   * Advance the round/buy timers.
+   *
+   * @param bombActive when true, the bomb has been planted; CS-style, the round
+   *   timer freezes and only the bomb's own fuse (explosion/defuse) can end the
+   *   round. Without this, a plant made late in the round would be cut short the
+   *   instant the round timer expired, robbing CTs of their defuse window.
+   */
+  update(dt: number, bombActive: boolean = false): void {
     if (this.state === RoundState.Buying) {
       this.buyPhaseTimer -= dt
       if (this.buyPhaseTimer <= 0) {
@@ -32,6 +40,7 @@ export class RoundManager {
         this.roundTimer = this.roundDuration
       }
     } else if (this.state === RoundState.Active) {
+      if (bombActive) return // bomb planted: only the fuse matters now
       this.roundTimer -= dt
       if (this.roundTimer <= 0) {
         this.state = RoundState.Over
