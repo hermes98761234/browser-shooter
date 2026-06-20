@@ -1,3 +1,4 @@
+import { describe, it, expect } from 'vitest'
 import { building, buildingWithRooms, stairs } from './buildings'
 
 describe('building helper', () => {
