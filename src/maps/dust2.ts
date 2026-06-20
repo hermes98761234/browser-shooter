@@ -16,7 +16,7 @@ function coverCluster(x: number, z: number): MapStructure[] {
   return [
     { center: [x, 0.6, z], size: [4, 1.2, 1], material: 'concrete' },  // sandbag
     { center: [x + 3, 1, z + 1], size: [2, 2, 2], material: 'crate' },
-    { center: [x - 1, 0.75, z + 2], size: [1.5, 1.5, 1.5], material: 'wood' },  // barrel
+    { center: [x - 1, 1, z + 2], size: [1.5, 2, 1.5], material: 'metal' },  // barrel
   ]
 }
 
