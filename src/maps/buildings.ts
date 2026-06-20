@@ -105,8 +105,8 @@ export function stairs(
 
   for (let i = 0; i < steps; i++) {
     const offset = i * stepD
-    let center: [number, number, number]
-    let size: [number, number, number]
+    let center: [number, number, number] = [x, 0, z]
+    let size: [number, number, number] = [stepW, stepH, stepD]
 
     switch (direction) {
       case 'north':
