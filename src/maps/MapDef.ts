@@ -1,5 +1,5 @@
 /** Material key for a map structure; resolved to a THREE material in Arena.ts. */
-export type StructureMaterial = 'wall' | 'crate' | 'concrete'
+export type StructureMaterial = 'wall' | 'crate' | 'concrete' | 'metal' | 'wood'
 
 /** A solid box added to both the rendered scene and the collision world. */
 export interface MapStructure {

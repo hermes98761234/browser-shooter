@@ -14,6 +14,10 @@ function materialFor(kind: StructureMaterial): THREE.MeshStandardMaterial {
       return new THREE.MeshStandardMaterial({ color: 0x9c7a3c, roughness: 0.8, metalness: 0.05 })
     case 'concrete':
       return new THREE.MeshStandardMaterial({ color: 0x707078, roughness: 0.9, metalness: 0.1 })
+    case 'metal':
+      return new THREE.MeshStandardMaterial({ color: 0x6a6a72, roughness: 0.6, metalness: 0.4 })
+    case 'wood':
+      return new THREE.MeshStandardMaterial({ color: 0x8b6b3c, roughness: 0.9, metalness: 0.0 })
     case 'wall':
     default:
       return new THREE.MeshStandardMaterial({ color: 0x8a8577, roughness: 0.85, metalness: 0.1 })
