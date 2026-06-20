@@ -262,6 +262,8 @@ function App() {
     fresh.waveManager.onWaveComplete = data.session.waveManager.onWaveComplete
     fresh.getPlayer(fresh.localId)!.name = settingsRef.current.playerName
     data.session = fresh
+    // Render bots (and any non-local players) in single-player with the player model.
+    if (scene) data.remotePlayers = new RemotePlayerManager(scene, fresh.localId)
     data.grenadeManager = new GrenadeManager()
     lookRef.current = { yaw: 0, pitch: 0 }
     data.money = 16000
@@ -643,6 +645,9 @@ function App() {
       showScoreboardRef.current = show
       setShowScoreboard(show)
     }
+    // Authority-only: [ adds a CT bot, ] adds a T bot, \ removes the last bot.
+    data.controls.onAddBot = (team) => { if (data.role !== 'client') data.session.addBot(team) }
+    data.controls.onRemoveBot = () => { if (data.role !== 'client') data.session.removeBot() }
 
     data.controls.onSelectGrenade = (type: GrenadeType) => {
       if (gameStateRef.current !== 'playing') return
@@ -949,8 +954,13 @@ function App() {
 
         data.pingTimer += dt
         if (data.pingTimer >= 1) { data.pingTimer = 0; data.netHost.pingClients() }
-      } else if (data.role === 'single' && showScoreboardRef.current) {
-        data.lastPlayers = session.getSnapshot().players
+      } else if (data.role === 'single') {
+        const snap = session.getSnapshot()
+        if (showScoreboardRef.current) data.lastPlayers = snap.players
+        if (data.remotePlayers) {
+          data.remotePlayers.sync(snap.players)
+          data.remotePlayers.update(dt)
+        }
       }
       if (matchOverPending) { engine.stop(); updateGameState('matchover') }
     })
