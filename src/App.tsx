@@ -295,8 +295,21 @@ function App() {
     const engine = engineRef.current
     if (!engine) return
     data.role = role
-    // Ensure the rendered arena and collision world match the host's selected map.
-    data.session.collisionWorld = rebuildArena(engine.scene, getMap(data.matchConfig.mapId))
+    if (role === 'client') {
+      // The client's menu-time session was built with the default map. Rebuild it from the
+      // host's config (received in 'welcome') so the session's map, spawns, and bombsites
+      // match the real map — not just the rendered arena. Mirrors hostGame()/startGame().
+      const fresh = new GameSession(data.matchConfig)
+      fresh.collisionWorld = rebuildArena(engine.scene, getMap(data.matchConfig.mapId))
+      fresh.waveManager.onEnemySpawned = data.session.waveManager.onEnemySpawned
+      fresh.waveManager.onWaveComplete = data.session.waveManager.onWaveComplete
+      fresh.getPlayer(fresh.localId)!.name = settingsRef.current.playerName
+      data.session = fresh
+    } else {
+      // Host already rebuilt its session with the chosen map in hostGame(); just ensure the
+      // rendered arena and collision world match.
+      data.session.collisionWorld = rebuildArena(engine.scene, getMap(data.matchConfig.mapId))
+    }
     const localId = data.netClient?.playerId ?? data.session.localId
     data.remotePlayers = new RemotePlayerManager(engine.scene, localId)
     lookRef.current = { yaw: 0, pitch: 0 }
@@ -1210,7 +1223,11 @@ function App() {
       )}
 
       {gameState === 'teamselect' && (
-        <TeamSelect onSelect={(t) => { setTeam(t); startGame() }} />
+        <TeamSelect onSelect={(t, mapId) => {
+          setTeam(t)
+          gameDataRef.current.matchConfig = { ...gameDataRef.current.matchConfig, mapId }
+          startGame()
+        }} />
       )}
 
       {gameState === 'mpmenu' && (
