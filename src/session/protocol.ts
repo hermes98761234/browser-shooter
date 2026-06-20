@@ -37,6 +37,7 @@ export interface EntityState {
   weaponType?: string  // players only; for remote weapon model
   name?: string        // players only; nameplate
   team?: Team          // players only
+  isBot?: boolean      // players only; true for AI-controlled bots
   respawnIn?: number   // players only; seconds until respawn (omitted if alive)
   ping?: number        // players only; round-trip latency in ms (host-measured)
   hasArmor?: boolean   // players only; armor state

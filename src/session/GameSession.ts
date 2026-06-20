@@ -1,6 +1,8 @@
 import * as THREE from 'three'
 import { Player } from '../player/Player'
 import { WeaponManager } from '../weapons/WeaponManager'
+import { BotController } from '../bots/BotController'
+import { BOT_NAMES, botDisplayName } from '../bots/botNames'
 import { Enemy } from '../enemies/Enemy'
 import { WaveManager } from '../enemies/WaveManager'
 import { Pickup } from '../systems/Pickup'
@@ -39,6 +41,7 @@ export interface PlayerEntity {
   team: Team
   player: Player
   weapons: WeaponManager
+  isBot?: boolean
 }
 
 export class GameSession {
@@ -65,6 +68,9 @@ export class GameSession {
   private shootRaycaster = new THREE.Raycaster()
   private cameraQuat = new THREE.Quaternion()
   private inputs = new Map<string, PlayerInput>()
+  private bots = new Map<string, BotController>()
+  private nextBotNum = 0
+  private usedBotNames = new Set<string>()
 
   constructor(config: MatchConfig = defaultMatchConfig()) {
     this.config = config
@@ -81,9 +87,9 @@ export class GameSession {
     }
   }
 
-  addPlayer(id: string, name: string, team: Team = 'ct'): PlayerEntity {
+  addPlayer(id: string, name: string, team: Team = 'ct', isBot = false): PlayerEntity {
     const index = this.playerMap.size // 0 = host/local, kept at origin
-    const entity: PlayerEntity = { id, name, team, player: new Player(), weapons: new WeaponManager() }
+    const entity: PlayerEntity = { id, name, team, player: new Player(), weapons: new WeaponManager(), isBot }
     entity.player.position.copy(this.spawnPosition(index))
     this.playerMap.set(id, entity)
     this.inputs.set(id, emptyInput())
@@ -101,6 +107,32 @@ export class GameSession {
   removePlayer(id: string): void {
     this.playerMap.delete(id)
     this.inputs.delete(id)
+  }
+
+  /** Spawn an AI bot on `team` with a rifle and a CS-style name. */
+  addBot(team: Team): PlayerEntity | null {
+    const id = `bot-${this.nextBotNum++}`
+    const entity = this.addPlayer(id, botDisplayName(this.nextBotName()), team, true)
+    entity.weapons.equip('rifle', 'primary')
+    this.bots.set(id, new BotController(id))
+    return entity
+  }
+
+  /** Remove a bot (defaults to the most recently added). */
+  removeBot(id?: string): void {
+    const targetId = id ?? [...this.bots.keys()].pop()
+    if (!targetId || !this.bots.has(targetId)) return
+    const entity = this.getPlayer(targetId)
+    if (entity) this.usedBotNames.delete(entity.name.replace(/^BOT /, ''))
+    this.bots.delete(targetId)
+    this.removePlayer(targetId)
+  }
+
+  private nextBotName(): string {
+    for (const n of BOT_NAMES) {
+      if (!this.usedBotNames.has(n)) { this.usedBotNames.add(n); return n }
+    }
+    return `#${this.nextBotNum}`
   }
 
   getPlayer(id: string): PlayerEntity | undefined {
@@ -370,6 +402,7 @@ export class GameSession {
       weaponType: e.weapons.current.type,
       name: e.name,
       team: e.team,
+      isBot: e.isBot,
       respawnIn: this.respawnQueue.isPending(e.id) ? this.respawnQueue.remaining(e.id) : undefined,
       hasArmor: e.player.hasArmor ?? false,
       hasHelmet: e.player.hasHelmet ?? false,
@@ -454,6 +487,16 @@ export class GameSession {
       entity.player.revive()
       events.push({ type: 'playerRespawned', playerId: id })
     }
+    // Drive bots: each bot's AI produces this tick's input before players advance.
+    if (this.bots.size > 0) {
+      const all = [...this.playerMap.values()]
+      for (const [id, controller] of this.bots) {
+        const self = this.playerMap.get(id)
+        if (!self) continue
+        this.applyInput(id, controller.computeInput(self, all, this.collisionWorld, dt))
+      }
+    }
+
     // Advance every player: look, movement+collision, weapons, shooting.
     for (const entity of this.playerMap.values()) {
       const input = this.getInput(entity.id)
