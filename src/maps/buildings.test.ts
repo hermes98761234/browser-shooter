@@ -1,5 +1,4 @@
 import { building, buildingWithRooms, stairs } from './buildings'
-import type { MapStructure } from './MapDef'
 
 describe('building helper', () => {
   it('creates a rectangular building with doorway', () => {

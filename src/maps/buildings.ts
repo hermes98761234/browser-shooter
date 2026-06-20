@@ -10,8 +10,7 @@ const DOOR_W = 2.5
 export function building(
   x: number, z: number,
   width: number, depth: number,
-  doorSide: 'north' | 'south' | 'east' | 'west',
-  doorOffset: number = 0
+  doorSide: 'north' | 'south' | 'east' | 'west'
 ): MapStructure[] {
   const walls: MapStructure[] = []
   const halfW = width / 2
