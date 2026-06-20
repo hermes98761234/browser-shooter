@@ -1,4 +1,4 @@
-import type { GameState } from '../types'
+import type { GameState, Team } from '../types'
 
 export const PUSH_TO_TALK_KEY = 'KeyK'
 
@@ -22,6 +22,9 @@ export class Controls {
   /** Fired on Tab down (true) / up (false) to show/hide the scoreboard. */
   onScoreboard: ((show: boolean) => void) | null = null
   onThrowGrenade: ((mode: 'long' | 'short') => void) | null = null
+  /** Authority-only: add a bot to the given team / remove the last bot. */
+  onAddBot: ((team: Team) => void) | null = null
+  onRemoveBot: (() => void) | null = null
   onSelectGrenade: ((type: 'he' | 'flash' | 'smoke') => void) | null = null
   onCycleGrenade: (() => void) | null = null
   onIsStoreOpen: (() => boolean) | null = null
@@ -74,6 +77,9 @@ export class Controls {
       case 'Digit5': this.onSelectGrenade?.('flash'); break
       case 'Digit6': this.onSelectGrenade?.('smoke'); break
       case 'KeyG': this.onCycleGrenade?.(); break
+      case 'BracketLeft': this.onAddBot?.('ct'); break
+      case 'BracketRight': this.onAddBot?.('t'); break
+      case 'Backslash': this.onRemoveBot?.(); break
       case PUSH_TO_TALK_KEY:
         if (!this.talkHeld) { this.talkHeld = true; this.onTalkStart?.() }
         break

@@ -57,7 +57,9 @@ export const Scoreboard: React.FC<ScoreboardProps> = ({ players, roomCode, score
                 <span>{ps?.kills ?? 0}</span>
                 <span>{ps?.deaths ?? 0}</span>
                 <span style={{ color: p.isDead ? '#ff5544' : '#8888aa' }}>{p.isDead ? 'DEAD' : 'ALIVE'}</span>
-                <span style={{ textAlign: 'right', color: pingColor(p.ping ?? 0) }}>{p.ping ?? 0} ms</span>
+                <span style={{ textAlign: 'right', color: p.isBot ? '#8888aa' : pingColor(p.ping ?? 0) }}>
+                  {p.isBot ? 'BOT' : `${p.ping ?? 0} ms`}
+                </span>
               </React.Fragment>
             )
           })}

@@ -223,3 +223,29 @@ describe('Controls', () => {
     expect(controls.shoot).toBe(false)
   })
 })
+
+describe('Controls bot hotkeys', () => {
+  let element: HTMLElement
+  let controls: Controls
+
+  beforeEach(() => {
+    element = createMockElement()
+    controls = new Controls(element, () => 'playing')
+  })
+  afterEach(() => { controls.destroy(); vi.restoreAllMocks() })
+
+  it('adds a CT bot on BracketLeft and a T bot on BracketRight', () => {
+    const teams: string[] = []
+    controls.onAddBot = (t) => teams.push(t)
+    document.dispatchEvent(new KeyboardEvent('keydown', { code: 'BracketLeft' }))
+    document.dispatchEvent(new KeyboardEvent('keydown', { code: 'BracketRight' }))
+    expect(teams).toEqual(['ct', 't'])
+  })
+
+  it('removes a bot on Backslash', () => {
+    const remove = vi.fn()
+    controls.onRemoveBot = remove
+    document.dispatchEvent(new KeyboardEvent('keydown', { code: 'Backslash' }))
+    expect(remove).toHaveBeenCalledTimes(1)
+  })
+})
