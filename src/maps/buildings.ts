@@ -4,6 +4,26 @@ const WALL_H = 5
 const WALL_THICK = 0.5
 const DOOR_W = 2.5
 
+// One wall of a building: a solid box, or two segments around a centered door.
+// axis 'x' => wall runs along x (a north/south face); 'z' => runs along z.
+function wall(cx: number, cz: number, len: number, axis: 'x' | 'z', door: boolean): MapStructure[] {
+  const size = (l: number): [number, number, number] =>
+    axis === 'x' ? [l, WALL_H, WALL_THICK] : [WALL_THICK, WALL_H, l]
+  if (!door) return [{ center: [cx, WALL_H / 2, cz], size: size(len), material: 'wall' }]
+
+  const seg = (len - DOOR_W) / 2
+  const off = (len + DOOR_W) / 4 // distance from wall center to each segment center
+  return axis === 'x'
+    ? [
+        { center: [cx - off, WALL_H / 2, cz], size: size(seg), material: 'wall' },
+        { center: [cx + off, WALL_H / 2, cz], size: size(seg), material: 'wall' },
+      ]
+    : [
+        { center: [cx, WALL_H / 2, cz - off], size: size(seg), material: 'wall' },
+        { center: [cx, WALL_H / 2, cz + off], size: size(seg), material: 'wall' },
+      ]
+}
+
 /**
  * Creates a rectangular building with a doorway on the specified side.
  */
@@ -12,123 +32,46 @@ export function building(
   width: number, depth: number,
   doorSide: 'north' | 'south' | 'east' | 'west'
 ): MapStructure[] {
-  const walls: MapStructure[] = []
   const halfW = width / 2
   const halfD = depth / 2
-
-  // North wall (z - depth/2)
-  if (doorSide === 'north') {
-    const segW = (width - DOOR_W) / 2
-    walls.push(
-      { center: [x - halfW + segW/2, WALL_H/2, z - halfD], size: [segW, WALL_H, WALL_THICK], material: 'wall' },
-      { center: [x + halfW - segW/2, WALL_H/2, z - halfD], size: [segW, WALL_H, WALL_THICK], material: 'wall' }
-    )
-  } else {
-    walls.push({ center: [x, WALL_H/2, z - halfD], size: [width, WALL_H, WALL_THICK], material: 'wall' })
-  }
-
-  // South wall (z + depth/2)
-  if (doorSide === 'south') {
-    const segW = (width - DOOR_W) / 2
-    walls.push(
-      { center: [x - halfW + segW/2, WALL_H/2, z + halfD], size: [segW, WALL_H, WALL_THICK], material: 'wall' },
-      { center: [x + halfW - segW/2, WALL_H/2, z + halfD], size: [segW, WALL_H, WALL_THICK], material: 'wall' }
-    )
-  } else {
-    walls.push({ center: [x, WALL_H/2, z + halfD], size: [width, WALL_H, WALL_THICK], material: 'wall' })
-  }
-
-  // East wall (x + width/2)
-  if (doorSide === 'east') {
-    const segD = (depth - DOOR_W) / 2
-    walls.push(
-      { center: [x + halfW, WALL_H/2, z - halfD + segD/2], size: [WALL_THICK, WALL_H, segD], material: 'wall' },
-      { center: [x + halfW, WALL_H/2, z + halfD - segD/2], size: [WALL_THICK, WALL_H, segD], material: 'wall' }
-    )
-  } else {
-    walls.push({ center: [x + halfW, WALL_H/2, z], size: [WALL_THICK, WALL_H, depth], material: 'wall' })
-  }
-
-  // West wall (x - width/2)
-  if (doorSide === 'west') {
-    const segD = (depth - DOOR_W) / 2
-    walls.push(
-      { center: [x - halfW, WALL_H/2, z - halfD + segD/2], size: [WALL_THICK, WALL_H, segD], material: 'wall' },
-      { center: [x - halfW, WALL_H/2, z + halfD - segD/2], size: [WALL_THICK, WALL_H, segD], material: 'wall' }
-    )
-  } else {
-    walls.push({ center: [x - halfW, WALL_H/2, z], size: [WALL_THICK, WALL_H, depth], material: 'wall' })
-  }
-
-  return walls
+  return [
+    ...wall(x, z - halfD, width, 'x', doorSide === 'north'),
+    ...wall(x, z + halfD, width, 'x', doorSide === 'south'),
+    ...wall(x + halfW, z, depth, 'z', doorSide === 'east'),
+    ...wall(x - halfW, z, depth, 'z', doorSide === 'west'),
+  ]
 }
 
 /**
- * Creates a building with an internal dividing wall.
+ * Creates a building with a single internal dividing wall down the middle.
  */
 export function buildingWithRooms(
   x: number, z: number,
   width: number, depth: number,
-  doorSide: 'north' | 'south' | 'east' | 'west',
-  rooms: number = 2
+  doorSide: 'north' | 'south' | 'east' | 'west'
 ): MapStructure[] {
-  const walls = building(x, z, width, depth, doorSide)
-
-  // Add internal walls (simple division along depth)
-  if (rooms > 1) {
-    const roomWidth = width / rooms
-    for (let i = 1; i < rooms; i++) {
-      const wallX = x - width/2 + roomWidth * i
-      walls.push({
-        center: [wallX, WALL_H/2, z],
-        size: [WALL_THICK, WALL_H, depth - WALL_THICK * 2],
-        material: 'wall'
-      })
-    }
-  }
-
-  return walls
+  return [
+    ...building(x, z, width, depth, doorSide),
+    { center: [x, WALL_H / 2, z], size: [WALL_THICK, WALL_H, depth - WALL_THICK * 2], material: 'wall' },
+  ]
 }
 
 /**
- * Creates a staircase (series of ascending boxes).
+ * Creates a staircase: a series of ascending boxes marching in `direction`.
  */
 export function stairs(
   x: number, z: number,
   steps: number,
   direction: 'north' | 'south' | 'east' | 'west'
 ): MapStructure[] {
-  const result: MapStructure[] = []
-  const stepH = 1
-  const stepD = 1
-  const stepW = 3
+  const stepH = 1, stepD = 1, stepW = 3
+  const dx = direction === 'east' ? 1 : direction === 'west' ? -1 : 0
+  const dz = direction === 'south' ? 1 : direction === 'north' ? -1 : 0
+  const size: [number, number, number] = dx !== 0 ? [stepD, stepH, stepW] : [stepW, stepH, stepD]
 
-  for (let i = 0; i < steps; i++) {
-    const offset = i * stepD
-    let center: [number, number, number] = [x, 0, z]
-    let size: [number, number, number] = [stepW, stepH, stepD]
-
-    switch (direction) {
-      case 'north':
-        center = [x, stepH/2 + i * stepH, z - offset]
-        size = [stepW, stepH, stepD]
-        break
-      case 'south':
-        center = [x, stepH/2 + i * stepH, z + offset]
-        size = [stepW, stepH, stepD]
-        break
-      case 'east':
-        center = [x + offset, stepH/2 + i * stepH, z]
-        size = [stepD, stepH, stepW]
-        break
-      case 'west':
-        center = [x - offset, stepH/2 + i * stepH, z]
-        size = [stepD, stepH, stepW]
-        break
-    }
-
-    result.push({ center, size, material: 'concrete' })
-  }
-
-  return result
+  return Array.from({ length: steps }, (_, i) => ({
+    center: [x + dx * i * stepD, stepH / 2 + i * stepH, z + dz * i * stepD] as [number, number, number],
+    size,
+    material: 'concrete' as const,
+  }))
 }

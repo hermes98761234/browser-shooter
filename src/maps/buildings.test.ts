@@ -17,7 +17,7 @@ describe('building helper', () => {
   })
 
   it('creates building with internal rooms', () => {
-    const structures = buildingWithRooms(0, 0, 10, 8, 'south', 2)
+    const structures = buildingWithRooms(0, 0, 10, 8, 'south')
     expect(structures.length).toBe(6) // 5 outer walls (south wall split for door) + 1 inner wall
 
     // Verify the dividing wall exists (internal wall runs along depth at center x)

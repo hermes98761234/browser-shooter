@@ -34,7 +34,7 @@ export const DUST2: MapDef = {
   structures: [
     // === T SPAWN AREA (North) ===
     // Building T1: Large building with 2 rooms
-    ...buildingWithRooms(-15, -30, 10, 8, 'south', 2),
+    ...buildingWithRooms(-15, -30, 10, 8, 'south'),
     // Table and crates inside T1
     { center: [-17, 0.5, -30], size: [4, 1, 2], material: 'wood' },
     ...crateStack(-13, -32),
@@ -78,7 +78,7 @@ export const DUST2: MapDef = {
     
     // === BOMBSITE A (East - Indoor) ===
     // Building A: Large building with bombsite inside
-    ...buildingWithRooms(28, 8, 12, 10, 'west', 2),
+    ...buildingWithRooms(28, 8, 12, 10, 'west'),
     // Raised platform inside
     { center: [30, 1, 8], size: [6, 2, 6], material: 'concrete' },
     // Cover inside
@@ -99,7 +99,7 @@ export const DUST2: MapDef = {
     
     // === CT SPAWN AREA (South) ===
     // Building CT1: Large building with 2 rooms (mirrors T1)
-    ...buildingWithRooms(15, 30, 10, 8, 'north', 2),
+    ...buildingWithRooms(15, 30, 10, 8, 'north'),
     // Table and crates inside CT1
     { center: [17, 0.5, 30], size: [4, 1, 2], material: 'wood' },
     ...crateStack(13, 32),
