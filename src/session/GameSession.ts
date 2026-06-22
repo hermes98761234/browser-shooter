@@ -26,6 +26,8 @@ import { getMap } from '../maps/registry'
 import { Grenade } from '../weapons/Grenade'
 import { GRENADE_DEFS, calcHeDamage, calcFlashBlindDuration } from '../weapons/GrenadeDefs'
 import { SmokeCloud } from '../effects/SmokeCloud'
+import { findItem } from '../weapons/StoreCatalog'
+import { applyItem } from '../player/applyPurchase'
 
 export const ARENA_SIZE = 30
 const LOCAL_ID = 'local'
@@ -73,6 +75,7 @@ export class GameSession {
   private bots = new Map<string, BotController>()
   private nextBotNum = 0
   private usedBotNames = new Set<string>()
+  private botEconomies = new Map<string, Economy>()
 
   constructor(config: MatchConfig = defaultMatchConfig()) {
     this.config = config
@@ -117,6 +120,7 @@ export class GameSession {
     if (this.bots.size >= MAX_BOTS) return null
     const id = `bot-${this.nextBotNum++}`
     const entity = this.addPlayer(id, botDisplayName(this.nextBotName()), team, true)
+    if (this.config.mode === 'competitive') this.botEconomies.set(id, new Economy(800))
     this.giveBotLoadout(entity)
     this.bots.set(id, new BotController(id))
     return entity
@@ -126,6 +130,20 @@ export class GameSession {
    *  Used on spawn and after any competitive weapon reset so bots stay armed. */
   private giveBotLoadout(entity: PlayerEntity): void {
     entity.weapons.equip('rifle', 'primary')
+    this.botBuyEquipment(entity)
+  }
+
+  private botBuyEquipment(entity: PlayerEntity): void {
+    if (this.config.mode !== 'competitive') return
+    const eco = this.botEconomies.get(entity.id)
+    if (!eco) return
+    if (!entity.player.hasArmor && eco.canAfford(1000)) {
+      const item = findItem('kevlar_helmet')
+      if (item && eco.spendMoney(item.price)) applyItem(item, entity.player, entity.weapons)
+    } else if (!entity.player.hasArmor && eco.canAfford(650)) {
+      const item = findItem('kevlar')
+      if (item && eco.spendMoney(item.price)) applyItem(item, entity.player, entity.weapons)
+    }
   }
 
   /** Remove a bot (defaults to the most recently added). */
@@ -135,6 +153,7 @@ export class GameSession {
     const entity = this.getPlayer(targetId)
     if (entity) this.usedBotNames.delete(entity.name.replace(/^BOT /, ''))
     this.bots.delete(targetId)
+    this.botEconomies.delete(targetId)
     this.removePlayer(targetId)
   }
 
@@ -207,6 +226,10 @@ export class GameSession {
       this.economy.recordKillReward(weaponType)
       events.push({ type: 'moneyUpdate', playerId: attacker!.id, amount: this.economy.money })
     }
+    if (isKillCredit && attacker!.isBot && this.config.mode === 'competitive') {
+      const botEco = this.botEconomies.get(attacker!.id)
+      if (botEco) botEco.recordKillReward(weaponType)
+    }
     if (this.scoreboard.matchOver) events.push({ type: 'matchOver', winningTeam: this.scoreboard.winningTeam! })
   }
 
@@ -234,6 +257,14 @@ export class GameSession {
       // draw: no economy change
       if (rm.isHalftime) this.economy.reset(800)
       events.push({ type: 'moneyUpdate', playerId: this.localId, amount: this.economy.money })
+    }
+    for (const [botId, eco] of this.botEconomies) {
+      if (winner === 'ct' || winner === 't') {
+        const botEntity = this.playerMap.get(botId)
+        if (botEntity && botEntity.team === winner) eco.recordWin()
+        else eco.recordLoss()
+      }
+      if (rm.isHalftime) eco.reset(800)
     }
     if (rm.matchOver) {
       events.push({ type: 'matchOver', winningTeam: rm.winner as Team })
