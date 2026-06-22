@@ -757,7 +757,8 @@ export class GameSession {
       const zone = playerHit!.zone
       const damage = zonedDamage(baseDamage, zone)
       const target = playerHit!.entity
-      const killed = target.player.takeDamage(damage)
+      target.player.takeDamage(damage)
+      const killed = target.player.isDead
       events.push({ type: 'playerHitPlayer', victimId: target.id, hit: { targetId: target.id, zone, damage, killed, point: playerHit!.point } })
       if (killed) {
         this.scoreboard.recordKill(shooter.id, shooter.team, target.id, target.team, this.config.damagePolicy)
@@ -782,7 +783,8 @@ export class GameSession {
     if (enemyValid) {
       const zone = resolveZone(enemyObj)
       const damage = zonedDamage(baseDamage, zone)
-      const killed = nearestEnemy!.takeDamage(damage)
+      nearestEnemy!.takeDamage(damage)
+      const killed = nearestEnemy!.isDead
       events.push({
         type: 'playerHitEnemy',
         enemyType: nearestEnemy!.type,
