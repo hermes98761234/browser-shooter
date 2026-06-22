@@ -13,6 +13,7 @@ export class RemotePlayerManager {
   get(id: string): RemotePlayer | undefined { return this.players.get(id) }
 
   sync(playerStates: EntityState[]): void {
+    const localTeam = playerStates.find((s) => s.id === this.localId)?.team
     const seen = new Set<string>()
     for (const s of playerStates) {
       if (s.id === this.localId) continue
@@ -24,6 +25,8 @@ export class RemotePlayerManager {
         this.scene.add(rp.group)
       }
       rp.pushState(s)
+      // Only teammates' nameplates are visible (enemy plates would show through walls).
+      rp.setNameVisible(!!localTeam && s.team === localTeam)
     }
     for (const [id, rp] of this.players) {
       if (!seen.has(id)) { this.scene.remove(rp.group); rp.dispose(); this.players.delete(id) }

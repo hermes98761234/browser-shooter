@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { animateCharacter, buildCharacter } from '../entities/CharacterModel'
+import { animateCharacter, buildCharacter, getNameTag } from '../entities/CharacterModel'
 import { EYE_HEIGHT } from '../player/Player'
 import type { EntityState } from '../session/protocol'
 import type { Team, WeaponType } from '../types'
@@ -25,11 +25,13 @@ export class RemotePlayer {
   hasHelmet = false
   private vestMesh: THREE.Mesh | null = null
   private helmetMesh: THREE.Mesh | null = null
+  private nameTag: THREE.Sprite | null
   private readonly prevPos = new THREE.Vector3()
   private hasPrevPos = false
 
   constructor(readonly id: string, name: string, tint = 0x3399ff) {
     this.group = buildCharacter({ tint, name })
+    this.nameTag = getNameTag(this.group)
     this.thirdPersonWeapon = new ThirdPersonWeapon('pistol')
     this.thirdPersonWeapon.group.position.set(0.42, 1.3, -0.35)
     this.group.add(this.thirdPersonWeapon.group)
@@ -132,6 +134,12 @@ export class RemotePlayer {
    *  snapshot position is the player's eye, so drop the group by EYE_HEIGHT. */
   private setFeet(eyePos: THREE.Vector3): void {
     this.group.position.set(eyePos.x, eyePos.y - EYE_HEIGHT, eyePos.z)
+  }
+
+  /** Nameplates render through walls (depthTest off), so only show them for teammates —
+   *  otherwise enemy positions leak through geometry. */
+  setNameVisible(show: boolean): void {
+    if (this.nameTag) this.nameTag.visible = show
   }
 
   setArmor(show: boolean): void {

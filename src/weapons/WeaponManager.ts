@@ -54,4 +54,10 @@ export class WeaponManager {
     this.secondary = new Weapon('pistol')
     this.currentSlot = 'secondary'
   }
+
+  /** Refill both held weapons to full mags (CS2-style on respawn) without changing the loadout. */
+  refill() {
+    this.primary?.refill()
+    this.secondary.refill()
+  }
 }

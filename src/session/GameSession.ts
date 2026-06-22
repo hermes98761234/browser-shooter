@@ -499,15 +499,21 @@ export class GameSession {
       if (!entity) continue
       entity.player.position.copy(pickSpawn(entity.team, this.map))
       entity.player.revive()
+      entity.weapons.refill() // CS2-style: respawn with full mags
       events.push({ type: 'playerRespawned', playerId: id })
     }
     // Drive bots: each bot's AI produces this tick's input before players advance.
     if (this.bots.size > 0) {
       const all = [...this.playerMap.values()]
+      // In co-op there are no enemy teams to fight, so point bots at the AI wave
+      // instead — otherwise they'd shoot each other (or stand idle).
+      const hostiles = this.config.mode === 'coop'
+        ? this.enemies.filter((e) => !e.isDead).map((e) => e.mesh.position)
+        : undefined
       for (const [id, controller] of this.bots) {
         const self = this.playerMap.get(id)
         if (!self) continue
-        this.applyInput(id, controller.computeInput(self, all, this.collisionWorld, dt))
+        this.applyInput(id, controller.computeInput(self, all, this.collisionWorld, dt, hostiles))
       }
     }
 
@@ -672,7 +678,34 @@ export class GameSession {
       }
     }
 
+    // Competitive: a round also ends the moment one team is wiped out. Skip while the
+    // bomb is planted/defusing — CS keeps that round live until it explodes or is
+    // defused even if every attacker is dead.
+    if (this.roundManager && this.config.mode === 'competitive' &&
+        this.roundManager.state === RoundState.Active && !this.roundManager.matchOver &&
+        this.bomb.state !== BombState.Planted && this.bomb.state !== BombState.Defusing) {
+      const ct = this.teamCensus('ct')
+      const t = this.teamCensus('t')
+      if (ct.total > 0 && t.total > 0 && (ct.alive === 0 || t.alive === 0)) {
+        const winner: 'ct' | 't' | 'draw' =
+          ct.alive === 0 && t.alive === 0 ? 'draw' : t.alive === 0 ? 'ct' : 't'
+        this.concludeRound(winner, 'elimination', events)
+      }
+    }
+
     return events
+  }
+
+  /** Living/total members of a team — used for competitive elimination checks. */
+  private teamCensus(team: Team): { alive: number; total: number } {
+    let alive = 0
+    let total = 0
+    for (const e of this.playerMap.values()) {
+      if (e.team !== team) continue
+      total++
+      if (!e.player.isDead) alive++
+    }
+    return { alive, total }
   }
 
   private fireWeapon(entity: PlayerEntity, events: SessionEvent[]): void {

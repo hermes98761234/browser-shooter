@@ -48,6 +48,13 @@ export class Weapon {
     this.ammo = Math.max(0, Math.min(this.def.maxAmmo, this.ammo + amount))
   }
 
+  /** Top up to a full magazine and cancel any in-progress reload (used on respawn). */
+  refill() {
+    this.ammo = this.def.maxAmmo
+    this.isReloading = false
+    this.reloadTimer = 0
+  }
+
   applyUpgrade(mod: WeaponUpgrade) {
     if (mod.ammoMult != null) {
       this.def.maxAmmo = Math.round(this.def.maxAmmo * mod.ammoMult)

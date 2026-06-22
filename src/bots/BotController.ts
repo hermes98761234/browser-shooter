@@ -18,14 +18,27 @@ export class BotController {
 
   constructor(readonly id: string) {}
 
-  computeInput(self: PlayerEntity, others: PlayerEntity[], world: CollisionWorld | null, dt: number): PlayerInput {
+  /**
+   * @param hostiles positions the bot is allowed to engage. In PvP modes the session
+   *   passes enemy-team players; in co-op it passes the AI wave enemies so bots fight
+   *   the horde instead of each other. When omitted/empty the bot falls back to the
+   *   nearest enemy-team player in `others`.
+   */
+  computeInput(
+    self: PlayerEntity, others: PlayerEntity[], world: CollisionWorld | null, dt: number,
+    hostiles?: THREE.Vector3[],
+  ): PlayerInput {
     const input = emptyInput()
     if (self.player.isDead) { this.aimTimer = 0; return input }
 
-    const target = this.pickTarget(self, others)
-    if (!target) { this.aimTimer = 0; return input }
+    // Bots never visit the buy menu; reload as soon as the mag runs dry so they don't
+    // stand around with an empty gun. canShoot() already blocks fire while reloading.
+    if (self.weapons.current.ammo === 0) self.weapons.current.reload()
 
-    const delta = new THREE.Vector3().subVectors(target.player.position, self.player.position)
+    const targetPos = this.pickTargetPos(self, others, hostiles)
+    if (!targetPos) { this.aimTimer = 0; return input }
+
+    const delta = new THREE.Vector3().subVectors(targetPos, self.player.position)
     const dist = delta.length()
     const dir = dist > 1e-4 ? delta.clone().multiplyScalar(1 / dist) : new THREE.Vector3(0, 0, -1)
 
@@ -42,7 +55,7 @@ export class BotController {
     else if (dist < STANDOFF * 0.6) move = flat.clone().multiplyScalar(-1)
     if (move) this.applyMove(input, move)
 
-    const hasLOS = !world || world.segmentBlocked(self.player.position, target.player.position) === null
+    const hasLOS = !world || world.segmentBlocked(self.player.position, targetPos) === null
     const range = self.weapons.current.def.range
 
     if (hasLOS && dist <= range) {
@@ -87,14 +100,26 @@ export class BotController {
     else if (r < -0.3) input.left = true
   }
 
-  /** Nearest living, enemy-team player. */
-  private pickTarget(self: PlayerEntity, others: PlayerEntity[]): PlayerEntity | null {
-    let best: PlayerEntity | null = null
+  /** Position of the nearest thing the bot should shoot: an explicit hostile (co-op
+   *  wave enemy) if any were supplied, otherwise the nearest living enemy-team player. */
+  private pickTargetPos(
+    self: PlayerEntity, others: PlayerEntity[], hostiles?: THREE.Vector3[],
+  ): THREE.Vector3 | null {
+    let best: THREE.Vector3 | null = null
     let bestDist = Infinity
+    // When the session supplies an explicit hostile list (co-op), the bot engages ONLY
+    // those — never other players — even if the list is momentarily empty between waves.
+    if (hostiles !== undefined) {
+      for (const pos of hostiles) {
+        const d = pos.distanceToSquared(self.player.position)
+        if (d < bestDist) { bestDist = d; best = pos }
+      }
+      return best
+    }
     for (const o of others) {
       if (o.id === self.id || o.player.isDead || o.team === self.team) continue
       const d = o.player.position.distanceToSquared(self.player.position)
-      if (d < bestDist) { bestDist = d; best = o }
+      if (d < bestDist) { bestDist = d; best = o.player.position }
     }
     return best
   }

@@ -67,6 +67,30 @@ export const HelpModal = ({ onClose, inGame }: HelpModalProps) => {
           </div>
         </div>
 
+        <div style={{ marginBottom: 20 }}>
+          <h3 style={{ marginBottom: 12, fontSize: 14, color: '#8a8aad' }}>MODES &amp; ROOM RULES</h3>
+          <div style={{ fontSize: 13, lineHeight: 1.6, opacity: 0.8 }}>
+            <p style={{ margin: '0 0 4px' }}><strong>Mode</strong> — how a room is played:</p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '4px 12px', marginBottom: 10 }}>
+              <span style={{ opacity: 0.6 }}>Co-op</span><span>Team up vs AI waves, no enemy players.</span>
+              <span style={{ opacity: 0.6 }}>Team PvP</span><span>Two teams fight each other, no AI.</span>
+              <span style={{ opacity: 0.6 }}>Hybrid</span><span>Teams fight each other and AI waves.</span>
+              <span style={{ opacity: 0.6 }}>Competitive</span><span>CS-style bomb rounds + buy economy, first to 16.</span>
+            </div>
+            <p style={{ margin: '0 0 4px' }}><strong>Damage policy</strong> — who can hurt whom:</p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '4px 12px', marginBottom: 10 }}>
+              <span style={{ opacity: 0.6 }}>Opposite team</span><span>Teammates can't be damaged (default).</span>
+              <span style={{ opacity: 0.6 }}>Friendly fire</span><span>You can also damage your own team.</span>
+              <span style={{ opacity: 0.6 }}>Free-for-all</span><span>Everyone can damage everyone.</span>
+            </div>
+            <p style={{ margin: '0 0 4px' }}><strong>Join policy</strong> — how players get in:</p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '4px 12px' }}>
+              <span style={{ opacity: 0.6 }}>Lobby</span><span>Players wait in a lobby; the host starts the match.</span>
+              <span style={{ opacity: 0.6 }}>Free</span><span>Players can drop into a running match (optional password).</span>
+            </div>
+          </div>
+        </div>
+
         {inGame && (
           <div style={{ marginBottom: 20 }}>
             <h3 style={{ marginBottom: 12, fontSize: 14, color: '#8a8aad' }}>IN-GAME</h3>

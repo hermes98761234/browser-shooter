@@ -80,6 +80,15 @@ function moveToTeam(roster: { ct: string[]; t: string[] }, name: string, team: '
   return { ct, t }
 }
 
+/** Living teammates (excluding the local player) as minimap dots. */
+function allyDots(players: EntityState[], localId: string): { x: number; z: number }[] {
+  const localTeam = players.find((p) => p.id === localId)?.team
+  if (!localTeam) return []
+  return players
+    .filter((p) => p.id !== localId && !p.isDead && p.team === localTeam)
+    .map((p) => ({ x: p.position.x, z: p.position.z }))
+}
+
 /** Render another player's/bot's gunfire (audio + muzzle flash + tracer). Caller skips
  *  the local shooter, who gets its own fire feedback. */
 function renderRemoteShot(particleSystem: ParticleSystem, audio: SoundEffects, ev: { from: Vec3; to: Vec3 }) {
@@ -105,6 +114,7 @@ function App() {
   const [playerPos, setPlayerPos] = useState(new THREE.Vector3())
   const [playerRot, setPlayerRot] = useState(0)
   const [enemyPositions, setEnemyPositions] = useState<THREE.Vector3[]>([])
+  const [allyPositions, setAllyPositions] = useState<{ x: number; z: number }[]>([])
   const [highScore, setHighScore] = useState(0)
   const [damageIndicator, setDamageIndicator] = useState<DamageIndicatorState | null>(null)
   const [flashEffect, setFlashEffect] = useState<FlashEffectState | null>(null)
@@ -893,7 +903,7 @@ function App() {
       // Player fire feedback (muzzle flash + recoil + sound): the weapon fired this frame
       // iff step() just reset fireTimer to def.fireRate this tick.
       let firedThisFrame = false
-      if (controls.shoot && session.weaponManager.current.fireTimer > session.weaponManager.current.def.fireRate - dt) {
+      if (!session.player.isDead && controls.shoot && session.weaponManager.current.fireTimer > session.weaponManager.current.def.fireRate - dt) {
         firedThisFrame = true
         data.viewmodel?.fire()
         data.audio.playWeaponShoot(weaponVisual(session.weaponManager.current.type), session.player.position)
@@ -961,6 +971,7 @@ function App() {
         const snap = session.getSnapshot()
         data.netHost.broadcastSnapshot(snap, events)
         data.lastPlayers = snap.players
+        setAllyPositions(allyDots(snap.players, session.localId))
         data.remotePlayers.sync(snap.players)
         for (const entity of snap.players) {
           const remote = data.remotePlayers.get(entity.id)
@@ -976,6 +987,7 @@ function App() {
       } else if (data.role === 'single') {
         const snap = session.getSnapshot()
         if (showScoreboardRef.current) data.lastPlayers = snap.players
+        setAllyPositions(allyDots(snap.players, session.localId))
         if (data.remotePlayers) {
           data.remotePlayers.sync(snap.players)
           data.remotePlayers.update(dt)
@@ -1040,6 +1052,7 @@ function App() {
       const snap = client.latestSnapshot
       if (!snap) return
       data.lastPlayers = snap.players
+      if (client.playerId) setAllyPositions(allyDots(snap.players, client.playerId))
 
       const localPos = client.getLocalPosition()
       const localRot = client.getLocalRotation()
@@ -1352,6 +1365,7 @@ function App() {
             playerPosition={playerPos}
             playerRotation={playerRot}
             enemies={enemyPositions}
+            allies={allyPositions}
             arenaSize={ARENA_SIZE}
             bombsites={gameDataRef.current.session.bombsites.map(s => ({ id: s.id, position: s.center }))}
             bombPosition={gameDataRef.current.session.bomb.position ?? undefined}

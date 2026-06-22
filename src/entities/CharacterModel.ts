@@ -49,6 +49,11 @@ export function buildCharacter(opts: CharacterOptions): THREE.Group {
   return group
 }
 
+/** The character's floating nameplate sprite, if it has one (added when `name` is set). */
+export function getNameTag(group: THREE.Group): THREE.Sprite | null {
+  return (group.children.find((c) => c instanceof THREE.Sprite) as THREE.Sprite) ?? null
+}
+
 /** Build a limb as a pivot group at `(x, pivotY)` with the mesh hanging below it. */
 function makeLimb(
   geo: THREE.BoxGeometry,

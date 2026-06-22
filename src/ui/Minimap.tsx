@@ -5,6 +5,7 @@ interface MinimapProps {
   playerPosition: THREE.Vector3
   playerRotation: number
   enemies: THREE.Vector3[]
+  allies?: { x: number; z: number }[]
   arenaSize: number
   bombsites?: { id: string; position: { x: number; z: number } }[]
   bombPosition?: { x: number; z: number }
@@ -14,14 +15,15 @@ export const Minimap: React.FC<MinimapProps> = ({
   playerPosition,
   playerRotation,
   enemies,
+  allies,
   arenaSize,
   bombsites,
   bombPosition,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [isMobile, setIsMobile] = React.useState(() => window.matchMedia('(max-width: 767px)').matches)
-  const propsRef = useRef({ playerPosition, playerRotation, enemies, arenaSize, bombsites, bombPosition })
-  propsRef.current = { playerPosition, playerRotation, enemies, arenaSize, bombsites, bombPosition }
+  const propsRef = useRef({ playerPosition, playerRotation, enemies, allies, arenaSize, bombsites, bombPosition })
+  propsRef.current = { playerPosition, playerRotation, enemies, allies, arenaSize, bombsites, bombPosition }
 
   React.useEffect(() => {
     const mql = window.matchMedia('(max-width: 767px)')
@@ -38,7 +40,7 @@ export const Minimap: React.FC<MinimapProps> = ({
     let raf: number
 
     const draw = () => {
-      const { playerPosition, playerRotation, enemies, arenaSize, bombsites, bombPosition } = propsRef.current
+      const { playerPosition, playerRotation, enemies, allies, arenaSize, bombsites, bombPosition } = propsRef.current
       const size = isMobile ? 80 : 150
       const scale = size / (arenaSize * 2.5)
 
@@ -71,6 +73,20 @@ export const Minimap: React.FC<MinimapProps> = ({
           ctx.beginPath()
           ctx.arc(ex, ey, 2, 0, Math.PI * 2)
           ctx.fill()
+        }
+      }
+
+      // Teammates (cyan) so you can see where your team / bots are.
+      if (allies) {
+        for (const ally of allies) {
+          const ax = cx + (ally.x - playerPosition.x) * scale
+          const ay = cy + (ally.z - playerPosition.z) * scale
+          if (ax > 5 && ax < size - 5 && ay > 5 && ay < size - 5) {
+            ctx.fillStyle = '#33ddff'
+            ctx.beginPath()
+            ctx.arc(ax, ay, 2.5, 0, Math.PI * 2)
+            ctx.fill()
+          }
         }
       }
 
