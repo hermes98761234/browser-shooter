@@ -30,7 +30,19 @@ describe('BotController', () => {
     const ctrl = new BotController('bot-0')
     const input = ctrl.computeInput(bot, [ally, farEnemy, nearEnemy], null, 0.016)
     const dirToNear = new THREE.Vector3(5, 0, 0).normalize()
-    expect(forwardOf(input.yaw, input.pitch).dot(dirToNear)).toBeGreaterThan(0.99)
+    // Yaw (horizontal aim) must point at the nearest enemy; pitch is intentionally
+    // randomized across the body, so only the horizontal direction is checked here.
+    expect(forwardOf(input.yaw, 0).dot(dirToNear)).toBeGreaterThan(0.99)
+  })
+
+  it('varies aim height across shots instead of always headshotting', () => {
+    const bot = entity('bot-0', 't', new THREE.Vector3(0, 2, 0))
+    const enemy = entity('e', 'ct', new THREE.Vector3(0, 2, -10))
+    const ctrl = new BotController('bot-0')
+    const pitches = new Set<number>()
+    for (let i = 0; i < 50; i++) pitches.add(ctrl.computeInput(bot, [enemy], null, 0.016).pitch)
+    // Eye-level-only aim would give a single (~0) pitch; spread proves it hits other zones.
+    expect(pitches.size).toBeGreaterThan(5)
   })
 
   it('fires only after the reaction delay when target is in range with line of sight', () => {

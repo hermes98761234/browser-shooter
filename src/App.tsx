@@ -51,6 +51,7 @@ import { stepBloom } from './weapons/CrosshairBloom'
 import { MatchSetup } from './ui/MatchSetup'
 import { RoundState } from './session/RoundManager'
 import { KillFeed, type KillLine } from './ui/KillFeed'
+import type { HitZone } from './systems/DamageZones'
 import { RespawnOverlay } from './ui/RespawnOverlay'
 import { MatchOver } from './ui/MatchOver'
 import { defaultMatchConfig, type MatchConfig } from './session/MatchConfig'
@@ -89,15 +90,21 @@ function allyDots(players: EntityState[], localId: string): { x: number; z: numb
     .map((p) => ({ x: p.position.x, z: p.position.z }))
 }
 
-/** Render another player's/bot's gunfire (audio + muzzle flash + tracer). Caller skips
- *  the local shooter, who gets its own fire feedback. */
+/** Render another player's/bot's gunfire (audio + muzzle flash). No tracer: tracers are
+ *  reserved for the local player's own shots so they can read their own fire. */
 function renderRemoteShot(particleSystem: ParticleSystem, audio: SoundEffects, ev: { from: Vec3; to: Vec3 }) {
   const from = new THREE.Vector3(ev.from.x, ev.from.y, ev.from.z)
   const to = new THREE.Vector3(ev.to.x, ev.to.y, ev.to.z)
   const dir = to.clone().sub(from).normalize()
   audio.playWeaponShoot('rifle', from)
   particleSystem.muzzleFlash(from.clone().add(dir.clone().multiplyScalar(0.4)), dir)
-  particleSystem.tracer(from, to, 0xfff0a0, 0.2)
+}
+
+/** Tracer for the local player's own shot — the only gunfire that draws a tracer. */
+function renderLocalTracer(particleSystem: ParticleSystem, ev: { from: Vec3; to: Vec3 }) {
+  particleSystem.tracer(
+    new THREE.Vector3(ev.from.x, ev.from.y, ev.from.z),
+    new THREE.Vector3(ev.to.x, ev.to.y, ev.to.z), 0xfff0a0, 0.2)
 }
 
 function App() {
@@ -217,9 +224,9 @@ function App() {
     micProvider: new BrowserMicProvider(),
   })
 
-  const pushKill = useCallback((attacker: string, victim: string, teamkill: boolean) => {
+  const pushKill = useCallback((attacker: string, victim: string, teamkill: boolean, zone: HitZone) => {
     const id = gameDataRef.current.killSeq++
-    setKillFeed((prev) => [...prev.slice(-4), { id, attacker, victim, teamkill }])
+    setKillFeed((prev) => [...prev.slice(-4), { id, attacker, victim, teamkill, zone }])
     setTimeout(() => setKillFeed((prev) => prev.filter(l => l.id !== id)), 5000)
   }, [])
 
@@ -469,7 +476,8 @@ function App() {
           particleSystem.bulletImpact(new THREE.Vector3(ev.point.x, ev.point.y, ev.point.z))
           break
         case 'playerShot':
-          if (ev.shooterId !== data.netClient?.playerId) renderRemoteShot(particleSystem, data.audio, ev)
+          if (ev.shooterId === data.netClient?.playerId) renderLocalTracer(particleSystem, ev)
+          else renderRemoteShot(particleSystem, data.audio, ev)
           break
         case 'enemyShoot': {
           const from = new THREE.Vector3(ev.from.x, ev.from.y, ev.from.z)
@@ -477,7 +485,6 @@ function App() {
           data.audio.playWeaponShoot('rifle', from)
           const dir = to.clone().sub(from).normalize()
           particleSystem.muzzleFlash(from, dir, 0xffcf6a, 4, 7)
-          particleSystem.tracer(from, to, 0xff7a1e, 0.2)
           if (ev.hit && ev.victimId === data.netClient?.playerId) {
             data.audio.playPlayerHit()
             setHealth(data.session.player.health)
@@ -513,7 +520,7 @@ function App() {
           break
         }
         case 'playerKilledPlayer':
-          pushKill(ev.attackerId, ev.victimId, ev.teamkill)
+          pushKill(ev.attackerId, ev.victimId, ev.teamkill, ev.zone)
           break
         case 'matchOver':
           break // handled via snapshot.scores in updateClient
@@ -804,8 +811,10 @@ function App() {
             data.particleSystem!.bulletImpact(new THREE.Vector3(ev.point.x, ev.point.y, ev.point.z))
             break
           case 'playerShot':
-            // The local player already draws its own muzzle flash; only render others'.
-            if (ev.shooterId !== session.localId) renderRemoteShot(particleSystem, data.audio, ev)
+            // The local player already draws its own muzzle flash; add its tracer here and
+            // render only flash/audio for everyone else (tracers are local-only).
+            if (ev.shooterId === session.localId) renderLocalTracer(particleSystem, ev)
+            else renderRemoteShot(particleSystem, data.audio, ev)
             break
           case 'enemyShoot': {
             const from = new THREE.Vector3(ev.from.x, ev.from.y, ev.from.z)
@@ -813,7 +822,6 @@ function App() {
             data.audio.playWeaponShoot('rifle', from)
             const dir = to.clone().sub(from).normalize()
             particleSystem.muzzleFlash(from, dir, 0xffcf6a, 4, 7)
-            particleSystem.tracer(from, to, 0xff7a1e, 0.2)
             if (ev.hit && ev.victimId === session.localId) {
               data.audio.playPlayerHit()
               setHealth(session.player.health)
@@ -864,7 +872,7 @@ function App() {
           case 'playerKilledPlayer': {
             const a = session.getPlayer(ev.attackerId)?.name ?? ev.attackerId
             const v = session.getPlayer(ev.victimId)?.name ?? ev.victimId
-            pushKill(a, v, ev.teamkill)
+            pushKill(a, v, ev.teamkill, ev.zone)
             break
           }
           case 'matchOver':

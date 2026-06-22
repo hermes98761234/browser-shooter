@@ -3,6 +3,7 @@ import type { PlayerInput } from '../session/protocol'
 import { emptyInput } from '../session/protocol'
 import type { PlayerEntity } from '../session/GameSession'
 import type { CollisionWorld } from '../engine/CollisionWorld'
+import { PLAYER_HEIGHT } from '../session/PlayerHit'
 
 const STANDOFF = 8          // preferred distance (m) to hold from the target
 const REACTION_TIME = 0.35  // seconds of continuous sight before opening fire
@@ -21,8 +22,9 @@ export class BotController {
   /**
    * @param hostiles positions the bot is allowed to engage. In PvP modes the session
    *   passes enemy-team players; in co-op it passes the AI wave enemies so bots fight
-   *   the horde instead of each other. When omitted/empty the bot falls back to the
-   *   nearest enemy-team player in `others`.
+   *   the horde instead of each other. When omitted the bot falls back to the nearest
+   *   enemy-team player in `others`; an explicit list (even if empty) means engage only
+   *   those — an empty list leaves the bot idle between waves rather than shooting players.
    */
   computeInput(
     self: PlayerEntity, others: PlayerEntity[], world: CollisionWorld | null, dt: number,
@@ -42,9 +44,18 @@ export class BotController {
     const dist = delta.length()
     const dir = dist > 1e-4 ? delta.clone().multiplyScalar(1 / dist) : new THREE.Vector3(0, 0, -1)
 
-    // Face the target (same convention the session uses to derive the forward ray).
-    input.yaw = Math.atan2(-dir.x, -dir.z)
-    input.pitch = Math.asin(THREE.MathUtils.clamp(dir.y, -1, 1))
+    // Aim point: against players, pick a random height up the body each tick so shots land
+    // across head/torso/legs instead of always at eye level (a guaranteed headshot). Co-op
+    // wave enemies (hostiles supplied) keep dead-center aim. feet=0, head top=PLAYER_HEIGHT.
+    const aimPos = hostiles === undefined
+      ? new THREE.Vector3(targetPos.x, Math.random() * PLAYER_HEIGHT, targetPos.z)
+      : targetPos
+    const aimDir = new THREE.Vector3().subVectors(aimPos, self.player.position)
+    if (aimDir.lengthSq() > 1e-8) aimDir.normalize()
+
+    // Face the aim point (same convention the session uses to derive the forward ray).
+    input.yaw = Math.atan2(-aimDir.x, -aimDir.z)
+    input.pitch = Math.asin(THREE.MathUtils.clamp(aimDir.y, -1, 1))
 
     // Choose a horizontal travel heading: approach the target, hold, or back off — then
     // steer that heading around any wall in the way so the bot doesn't grind into geometry.

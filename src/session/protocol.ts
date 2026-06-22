@@ -108,7 +108,7 @@ export type SessionEvent =
   | { type: 'pickup'; pickupType: string; value: number; playerId: string }
   | { type: 'playerDied'; playerId: string }
   | { type: 'playerHitPlayer'; hit: HitEvent; victimId: string }
-  | { type: 'playerKilledPlayer'; attackerId: string; victimId: string; victimTeam: Team; teamkill: boolean }
+  | { type: 'playerKilledPlayer'; attackerId: string; victimId: string; victimTeam: Team; teamkill: boolean; zone: HitZone }
   | { type: 'playerRespawned'; playerId: string }
   | { type: 'matchOver'; winningTeam: Team }
   | { type: 'roundStart'; round: number; money: number; ctScore: number; tScore: number }

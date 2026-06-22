@@ -763,7 +763,7 @@ export class GameSession {
         this.scoreboard.recordKill(shooter.id, shooter.team, target.id, target.team, this.config.damagePolicy)
         // Competitive: no mid-round respawn — players revive at the next round start.
         if (this.config.mode !== 'competitive') this.respawnQueue.enqueue(target.id, RESPAWN_DELAY)
-        events.push({ type: 'playerKilledPlayer', attackerId: shooter.id, victimId: target.id, victimTeam: target.team, teamkill: this.config.damagePolicy === 'friendly' && shooter.team === target.team })
+        events.push({ type: 'playerKilledPlayer', attackerId: shooter.id, victimId: target.id, victimTeam: target.team, teamkill: this.config.damagePolicy === 'friendly' && shooter.team === target.team, zone })
         events.push({ type: 'playerDied', playerId: target.id })
         const wasCarrier = this.bomb.carrier === target.id
         this.handleDeath(target.id)
