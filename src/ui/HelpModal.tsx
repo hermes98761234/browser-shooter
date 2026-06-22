@@ -51,6 +51,22 @@ export const HelpModal = ({ onClose, inGame }: HelpModalProps) => {
           </div>
         </div>
 
+        <div style={{ marginBottom: 20 }}>
+          <h3 style={{ marginBottom: 12, fontSize: 14, color: '#8a8aad' }}>HOW TO WORK WITH BOTS</h3>
+          <div style={{ fontSize: 13, lineHeight: 1.6, opacity: 0.8 }}>
+            <p style={{ margin: '0 0 8px' }}>Add AI bots in <strong>Singleplayer</strong> or as the <strong>host in Multiplayer</strong>.</p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 20px' }}>
+              <span style={{ opacity: 0.6 }}>[</span><span>Add CT Bot</span>
+              <span style={{ opacity: 0.6 }}>]</span><span>Add T Bot</span>
+              <span style={{ opacity: 0.6 }}>\</span><span>Remove Last Bot</span>
+            </div>
+            <p style={{ margin: '12px 0 0', fontSize: 12, opacity: 0.6 }}>
+              Bots use the same weapon system as players and appear on the scoreboard with names and K/D.
+              <br />Max 9 bots per session. Bots are not available to clients — only the host or single-player player can add them.
+            </p>
+          </div>
+        </div>
+
         {inGame && (
           <div style={{ marginBottom: 20 }}>
             <h3 style={{ marginBottom: 12, fontSize: 14, color: '#8a8aad' }}>IN-GAME</h3>
