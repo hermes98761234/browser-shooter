@@ -22,8 +22,9 @@ export class BotController {
   /**
    * @param hostiles positions the bot is allowed to engage. In PvP modes the session
    *   passes enemy-team players; in co-op it passes the AI wave enemies so bots fight
-   *   the horde instead of each other. When omitted/empty the bot falls back to the
-   *   nearest enemy-team player in `others`.
+   *   the horde instead of each other. When omitted the bot falls back to the nearest
+   *   enemy-team player in `others`; an explicit list (even if empty) means engage only
+   *   those — an empty list leaves the bot idle between waves rather than shooting players.
    */
   computeInput(
     self: PlayerEntity, others: PlayerEntity[], world: CollisionWorld | null, dt: number,
