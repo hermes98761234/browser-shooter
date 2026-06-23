@@ -1,6 +1,6 @@
 import type { GameState, Team } from '../types'
 
-export const PUSH_TO_TALK_KEY = 'KeyK'
+const PUSH_TO_TALK_KEY = 'KeyK'
 
 export class Controls {
   forward = false

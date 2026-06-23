@@ -35,16 +35,3 @@ export function createGrenadeModel(type: GrenadeType): THREE.Group {
 
   return group
 }
-
-export function disposeGrenadeModel(group: THREE.Group): void {
-  group.traverse((child) => {
-    if (child instanceof THREE.Mesh) {
-      child.geometry.dispose()
-      if (Array.isArray(child.material)) {
-        child.material.forEach(m => m.dispose())
-      } else {
-        child.material.dispose()
-      }
-    }
-  })
-}
