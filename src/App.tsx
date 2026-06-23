@@ -109,6 +109,18 @@ function renderLocalTracer(particleSystem: ParticleSystem, ev: { from: Vec3; to:
     new THREE.Vector3(ev.to.x, ev.to.y, ev.to.z), 0xfff0a0, 0.2)
 }
 
+/** Dispose geometries/materials under a Group so removed client meshes don't leak GPU memory. */
+function disposeGroup(obj: THREE.Object3D) {
+  obj.traverse((child) => {
+    if (child instanceof THREE.Mesh) {
+      child.geometry.dispose()
+      const mat = child.material
+      if (Array.isArray(mat)) mat.forEach((m) => m.dispose())
+      else mat.dispose()
+    }
+  })
+}
+
 function App() {
   const containerRef = useRef<HTMLDivElement>(null)
   const engineRef = useRef<GameEngine | null>(null)
@@ -246,7 +258,7 @@ function App() {
       ;(mesh.material as THREE.Material).dispose()
     }
     data.clientEnemies.clear()
-    for (const mesh of data.clientGrenades.values()) engineRef.current?.scene.remove(mesh)
+    for (const mesh of data.clientGrenades.values()) { engineRef.current?.scene.remove(mesh); disposeGroup(mesh) }
     data.clientGrenades.clear()
     data.voiceChat?.dispose(); data.voiceChat = null
     data.audioSink.dispose(); data.audioSink = new AudioSink()
@@ -1185,6 +1197,7 @@ function App() {
       for (const [id, mesh] of map) {
         if (!seen.has(id)) {
           engine.scene.remove(mesh)
+          disposeGroup(mesh)
           map.delete(id)
         }
       }
