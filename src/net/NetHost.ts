@@ -99,7 +99,8 @@ export class NetHost {
 
   addClient(playerId: string, name: string, transport: Transport, team: Team = 'ct', voicePeerId?: string): void {
     const validName = name?.trim() || 'Player'
-    this.session.addPlayer(playerId, validName, team)
+    const entity = this.session.addPlayer(playerId, validName, team)
+    entity.player.position.copy(pickSpawn(team, this.session.map))
     this.lastSeq.set(playerId, 0)
     transport.onMessage((msg) => {
       if (msg.type === 'input' && msg.playerId === playerId) {
