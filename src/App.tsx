@@ -15,7 +15,8 @@ import { createFlashEffect, triggerFlash, updateFlash, type FlashEffectState } f
 import type { GameState, Team, GrenadeType, Vec3 } from './types'
 import { GameSession, ARENA_SIZE } from './session/GameSession'
 import { pickSpawn } from './session/Spawns'
-import { emptyInput, type EntityState } from './session/protocol'
+import { emptyInput, type EntityState, type GrenadeState } from './session/protocol'
+import { createGrenadeModel } from './weapons/GrenadeModel'
 import { NetHost } from './net/NetHost'
 import { NetClient } from './net/NetClient'
 import { PeerHost } from './net/PeerHost'
@@ -106,6 +107,18 @@ function renderLocalTracer(particleSystem: ParticleSystem, ev: { from: Vec3; to:
   particleSystem.tracer(
     new THREE.Vector3(ev.from.x, ev.from.y, ev.from.z),
     new THREE.Vector3(ev.to.x, ev.to.y, ev.to.z), 0xfff0a0, 0.2)
+}
+
+/** Dispose geometries/materials under a Group so removed client meshes don't leak GPU memory. */
+function disposeGroup(obj: THREE.Object3D) {
+  obj.traverse((child) => {
+    if (child instanceof THREE.Mesh) {
+      child.geometry.dispose()
+      const mat = child.material
+      if (Array.isArray(mat)) mat.forEach((m) => m.dispose())
+      else mat.dispose()
+    }
+  })
 }
 
 function App() {
@@ -215,6 +228,7 @@ function App() {
     remotePlayers: null as RemotePlayerManager | null,
     nextClientNum: 1,
     clientEnemies: new Map<string, THREE.Mesh>(),
+    clientGrenades: new Map<string, THREE.Group>(),
     lastPlayers: [] as EntityState[],
     pingTimer: 0,
     matchConfig: defaultMatchConfig() as MatchConfig,
@@ -244,6 +258,8 @@ function App() {
       ;(mesh.material as THREE.Material).dispose()
     }
     data.clientEnemies.clear()
+    for (const mesh of data.clientGrenades.values()) { engineRef.current?.scene.remove(mesh); disposeGroup(mesh) }
+    data.clientGrenades.clear()
     data.voiceChat?.dispose(); data.voiceChat = null
     data.audioSink.dispose(); data.audioSink = new AudioSink()
     data.micProvider = new BrowserMicProvider()
@@ -546,6 +562,10 @@ function App() {
           break
         case 'grenadeDetonated': {
           const localId = data.netClient?.playerId
+          data.audio.playGrenadeDetonate(ev.grenadeType, ev.position)
+          if (ev.grenadeType === 'he') {
+            data.particleSystem?.explosion(new THREE.Vector3(ev.position.x, ev.position.y, ev.position.z))
+          }
           if (ev.grenadeType === 'flash' && localId && ev.affectedPlayers.includes(localId)) {
             data.flashEffect = triggerFlash(data.flashEffect, ev.blindDurations?.[localId] ?? 0)
             setFlashEffect({ ...data.flashEffect })
@@ -787,6 +807,7 @@ function App() {
 
       const enemiesBefore = new Set(session.enemies)
       const pickupsBefore = new Set(session.pickups)
+      const grenadesBefore = new Set(session.activeGrenades)
 
       const events = session.step(dt)
 
@@ -906,6 +927,10 @@ function App() {
             setBombState(BombState.Carried)
             break
           case 'grenadeDetonated': {
+            data.audio.playGrenadeDetonate(ev.grenadeType, ev.position)
+            if (ev.grenadeType === 'he') {
+              particleSystem.explosion(new THREE.Vector3(ev.position.x, ev.position.y, ev.position.z))
+            }
             if (ev.grenadeType === 'flash' && ev.affectedPlayers.includes(session.localId)) {
               data.flashEffect = triggerFlash(data.flashEffect, ev.blindDurations?.[session.localId] ?? 0)
               setFlashEffect({ ...data.flashEffect })
@@ -944,6 +969,13 @@ function App() {
       }
       for (const pk of pickupsBefore) {
         if (!session.pickups.includes(pk)) { engine.scene.remove(pk.mesh); pk.dispose() }
+      }
+      // Add newly-thrown grenade meshes; drop the ones that detonated this step.
+      for (const g of session.activeGrenades) {
+        if (!g.meshRef.parent) engine.scene.add(g.meshRef)
+      }
+      for (const g of grenadesBefore) {
+        if (!session.activeGrenades.includes(g)) engine.scene.remove(g.meshRef)
       }
 
       setAmmo(session.weaponManager.current.ammo)
@@ -1113,6 +1145,7 @@ function App() {
         }
       }
       renderClientEnemies(snap.enemies)
+      renderClientGrenades(snap.grenades)
       data.remotePlayers?.update(dt)
       particleSystem.update(dt)
 
@@ -1144,6 +1177,29 @@ function App() {
           engine.scene.remove(mesh)
           mesh.geometry.dispose()
           ;(mesh.material as THREE.Material).dispose()
+          map.delete(id)
+        }
+      }
+    }
+
+    function renderClientGrenades(grenades: GrenadeState[]) {
+      const map = data.clientGrenades
+      const seen = new Set<string>()
+      for (const g of grenades) {
+        seen.add(g.id)
+        let mesh = map.get(g.id)
+        if (!mesh) {
+          mesh = createGrenadeModel(g.type)
+          map.set(g.id, mesh)
+          engine.scene.add(mesh)
+        }
+        mesh.position.set(g.position.x, g.position.y, g.position.z)
+        mesh.rotation.set(g.rotation.x, g.rotation.y, g.rotation.z)
+      }
+      for (const [id, mesh] of map) {
+        if (!seen.has(id)) {
+          engine.scene.remove(mesh)
+          disposeGroup(mesh)
           map.delete(id)
         }
       }
