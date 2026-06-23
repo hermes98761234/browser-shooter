@@ -54,7 +54,7 @@ export function buildPeerOptions(env: PeerEnv): PeerOptions | undefined {
 }
 
 /** Options resolved once from the build-time env; undefined => default public broker. */
-export const PEER_OPTIONS = buildPeerOptions(import.meta.env as unknown as PeerEnv)
+const PEER_OPTIONS = buildPeerOptions(import.meta.env as unknown as PeerEnv)
 
 /** Construct a Peer wired to the configured broker. Pass an id to claim a fixed id. */
 export function createPeer(id?: string): Peer {

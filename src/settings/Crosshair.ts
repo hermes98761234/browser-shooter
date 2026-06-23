@@ -60,7 +60,7 @@ export function resolveCrosshair(settings: CrosshairSettings, weapon: WeaponType
 }
 
 /** Fill any missing fields of a partially-stored config from the defaults. */
-export function normalizeCrosshair(partial: Partial<CrosshairConfig> | undefined): CrosshairConfig {
+function normalizeCrosshair(partial: Partial<CrosshairConfig> | undefined): CrosshairConfig {
   return { ...DEFAULT_CROSSHAIR, ...partial }
 }
 

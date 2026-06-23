@@ -6,7 +6,7 @@ export interface BoxCollider {
 }
 
 /** How far the player can step up onto a ledge without jumping. */
-export const STEP_TOLERANCE = 0.35
+const STEP_TOLERANCE = 0.35
 
 /** Vertical extent of the player's body (feet to just above the head), for height-aware collision. */
 export const PLAYER_HEIGHT = 2.2

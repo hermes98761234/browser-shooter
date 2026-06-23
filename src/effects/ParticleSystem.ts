@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { createMuzzleFlash, getMuzzleFlashPosition } from './MuzzleFlash'
+import { createMuzzleFlash } from './MuzzleFlash'
 import { createSparkBurst, createBloodSplatter, updateParticleHandle } from './BulletImpact'
 import { createExplosion, updateExplosion, disposeExplosion, getExplosionScale, type ExplosionHandle } from './Explosion'
 import type { ParticleHandle } from './BulletImpact'
@@ -186,5 +186,3 @@ export class ParticleSystem {
     this.tracers = []
   }
 }
-
-export { getMuzzleFlashPosition }
