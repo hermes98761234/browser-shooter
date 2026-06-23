@@ -1122,6 +1122,9 @@ function App() {
 
       const localPos = client.getLocalPosition()
       const localRot = client.getLocalRotation()
+      setPlayerPos(localPos.clone())
+      setPlayerRot(localRot.y)
+      setEnemyPositions(snap.enemies.filter(e => !e.isDead).map(e => new THREE.Vector3(e.position.x, e.position.y, e.position.z)))
       const error = localPos.clone().sub(engine.camera.position)
       if (error.lengthSq() > 0.001) {
         engine.camera.position.lerp(localPos, Math.min(1, dt / 0.1))
