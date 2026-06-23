@@ -28,6 +28,8 @@ export class Controls {
   onSelectGrenade: ((type: 'he' | 'flash' | 'smoke') => void) | null = null
   onCycleGrenade: (() => void) | null = null
   onIsStoreOpen: (() => boolean) | null = null
+  /** True when a grenade is selected; left click then throws instead of firing. */
+  onIsGrenadeSelected: (() => boolean) | null = null
   /** Fired on push-to-talk key down / up (hold to transmit voice). */
   onTalkStart: (() => void) | null = null
   onTalkStop: (() => void) | null = null
@@ -114,11 +116,17 @@ export class Controls {
   private onMouseDown(e: MouseEvent) {
     if (e.button === 0) {
       if (this.getGameState() === 'playing' && !this.onIsStoreOpen?.()) {
-        this.shoot = true
         if (document.pointerLockElement !== this.element) {
           this.element.requestPointerLock()
         }
-        this.onThrowGrenade?.('long')
+        // With a grenade selected, left click long-throws; otherwise it fires
+        // the gun. Doing both at once (the old behavior) made every shot also
+        // lob a grenade.
+        if (this.onIsGrenadeSelected?.()) {
+          this.onThrowGrenade?.('long')
+        } else {
+          this.shoot = true
+        }
       }
     }
     if (e.button === 2) {

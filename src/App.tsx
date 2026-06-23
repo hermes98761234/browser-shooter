@@ -716,6 +716,8 @@ function App() {
       gameDataRef.current.voiceChat?.stopTalking()
     }
 
+    data.controls.onIsGrenadeSelected = () => !!data.grenadeManager?.selected
+
     data.controls.onThrowGrenade = (mode: 'long' | 'short') => {
       if (gameStateRef.current !== 'playing') return
       const gm = data.grenadeManager
@@ -1208,6 +1210,11 @@ function App() {
       if (e.code in slotKeys && gameStateRef.current === 'playing') {
         const wm = data.session.weaponManager
         wm.selectSlot(slotKeys[e.code])
+        // Switching to a gun puts grenades away so left click fires again.
+        if (data.grenadeManager?.selected) {
+          data.grenadeManager.selected = null
+          setSelectedGrenade(null)
+        }
         setWeaponName(wm.current.def.name)
         setAmmo(wm.current.ammo)
         data.viewmodel?.setWeapon(weaponVisual(wm.current.type))

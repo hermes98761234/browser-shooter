@@ -89,6 +89,24 @@ describe('Controls', () => {
     expect(controls.shoot).toBe(false)
   })
 
+  it('left click long-throws instead of firing when a grenade is selected', () => {
+    const throws: string[] = []
+    controls.onThrowGrenade = (mode) => throws.push(mode)
+    controls.onIsGrenadeSelected = () => true
+    document.dispatchEvent(new MouseEvent('mousedown', { button: 0 }))
+    expect(controls.shoot).toBe(false)
+    expect(throws).toEqual(['long'])
+  })
+
+  it('left click fires (no throw) when no grenade is selected', () => {
+    const throws: string[] = []
+    controls.onThrowGrenade = (mode) => throws.push(mode)
+    controls.onIsGrenadeSelected = () => false
+    document.dispatchEvent(new MouseEvent('mousedown', { button: 0 }))
+    expect(controls.shoot).toBe(true)
+    expect(throws).toEqual([])
+  })
+
   it('requests pointer lock on mouse click', () => {
     document.dispatchEvent(new MouseEvent('mousedown', { button: 0 }))
     expect((element as any).requestPointerLock).toHaveBeenCalled()

@@ -383,6 +383,7 @@ export class GameSession {
         const dist = enemy.mesh.position.distanceTo(position)
         if (dist <= grenade.def.effectRadius) {
           const damage = calcHeDamage(dist)
+          if (damage <= 0) continue
           enemy.takeDamage(damage)
           if (enemy.isDead) {
             this.scoreSystem.addKill(enemy.def.scoreValue)

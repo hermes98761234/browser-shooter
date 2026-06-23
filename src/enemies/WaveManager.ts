@@ -75,7 +75,7 @@ export class WaveManager {
 
     if (this.spawnTimer >= waveDef.spawnDelay) {
       this.spawnTimer = 0
-      const type = this.spawnQueue.pop()!
+      const type = this.spawnQueue.shift()!
       const position = this.getRandomSpawnPosition(arenaSize)
       const enemy = new Enemy(type, position)
       enemy.id = `enemy-${this.nextEnemyId++}`
