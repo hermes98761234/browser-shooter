@@ -4,6 +4,7 @@ import { ARENA_SIZE } from '../session/GameSession'
 import type { Transport } from '../session/Transport'
 import type { GameMode, NetMessage, PlayerInput, SessionEvent, Snapshot, VoiceRosterEntry } from '../session/protocol'
 import type { MatchConfig } from '../session/MatchConfig'
+import type { CollisionWorld } from '../engine/CollisionWorld'
 
 interface InterpEntry {
   snapshot: { position: THREE.Vector3; rotationY: number; rotationX: number; health: number; isDead: boolean }
@@ -18,6 +19,7 @@ export class NetClient {
   mode: GameMode | null = null
   config: MatchConfig | null = null
   latestSnapshot: Snapshot | null = null
+  collisionWorld: CollisionWorld | null = null
 
   private localSeq = 0
   private pendingInputs: PlayerInput[] = []
@@ -57,7 +59,7 @@ export class NetClient {
     if (!this.playerId || this.pendingInputs.length === 0) return
     this.lastDt = dt
     const input = this.pendingInputs[this.pendingInputs.length - 1]
-    this.localPlayer.update(dt, input, ARENA_SIZE)
+    this.localPlayer.update(dt, input, ARENA_SIZE, this.collisionWorld ?? undefined)
   }
 
   getLocalPosition(): THREE.Vector3 {
@@ -177,7 +179,7 @@ export class NetClient {
     this.localPlayer.health = me.health
 
     for (const input of this.pendingInputs) {
-      this.localPlayer.update(this.lastDt, input, ARENA_SIZE)
+      this.localPlayer.update(this.lastDt, input, ARENA_SIZE, this.collisionWorld ?? undefined)
     }
   }
 
