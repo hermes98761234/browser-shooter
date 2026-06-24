@@ -5,9 +5,10 @@ import { HAZE } from './haze'
 import { EMBER } from './ember'
 import { REACTOR } from './reactor'
 import { CROSSING } from './crossing'
+import { RANDOM } from './random'
 
 /** All selectable zones, in menu order. Arid first (the default). */
-export const ZONES: ZoneDef[] = [ARID, HAZE, EMBER, REACTOR, CROSSING]
+export const ZONES: ZoneDef[] = [ARID, HAZE, EMBER, REACTOR, CROSSING, RANDOM]
 
 export const DEFAULT_ZONE_ID = ARID.id
 
