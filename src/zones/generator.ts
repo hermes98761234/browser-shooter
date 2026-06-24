@@ -326,3 +326,141 @@ export function generateBombsites(
     { id: 'B', center: [bX, bZ] },
   ]
 }
+
+// ─── Task 5: Main Generator Function ─────────────────────────────────────────
+
+/** Preset floor colors for random generation. */
+const FLOOR_COLORS: number[] = [
+  0xc4a882, // sand
+  0x8b8b8b, // grey concrete
+  0x6b4e37, // dirt brown
+  0x4a5a3a, // moss green
+  0x3a3a4a, // dark stone
+  0xd4c4a8, // light sandstone
+]
+
+/** Preset sky colors for random generation. */
+const SKY_COLORS: number[] = [
+  0x87ceeb, // sky blue
+  0x4a6fa5, // dusk blue
+  0xffd4a0, // sunset orange
+  0x9ab,    // overcast grey-blue
+  0x6c8ebf, // twilight
+]
+
+/** Preset lighting configurations. */
+const LIGHTING_PRESETS: ZoneDef['lighting'][] = [
+  // DAYLIGHT preset
+  {
+    ambientColor: 0xb0b8c0,
+    ambientIntensity: 0.7,
+    sunColor: 0xfff4e0,
+    sunIntensity: 1.1,
+    sunPosition: [20, 30, 10],
+  },
+  // SUNSET preset
+  {
+    ambientColor: 0xd4a076,
+    ambientIntensity: 0.5,
+    sunColor: 0xff8c42,
+    sunIntensity: 1.3,
+    sunPosition: [30, 10, 5],
+  },
+  // OVERCAST preset
+  {
+    ambientColor: 0x9090a0,
+    ambientIntensity: 0.9,
+    sunColor: 0xccccdd,
+    sunIntensity: 0.6,
+    sunPosition: [10, 40, 20],
+  },
+  // NIGHT preset
+  {
+    ambientColor: 0x202040,
+    ambientIntensity: 0.3,
+    sunColor: 0x8090b0,
+    sunIntensity: 0.4,
+    sunPosition: [-10, 20, 30],
+  },
+  // BRIGHT preset
+  {
+    ambientColor: 0xd0d8e0,
+    ambientIntensity: 0.8,
+    sunColor: 0xffffff,
+    sunIntensity: 1.4,
+    sunPosition: [15, 35, 15],
+  },
+]
+
+/** Zone name prefixes for random name generation. */
+const ZONE_NAME_PREFIXES = [
+  'Desert', 'Urban', 'Industrial', 'Arctic', 'Tropical', 'Underground',
+  'Rooftop', 'Warehouse', 'Plaza', 'Bunker', 'Outpost', 'Compound',
+]
+
+/** Zone name suffixes. */
+const ZONE_NAME_SUFFIXES = [
+  'Arena', 'Zone', 'District', 'Sector', 'Grounds', 'Yard',
+  'Complex', 'Station', 'Alley', 'Fortress', 'Ruins', 'Crossing',
+]
+
+/** Zone description templates. */
+const ZONE_DESCRIPTIONS = [
+  'A contested area with strategic cover positions.',
+  'Close-quarters combat with multiple flanking routes.',
+  'Open sightlines balanced with hard cover.',
+  'Abandoned facilities provide tactical advantages.',
+  'Dense urban environment with vertical gameplay.',
+  'Wide open spaces with scattered fortifications.',
+  'Tight corridors connect open engagement areas.',
+  'Multi-level terrain creates dynamic encounters.',
+]
+
+/**
+ * Generate a complete random zone definition.
+ *
+ * @param seed - Optional seed value. If omitted, uses Date.now().
+ * @param constraints - Optional generation constraints. Defaults to DEFAULT_CONSTRAINTS.
+ * @returns A valid ZoneDef with id='random'.
+ */
+export function generateRandomZone(
+  seed?: number,
+  constraints?: GenerationConstraints
+): ZoneDef {
+  const effectiveConstraints = constraints ?? DEFAULT_CONSTRAINTS
+  const s = createSeed(seed)
+
+  // Generate structures (walls + cover)
+  const walls = generateWalls(s, effectiveConstraints)
+  const cover = generateCover(s, effectiveConstraints)
+  const structures = [...walls, ...cover]
+
+  // Generate spawns and bombsites
+  const { tSpawns, ctSpawns } = generateSpawns(s, effectiveConstraints)
+  const bombsites = generateBombsites(s, effectiveConstraints)
+
+  // Pick random presets
+  const floorColor = FLOOR_COLORS[s.nextInt(0, FLOOR_COLORS.length - 1)]
+  const lighting = LIGHTING_PRESETS[s.nextInt(0, LIGHTING_PRESETS.length - 1)]
+  const skyColor = SKY_COLORS[s.nextInt(0, SKY_COLORS.length - 1)]
+
+  // Generate name and description
+  const name = ZONE_NAME_PREFIXES[s.nextInt(0, ZONE_NAME_PREFIXES.length - 1)] +
+    ' ' +
+    ZONE_NAME_SUFFIXES[s.nextInt(0, ZONE_NAME_SUFFIXES.length - 1)]
+  const description = ZONE_DESCRIPTIONS[s.nextInt(0, ZONE_DESCRIPTIONS.length - 1)]
+
+  return {
+    id: 'random',
+    name,
+    description,
+    arenaSize: effectiveConstraints.arenaSize,
+    floorColor,
+    skyColor,
+    lighting,
+    structures,
+    ctSpawns,
+    tSpawns,
+    bombsites,
+  }
+}
