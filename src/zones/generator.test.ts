@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { createSeed } from './generator'
+import { createSeed, DEFAULT_CONSTRAINTS } from './generator'
+import type { GenerationConstraints } from './generator'
 
 describe('createSeed', () => {
   it('creates a seed with deterministic output', () => {
@@ -37,5 +38,54 @@ describe('createSeed', () => {
       expect(val).toBeLessThanOrEqual(15)
       expect(Number.isInteger(val)).toBe(true)
     }
+  })
+})
+
+describe('GenerationConstraints', () => {
+  it('is a type that accepts all constraint fields', () => {
+    const c: GenerationConstraints = {
+      arenaSize: 50,
+      minStructures: 5,
+      maxStructures: 20,
+      structureDensity: 0.4,
+      ensureConnectivity: true,
+    }
+    expect(c.arenaSize).toBe(50)
+    expect(c.minStructures).toBe(5)
+    expect(c.maxStructures).toBe(20)
+    expect(c.structureDensity).toBe(0.4)
+    expect(c.ensureConnectivity).toBe(true)
+  })
+})
+
+describe('DEFAULT_CONSTRAINTS', () => {
+  it('provides sensible default values', () => {
+    expect(DEFAULT_CONSTRAINTS.arenaSize).toBeTypeOf('number')
+    expect(DEFAULT_CONSTRAINTS.minStructures).toBeTypeOf('number')
+    expect(DEFAULT_CONSTRAINTS.maxStructures).toBeTypeOf('number')
+    expect(DEFAULT_CONSTRAINTS.structureDensity).toBeTypeOf('number')
+    expect(DEFAULT_CONSTRAINTS.ensureConnectivity).toBeTypeOf('boolean')
+  })
+
+  it('has the correct default values per spec', () => {
+    expect(DEFAULT_CONSTRAINTS.arenaSize).toBe(50)
+    expect(DEFAULT_CONSTRAINTS.minStructures).toBe(30)
+    expect(DEFAULT_CONSTRAINTS.maxStructures).toBe(60)
+    expect(DEFAULT_CONSTRAINTS.structureDensity).toBe(0.4)
+    expect(DEFAULT_CONSTRAINTS.ensureConnectivity).toBe(true)
+  })
+
+  it('has min <= max for structure fields', () => {
+    expect(DEFAULT_CONSTRAINTS.minStructures).toBeLessThanOrEqual(DEFAULT_CONSTRAINTS.maxStructures)
+  })
+
+  it('structureDensity is between 0 and 1', () => {
+    expect(DEFAULT_CONSTRAINTS.structureDensity).toBeGreaterThanOrEqual(0)
+    expect(DEFAULT_CONSTRAINTS.structureDensity).toBeLessThanOrEqual(1)
+  })
+
+  it('matches the GenerationConstraints type', () => {
+    const c: GenerationConstraints = DEFAULT_CONSTRAINTS
+    expect(c).toBeDefined()
   })
 })

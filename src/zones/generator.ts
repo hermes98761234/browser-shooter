@@ -27,3 +27,30 @@ export function createSeed(value?: number): GenerationSeed {
     },
   }
 }
+
+/**
+ * Constraints that bound the random map generation.
+ */
+export interface GenerationConstraints {
+  /** Fixed arena half-extent (world units). Default: 50 */
+  arenaSize: number
+  /** Minimum number of structures to place. Default: 30 */
+  minStructures: number
+  /** Maximum number of structures to place. Default: 60 */
+  maxStructures: number
+  /** Structure fill density (0-1). Default: 0.4 */
+  structureDensity: number
+  /** Ensure connectivity between spawns. Default: true */
+  ensureConnectivity: boolean
+}
+
+/**
+ * Default generation constraints used when none are provided.
+ */
+export const DEFAULT_CONSTRAINTS: GenerationConstraints = {
+  arenaSize: 50,
+  minStructures: 30,
+  maxStructures: 60,
+  structureDensity: 0.4,
+  ensureConnectivity: true,
+}
