@@ -1,14 +1,12 @@
-import type { MapDef } from './MapDef'
-import { DAYLIGHT } from './MapDef'
+import type { ZoneDef } from './ZoneDef'
+import { DAYLIGHT } from './ZoneDef'
 
 /**
- * Mirage — Moroccan-themed, mid-control map. A central mid lane split by the
- * "mid doors", palace blocks guarding A to the south, and the apartments
- * structure feeding B to the north.
+ * Haze — sun-bleached urban district. Mid doors decide the round.
  */
-export const MIRAGE: MapDef = {
-  id: 'mirage',
-  name: 'Mirage',
+export const HAZE: ZoneDef = {
+  id: 'haze',
+  name: 'Haze',
   description: 'Mid doors decide the round. Palace to A, apartments to B.',
   arenaSize: 30,
   floorColor: 0xcdb892,

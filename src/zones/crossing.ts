@@ -1,15 +1,12 @@
-import type { MapDef } from './MapDef'
-import { DAYLIGHT } from './MapDef'
+import type { ZoneDef } from './ZoneDef'
+import { DAYLIGHT } from './ZoneDef'
 
 /**
- * Overpass — a German park-and-canal map with strong verticality. The long
- * canal sweeps up to B in the north; the elevated A site (the "bathrooms" /
- * party plateau) sits behind cover to the south. Raised blocks fake the
- * map's signature elevation changes.
+ * Crossing — urban bridge sector with strong verticality.
  */
-export const OVERPASS: MapDef = {
-  id: 'overpass',
-  name: 'Overpass',
+export const CROSSING: ZoneDef = {
+  id: 'crossing',
+  name: 'Crossing',
   description: 'Verticality and water. Long canal to B, elevated A.',
   arenaSize: 30,
   floorColor: 0x7d8a72,

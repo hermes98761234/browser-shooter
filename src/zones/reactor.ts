@@ -1,14 +1,11 @@
-import type { MapDef } from './MapDef'
+import type { ZoneDef } from './ZoneDef'
 
 /**
- * Nuke — a compact industrial facility. Its trademark stacked bombsites are
- * faked on a single plane: A is a raised platform (the "main hall" floor) to
- * the south, B sits behind low cover to the north, with the central silo
- * dominating the middle. Dim indoor lighting.
+ * Reactor — compact nuclear facility. Raised A platform, B behind the silo.
  */
-export const NUKE: MapDef = {
-  id: 'nuke',
-  name: 'Nuke',
+export const REACTOR: ZoneDef = {
+  id: 'reactor',
+  name: 'Reactor',
   description: 'Compact facility. Raised A platform, B behind the silo.',
   arenaSize: 30,
   floorColor: 0x8a8d90,

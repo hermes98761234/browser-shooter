@@ -1,8 +1,8 @@
-import type { MapDef, MapStructure } from './MapDef'
-import { DAYLIGHT } from './MapDef'
+import type { ZoneDef, ZoneStructure } from './ZoneDef'
+import { DAYLIGHT } from './ZoneDef'
 import { doorway, stairs } from './buildings'
 
-// Faithful Dust2 recreation in the box-geometry MapDef format.
+// Arid — desert zone in box-geometry ZoneDef format.
 //
 // Coordinate orientation (top-down radar view):
 //   +x = east  (A Long / A Site)
@@ -17,21 +17,21 @@ import { doorway, stairs } from './buildings'
 //   Mid        x  -2 → +8    (10 units, walls at x=-2 and x=+8)
 //   B Tunnels  x -38 → -50   (12 units, east wall at x=-38)
 
-type Mat = MapStructure['material']
+type Mat = ZoneStructure['material']
 
 const box = (
   center: [number, number, number],
   size: [number, number, number],
   material: Mat,
-): MapStructure => ({ center, size, material })
+): ZoneStructure => ({ center, size, material })
 
-const platform = (cx: number, cz: number, w: number, d: number, h: number, mat: Mat): MapStructure =>
+const platform = (cx: number, cz: number, w: number, d: number, h: number, mat: Mat): ZoneStructure =>
   box([cx, h / 2, cz], [w, h, d], mat)
 
-const ceiling = (cx: number, cz: number, w: number, d: number): MapStructure =>
+const ceiling = (cx: number, cz: number, w: number, d: number): ZoneStructure =>
   box([cx, 5.25, cz], [w, 0.5, d], 'concrete')
 
-const crateStack = (x: number, z: number): MapStructure[] => [
+const crateStack = (x: number, z: number): ZoneStructure[] => [
   box([x, 1, z], [2, 2, 2], 'crate'),
   box([x + 2, 1, z], [2, 2, 2], 'crate'),
   box([x + 1, 2.6, z], [2, 1.4, 2], 'crate'),
@@ -41,15 +41,15 @@ const WH = 5   // wall height (matches buildings.ts WALL_H)
 const WT = 0.5 // wall thickness (matches buildings.ts WALL_THICK)
 
 // Solid wall segment helper (axis-aligned box at wall height)
-const wallX = (x1: number, x2: number, z: number, mat: Mat = 'wall'): MapStructure =>
+const wallX = (x1: number, x2: number, z: number, mat: Mat = 'wall'): ZoneStructure =>
   box([(x1 + x2) / 2, WH / 2, z], [Math.abs(x2 - x1), WH, WT], mat)
-const wallZ = (x: number, z1: number, z2: number, mat: Mat = 'wall'): MapStructure =>
+const wallZ = (x: number, z1: number, z2: number, mat: Mat = 'wall'): ZoneStructure =>
   box([x, WH / 2, (z1 + z2) / 2], [WT, WH, Math.abs(z2 - z1)], mat)
 
-export const DUST2: MapDef = {
-  id: 'dust2',
-  name: 'Dust II',
-  description: 'The classic four-lane bomb-defusal map: Mid, A Long, A Short, and B Tunnels.',
+export const ARID: ZoneDef = {
+  id: 'arid',
+  name: 'Arid',
+  description: 'Four-lane desert zone: Mid, A Long, A Short, and B Tunnels.',
   arenaSize: 50,
   skyColor: 0x8ab4d8,  // Dust2 warm blue sky
   fogNear: 40,

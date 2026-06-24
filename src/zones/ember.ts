@@ -1,15 +1,13 @@
-import type { MapDef } from './MapDef'
-import { DAYLIGHT } from './MapDef'
+import type { ZoneDef } from './ZoneDef'
+import { DAYLIGHT } from './ZoneDef'
 
 /**
- * Inferno — tight, Italian-village map of narrow corridors. The infamous
- * "banana" choke leads up to B in the north; the arches and pit guard A to the
- * south. Close-quarters and utility-heavy.
+ * Ember — industrial heat zone of tight corridors.
  */
-export const INFERNO: MapDef = {
-  id: 'inferno',
-  name: 'Inferno',
-  description: 'Tight corridors. Hold banana to B, arches to A.',
+export const EMBER: ZoneDef = {
+  id: 'ember',
+  name: 'Ember',
+  description: 'Tight corridors. Hold the flank to B, arches to A.',
   arenaSize: 30,
   floorColor: 0xb08858,
   lighting: {
