@@ -2,7 +2,7 @@ import { useRef, useEffect, useState, useCallback } from 'react'
 import * as THREE from 'three'
 import { GameEngine } from './engine/GameEngine'
 import { createArena, rebuildArena } from './engine/Arena'
-import { getMap } from './maps/registry'
+import { getZone } from './zones/registry'
 import { Controls } from './player/Controls'
 import { Viewmodel } from './weapons/Viewmodel'
 import { Pickup } from './systems/Pickup'
@@ -300,7 +300,7 @@ function App() {
 
     const fresh = new GameSession(data.matchConfig)
     fresh.collisionWorld = scene
-      ? rebuildArena(scene, getMap(data.matchConfig.mapId))
+      ? rebuildArena(scene, getZone(data.matchConfig.zoneId))
       : data.session.collisionWorld
     fresh.waveManager.wavePauseTimer = 2 // 2s grace before wave 1 (matches pre-refactor behavior)
     fresh.waveManager.onEnemySpawned = data.session.waveManager.onEnemySpawned
@@ -347,7 +347,7 @@ function App() {
       // host's config (received in 'welcome') so the session's map, spawns, and bombsites
       // match the real map — not just the rendered arena. Mirrors hostGame()/startGame().
       const fresh = new GameSession(data.matchConfig)
-      fresh.collisionWorld = rebuildArena(engine.scene, getMap(data.matchConfig.mapId))
+      fresh.collisionWorld = rebuildArena(engine.scene, getZone(data.matchConfig.zoneId))
       fresh.waveManager.onEnemySpawned = data.session.waveManager.onEnemySpawned
       fresh.waveManager.onWaveComplete = data.session.waveManager.onWaveComplete
       fresh.getPlayer(fresh.localId)!.name = settingsRef.current.playerName
@@ -356,12 +356,12 @@ function App() {
       // respects walls and uses the correct map bounds.
       if (data.netClient) {
         data.netClient.collisionWorld = fresh.collisionWorld
-        data.netClient.arenaSize = getMap(data.matchConfig.mapId).arenaSize
+        data.netClient.arenaSize = getZone(data.matchConfig.zoneId).arenaSize
       }
     } else {
       // Host already rebuilt its session with the chosen map in hostGame(); just ensure the
       // rendered arena and collision world match.
-      data.session.collisionWorld = rebuildArena(engine.scene, getMap(data.matchConfig.mapId))
+      data.session.collisionWorld = rebuildArena(engine.scene, getZone(data.matchConfig.zoneId))
     }
     // Grenade inventory lives client-side; without this it stays null in net games,
     // so buying/selecting/throwing grenades silently no-ops (the buy button never leaves 0/N).
@@ -392,7 +392,7 @@ function App() {
     for (const enemy of data.session.enemies) { scene?.remove(enemy.mesh); enemy.dispose() }
     const fresh = new GameSession(config)
     fresh.collisionWorld = scene
-      ? rebuildArena(scene, getMap(config.mapId))
+      ? rebuildArena(scene, getZone(config.zoneId))
       : data.session.collisionWorld
     fresh.waveManager.onEnemySpawned = data.session.waveManager.onEnemySpawned
     fresh.waveManager.onWaveComplete = data.session.waveManager.onWaveComplete
@@ -683,7 +683,7 @@ function App() {
     const engine = new GameEngine(container)
     engineRef.current = engine
     const data = gameDataRef.current
-    data.session.collisionWorld = createArena(engine.scene, getMap(data.session.config.mapId))
+    data.session.collisionWorld = createArena(engine.scene, getZone(data.session.config.zoneId))
     engine.scene.add(engine.camera) // so the camera-parented viewmodel renders
     data.viewmodel = new Viewmodel(engine.camera)
     data.particleSystem = new ParticleSystem(engine.scene)
@@ -1369,9 +1369,9 @@ function App() {
       )}
 
       {gameState === 'teamselect' && (
-        <TeamSelect onBack={() => updateGameState('menu')} onSelect={(t, mapId) => {
+        <TeamSelect onBack={() => updateGameState('menu')} onSelect={(t, zoneId) => {
           setTeam(t)
-          gameDataRef.current.matchConfig = { ...gameDataRef.current.matchConfig, mapId }
+          gameDataRef.current.matchConfig = { ...gameDataRef.current.matchConfig, zoneId }
           startGame()
         }} />
       )}

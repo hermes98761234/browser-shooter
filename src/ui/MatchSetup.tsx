@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import type { MatchConfig, DamagePolicy, JoinPolicy } from '../session/MatchConfig'
 import { defaultCompetitiveConfig } from '../session/MatchConfig'
 import type { GameMode } from '../session/protocol'
-import { MAPS, DEFAULT_MAP_ID } from '../maps/registry'
+import { ZONES, DEFAULT_ZONE_ID } from '../zones/registry'
 import { BattlefieldBackground } from './BattlefieldBackground'
 
 const MODES: { value: GameMode; label: string }[] = [
@@ -30,7 +30,7 @@ export function MatchSetup({ onConfirm, onBack }: { onConfirm: (c: MatchConfig) 
   const [frag, setFrag] = useState(30)
   const [joinPolicy, setJoinPolicy] = useState<JoinPolicy>('lobby')
   const [password, setPassword] = useState('')
-  const [mapId, setMapId] = useState<string>(DEFAULT_MAP_ID)
+  const [zoneId, setZoneId] = useState<string>(DEFAULT_ZONE_ID)
 
   return (
     <div style={{ position: 'absolute', inset: 0, isolation: 'isolate', zIndex: 50 }}>
@@ -47,12 +47,12 @@ export function MatchSetup({ onConfirm, onBack }: { onConfirm: (c: MatchConfig) 
         </div>
       </div>
 
-      <div><div style={{ opacity: 0.6, marginBottom: 6 }}>MAP</div>
+      <div><div style={{ opacity: 0.6, marginBottom: 6 }}>ZONE</div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', maxWidth: 560 }}>
-          {MAPS.map(m => {
-            const active = mapId === m.id
+          {ZONES.map(m => {
+            const active = zoneId === m.id
             return (
-              <button key={m.id} onClick={() => setMapId(m.id)} style={{
+              <button key={m.id} onClick={() => setZoneId(m.id)} style={{
                 cursor: 'pointer', fontFamily: 'monospace', textAlign: 'left',
                 padding: '8px 12px', width: 170, boxSizing: 'border-box',
                 background: active ? '#ff6600' : '#1d1d2a', color: active ? '#000' : '#fff',
@@ -106,7 +106,7 @@ export function MatchSetup({ onConfirm, onBack }: { onConfirm: (c: MatchConfig) 
             ? { ...defaultCompetitiveConfig(), damagePolicy: policy }
             : { mode, damagePolicy: policy, fragLimit: frag }),
           joinPolicy,
-          mapId,
+          zoneId,
           ...(joinPolicy === 'free' && password ? { password } : {}),
         })}>Create Room</button>
       </div>

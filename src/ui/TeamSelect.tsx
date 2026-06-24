@@ -1,21 +1,21 @@
 import { useState } from 'react'
 import type { Team } from '../types'
-import { MAPS, DEFAULT_MAP_ID } from '../maps/registry'
+import { ZONES, DEFAULT_ZONE_ID } from '../zones/registry'
 import { BattlefieldBackground } from './BattlefieldBackground'
 
 interface TeamSelectProps {
-  onSelect: (team: Team, mapId: string) => void
+  onSelect: (team: Team, zoneId: string) => void
   onBack?: () => void
   selected?: Team
   counts?: { ct: number; t: number }
 }
 
 export function TeamSelect({ onSelect, onBack, selected, counts }: TeamSelectProps) {
-  const [mapId, setMapId] = useState<string>(DEFAULT_MAP_ID)
+  const [zoneId, setZoneId] = useState<string>(DEFAULT_ZONE_ID)
 
   const card = (team: Team, label: string, bg: string, border: string) => (
     <button
-      onClick={() => onSelect(team, mapId)}
+      onClick={() => onSelect(team, zoneId)}
       style={{
         padding: '20px 32px', background: bg, color: '#fff',
         border: selected === team ? '3px solid #fff' : `1px solid ${border}`,
@@ -36,12 +36,12 @@ export function TeamSelect({ onSelect, onBack, selected, counts }: TeamSelectPro
       boxSizing: 'border-box', overflowY: 'auto',
     }}>
       <BattlefieldBackground />
-      <h2 style={{ margin: 0 }}>CHOOSE YOUR MAP</h2>
+      <h2 style={{ margin: 0 }}>CHOOSE YOUR ZONE</h2>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', maxWidth: 560 }}>
-        {MAPS.map((m) => {
-          const active = mapId === m.id
+        {ZONES.map((m) => {
+          const active = zoneId === m.id
           return (
-            <button key={m.id} onClick={() => setMapId(m.id)} style={{
+            <button key={m.id} onClick={() => setZoneId(m.id)} style={{
               cursor: 'pointer', fontFamily: 'monospace', textAlign: 'left',
               padding: '8px 12px', width: 170, boxSizing: 'border-box',
               background: active ? '#ff6600' : '#1d1d2a', color: active ? '#000' : '#fff',
