@@ -12,7 +12,7 @@ import { doorway, stairs } from './buildings'
 //
 // Arena ±50 (100×100 world units).  One unit ≈ 50 Hammer units.
 //
-// Corridor widths (matching real Dust2 proportions):
+// Corridor widths:
 //   Long A     x +38 → +50   (12 units, west wall at x=+38)
 //   Mid        x  -2 → +8    (10 units, walls at x=-2 and x=+8)
 //   B Tunnels  x -38 → -50   (12 units, east wall at x=-38)
@@ -51,7 +51,7 @@ export const ARID: ZoneDef = {
   name: 'Arid',
   description: 'Four-lane desert zone: Mid, A Long, A Short, and B Tunnels.',
   arenaSize: 50,
-  skyColor: 0x8ab4d8,  // Dust2 warm blue sky
+  skyColor: 0x8ab4d8,  // warm blue sky
   fogNear: 40,
   fogFar: 120,
   floorColor: 0xc2a470,

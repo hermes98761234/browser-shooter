@@ -30,12 +30,12 @@ describe('pickSpawn', () => {
     expect(spawns.size).toBeGreaterThanOrEqual(2)
   })
 
-  it('defaults to the default map when none is given', () => {
+  it('defaults to the default zone when none is given', () => {
     const pos = pickSpawn('ct', undefined, 0)
     expect(pos.y).toBe(2)
   })
 
-  it('honors each map\'s own spawn points', () => {
+  it('honors each zone\'s own spawn points', () => {
     const haze = getZone('haze')
     const pos = pickSpawn('ct', haze, 0)
     expect([pos.x, pos.z]).toEqual([haze.ctSpawns[0][0], haze.ctSpawns[0][1]])

@@ -16,7 +16,7 @@ export const CROSSING: ZoneDef = {
     sunColor: 0xf0f4e8,
   },
   structures: [
-    // The overpass — a long elevated wall splitting the map
+    // The overpass — a long elevated wall splitting the zone
     { center: [0, 3, -2], size: [22, 1, 2], material: 'concrete' },
     { center: [-11, 1.5, -2], size: [1, 3, 2], material: 'concrete' }, // support
     { center: [11, 1.5, -2], size: [1, 3, 2], material: 'concrete' }, // support

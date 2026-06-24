@@ -27,7 +27,7 @@ function materialFor(kind: StructureMaterial): THREE.MeshStandardMaterial {
 /**
  * Builds a map (floor, perimeter walls, cover, bombsite markers, lighting) from
  * a {@link ZoneDef} into a single named group added to `scene`, and returns its
- * CollisionWorld. Defaults to the registry's default map (Dust2).
+ * CollisionWorld. Defaults to the registry's default zone (Arid).
  */
 export function createArena(scene: THREE.Scene, map: ZoneDef = getZone()): CollisionWorld {
   const world = new CollisionWorld()
