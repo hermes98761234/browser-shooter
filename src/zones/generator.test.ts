@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { createSeed, DEFAULT_CONSTRAINTS } from './generator'
+import { createSeed, DEFAULT_CONSTRAINTS, validateConnectivity } from './generator'
 import type { GenerationConstraints } from './generator'
+import type { ZoneDef } from './ZoneDef'
 
 describe('createSeed', () => {
   it('creates a seed with deterministic output', () => {
@@ -87,5 +88,63 @@ describe('DEFAULT_CONSTRAINTS', () => {
   it('matches the GenerationConstraints type', () => {
     const c: GenerationConstraints = DEFAULT_CONSTRAINTS
     expect(c).toBeDefined()
+  })
+})
+
+describe('validateConnectivity', () => {
+  it('returns true for a valid zone with clear paths', () => {
+    const zone: ZoneDef = {
+      id: 'test',
+      name: 'Test',
+      description: 'Test zone',
+      arenaSize: 30,
+      floorColor: 0xcccccc,
+      lighting: {
+        ambientColor: 0xffffff,
+        ambientIntensity: 1,
+        sunColor: 0xffffff,
+        sunIntensity: 1,
+        sunPosition: [0, 10, 0],
+      },
+      structures: [],
+      tSpawns: [[0, 20]],
+      ctSpawns: [[0, -20]],
+      bombsites: [
+        { id: 'A', center: [14, 0] },
+        { id: 'B', center: [-14, 0] },
+      ],
+    }
+    expect(validateConnectivity(zone)).toBe(true)
+  })
+
+  it('returns false when CT spawn is blocked', () => {
+    const zone: ZoneDef = {
+      id: 'test',
+      name: 'Test',
+      description: 'Test zone',
+      arenaSize: 30,
+      floorColor: 0xcccccc,
+      lighting: {
+        ambientColor: 0xffffff,
+        ambientIntensity: 1,
+        sunColor: 0xffffff,
+        sunIntensity: 1,
+        sunPosition: [0, 10, 0],
+      },
+      structures: [
+        {
+          center: [0, 2.5, -20],
+          size: [60, 5, 2],
+          material: 'wall',
+        },
+      ],
+      tSpawns: [[0, 20]],
+      ctSpawns: [[0, -20]],
+      bombsites: [
+        { id: 'A', center: [14, 0] },
+        { id: 'B', center: [-14, 0] },
+      ],
+    }
+    expect(validateConnectivity(zone)).toBe(false)
   })
 })

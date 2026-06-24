@@ -1,3 +1,5 @@
+import type { ZoneDef } from './ZoneDef'
+
 export interface GenerationSeed {
   value: number
   next(): number
@@ -53,4 +55,117 @@ export const DEFAULT_CONSTRAINTS: GenerationConstraints = {
   maxStructures: 60,
   structureDensity: 0.4,
   ensureConnectivity: true,
+}
+
+/** Grid step size for the flood-fill connectivity check. */
+const CONNECTIVITY_GRID_STEP = 2
+
+/**
+ * Returns true if the given (x, z) point lies inside any structure's AABB
+ * on the XZ plane (treating structures as solid obstacles).
+ */
+function isBlockedByStructure(
+  x: number,
+  z: number,
+  structures: ZoneDef['structures']
+): boolean {
+  for (const s of structures) {
+    const [cx, , cz] = s.center
+    const [sw, , sd] = s.size
+    const halfW = sw / 2
+    const halfD = sd / 2
+    if (
+      x >= cx - halfW &&
+      x <= cx + halfW &&
+      z >= cz - halfD &&
+      z <= cz + halfD
+    ) {
+      return true
+    }
+  }
+  return false
+}
+
+/**
+ * Validates that all CT spawns and bombsites are reachable from at least one
+ * T spawn, using a BFS flood-fill that treats structures as solid obstacles.
+ *
+ * Returns true if every CT spawn and every bombsite is reachable, false otherwise.
+ * Returns false if there are no T spawns to start from.
+ */
+export function validateConnectivity(zone: ZoneDef): boolean {
+  const { tSpawns, ctSpawns, bombsites, structures, arenaSize } = zone
+
+  if (tSpawns.length === 0) return false
+  if (ctSpawns.length === 0 && bombsites.length === 0) return true
+
+  // Build set of target keys we need to reach
+  const targets = new Set<string>()
+  for (const [tx, tz] of ctSpawns) {
+    targets.add(`${tx},${tz}`)
+  }
+  for (const b of bombsites) {
+    targets.add(`${b.center[0]},${b.center[1]}`)
+  }
+
+  // BFS from all T spawns simultaneously
+  const visited = new Set<string>()
+  const queue: [number, number][] = []
+
+  for (const [sx, sz] of tSpawns) {
+    const key = `${sx},${sz}`
+    if (!visited.has(key)) {
+      visited.add(key)
+      queue.push([sx, sz])
+    }
+  }
+
+  const step = CONNECTIVITY_GRID_STEP
+  let reachedCount = 0
+
+  // Check if any spawn is itself a target
+  for (const [sx, sz] of tSpawns) {
+    const key = `${sx},${sz}`
+    if (targets.has(key)) {
+      reachedCount++
+    }
+  }
+
+  while (queue.length > 0) {
+    const [cx, cz] = queue.shift()!
+
+    // Explore 4-neighbourhood (cardinal directions on the XZ plane)
+    const neighbours: [number, number][] = [
+      [cx + step, cz],
+      [cx - step, cz],
+      [cx, cz + step],
+      [cx, cz - step],
+    ]
+
+    for (const [nx, nz] of neighbours) {
+      // Stay within arena bounds
+      if (nx < -arenaSize || nx > arenaSize || nz < -arenaSize || nz > arenaSize) {
+        continue
+      }
+
+      const key = `${nx},${nz}`
+      if (visited.has(key)) continue
+      visited.add(key)
+
+      // Skip if blocked by a structure
+      if (isBlockedByStructure(nx, nz, structures)) continue
+
+      // Check if this cell is a target
+      if (targets.has(key)) {
+        reachedCount++
+        if (reachedCount >= targets.size) {
+          return true
+        }
+      }
+
+      queue.push([nx, nz])
+    }
+  }
+
+  return reachedCount >= targets.size
 }
