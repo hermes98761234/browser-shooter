@@ -1,4 +1,4 @@
-import type { ZoneDef } from './ZoneDef'
+import type { ZoneDef, ZoneStructure, ZoneBombsite } from './ZoneDef'
 
 export interface GenerationSeed {
   value: number
@@ -168,4 +168,148 @@ export function validateConnectivity(zone: ZoneDef): boolean {
   }
 
   return reachedCount >= targets.size
+}
+
+// ─── Task 4: Structure Generation Helpers ────────────────────────────────────
+
+const WALL_GRID_STEP = 10
+const WALL_HEIGHT = 5
+const WALL_THICKNESS = 0.5
+const WALL_CHANCE = 0.6
+
+const COVER_MATERIALS: ZoneStructure['material'][] = ['crate', 'metal', 'wood']
+const COVER_MIN_SIZE = 2
+const COVER_MAX_SIZE = 4
+const COVER_MIN_RATIO = 0.3
+const COVER_MAX_RATIO = 0.5
+
+const SPAWN_COUNT = 4
+
+/**
+ * Generate corridor walls along grid lines.
+ * Walls are placed on grid lines (step 10) with 60% chance per line segment.
+ * Each wall has height 5 and thickness 0.5.
+ */
+export function generateWalls(
+  seed: GenerationSeed,
+  constraints: GenerationConstraints
+): ZoneStructure[] {
+  const walls: ZoneStructure[] = []
+  const { arenaSize } = constraints
+  const range = Math.floor(arenaSize / WALL_GRID_STEP)
+
+  // Horizontal walls (along X axis, fixed Z grid lines)
+  for (let gz = -range; gz <= range; gz++) {
+    const z = gz * WALL_GRID_STEP
+    if (seed.next() < WALL_CHANCE) {
+      // Place a wall segment along X at this Z
+      const segLength = (range * WALL_GRID_STEP) * (0.5 + seed.next() * 0.5)
+      const startX = -range * WALL_GRID_STEP + seed.next() * (2 * range * WALL_GRID_STEP - segLength)
+      walls.push({
+        center: [startX + segLength / 2, WALL_HEIGHT / 2, z],
+        size: [segLength, WALL_HEIGHT, WALL_THICKNESS],
+        material: 'wall',
+      })
+    }
+  }
+
+  // Vertical walls (along Z axis, fixed X grid lines)
+  for (let gx = -range; gx <= range; gx++) {
+    const x = gx * WALL_GRID_STEP
+    if (seed.next() < WALL_CHANCE) {
+      const segLength = (range * WALL_GRID_STEP) * (0.5 + seed.next() * 0.5)
+      const startZ = -range * WALL_GRID_STEP + seed.next() * (2 * range * WALL_GRID_STEP - segLength)
+      walls.push({
+        center: [x, WALL_HEIGHT / 2, startZ + segLength / 2],
+        size: [WALL_THICKNESS, WALL_HEIGHT, segLength],
+        material: 'wall',
+      })
+    }
+  }
+
+  return walls
+}
+
+/**
+ * Generate cover structures (crates, metal boxes, wood boxes).
+ * Count is 30-50% of minStructures. Size ranges from 2 to 4.
+ */
+export function generateCover(
+  seed: GenerationSeed,
+  constraints: GenerationConstraints
+): ZoneStructure[] {
+  const cover: ZoneStructure[] = []
+  const { arenaSize, minStructures } = constraints
+  const count = Math.floor(
+    minStructures * (COVER_MIN_RATIO + seed.next() * (COVER_MAX_RATIO - COVER_MIN_RATIO))
+  )
+
+  for (let i = 0; i < count; i++) {
+    const material = COVER_MATERIALS[seed.nextInt(0, COVER_MATERIALS.length - 1)]
+    const w = seed.nextInt(COVER_MIN_SIZE, COVER_MAX_SIZE)
+    const h = seed.nextInt(COVER_MIN_SIZE, COVER_MAX_SIZE)
+    const d = seed.nextInt(COVER_MIN_SIZE, COVER_MAX_SIZE)
+    const x = seed.nextInt(-arenaSize + w, arenaSize - w)
+    const z = seed.nextInt(-arenaSize + d, arenaSize - d)
+
+    cover.push({
+      center: [x, h / 2, z],
+      size: [w, h, d],
+      material,
+    })
+  }
+
+  return cover
+}
+
+/**
+ * Generate spawn points: 4 T spawns in the south (z > 0) and 4 CT spawns in the north (z < 0).
+ */
+export function generateSpawns(
+  seed: GenerationSeed,
+  constraints: GenerationConstraints
+): { tSpawns: [number, number][]; ctSpawns: [number, number][] } {
+  const { arenaSize } = constraints
+  const tSpawns: [number, number][] = []
+  const ctSpawns: [number, number][] = []
+
+  const southZoneStart = Math.floor(arenaSize * 0.3)
+  const southZoneEnd = Math.floor(arenaSize * 0.8)
+  const northZoneStart = -southZoneEnd
+  const northZoneEnd = -southZoneStart
+
+  for (let i = 0; i < SPAWN_COUNT; i++) {
+    const x = seed.nextInt(-arenaSize + 2, arenaSize - 2)
+    const z = seed.nextInt(southZoneStart, southZoneEnd)
+    tSpawns.push([x, z])
+  }
+
+  for (let i = 0; i < SPAWN_COUNT; i++) {
+    const x = seed.nextInt(-arenaSize + 2, arenaSize - 2)
+    const z = seed.nextInt(northZoneStart, northZoneEnd)
+    ctSpawns.push([x, z])
+  }
+
+  return { tSpawns, ctSpawns }
+}
+
+/**
+ * Generate bombsites: A on the east (x > 0) and B on the west (x < 0).
+ */
+export function generateBombsites(
+  seed: GenerationSeed,
+  constraints: GenerationConstraints
+): ZoneBombsite[] {
+  const { arenaSize } = constraints
+
+  const aX = seed.nextInt(Math.floor(arenaSize * 0.3), Math.floor(arenaSize * 0.8))
+  const aZ = seed.nextInt(-Math.floor(arenaSize * 0.6), Math.floor(arenaSize * 0.6))
+
+  const bX = seed.nextInt(-Math.floor(arenaSize * 0.8), -Math.floor(arenaSize * 0.3))
+  const bZ = seed.nextInt(-Math.floor(arenaSize * 0.6), Math.floor(arenaSize * 0.6))
+
+  return [
+    { id: 'A', center: [aX, aZ] },
+    { id: 'B', center: [bX, bZ] },
+  ]
 }
