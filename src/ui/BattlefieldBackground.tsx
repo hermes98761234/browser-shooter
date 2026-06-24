@@ -2,7 +2,7 @@ import React from 'react'
 import './battlefield-bg.css'
 
 // CSS custom property values don't match React.CSSProperties types, so we extend here
-type BfStyle = React.CSSProperties & Record<string, string>
+type BfStyle = React.CSSProperties & Record<string, unknown>
 
 export const BattlefieldBackground: React.FC = () => (
   <div className="bf-root" aria-hidden="true">
