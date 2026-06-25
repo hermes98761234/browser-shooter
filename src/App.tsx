@@ -51,6 +51,8 @@ import { loadSettings, saveSettings, mobileControlsActive, type Settings } from 
 import { resolveCrosshair } from './settings/Crosshair'
 import { stepBloom } from './weapons/CrosshairBloom'
 import { MatchSetup } from './ui/MatchSetup'
+import { MapEditor } from './ui/MapEditor'
+import type { SavedMap } from './zones/mapStore'
 import { RoundState } from './session/RoundManager'
 import { KillFeed, type KillLine } from './ui/KillFeed'
 import type { HitZone } from './systems/DamageZones'
@@ -394,7 +396,7 @@ function App() {
     for (const enemy of data.session.enemies) { scene?.remove(enemy.mesh); enemy.dispose() }
     const fresh = new GameSession(config)
     fresh.collisionWorld = scene
-      ? rebuildArena(scene, getZone(config.zoneId, config.randomSeed))
+      ? rebuildArena(scene, getZone(config.zoneId, config.randomSeed, config.customZone))
       : data.session.collisionWorld
     fresh.waveManager.onEnemySpawned = data.session.waveManager.onEnemySpawned
     fresh.waveManager.onWaveComplete = data.session.waveManager.onWaveComplete
@@ -1453,6 +1455,13 @@ function App() {
         <MatchSetup
           onBack={() => setShowMatchSetup(false)}
           onConfirm={(c) => { setShowMatchSetup(false); void hostGame(c).catch(() => setJoinError('Could not start hosting.')) }}
+          onCreateMap={() => { setShowMatchSetup(false); updateGameState('mapeditor') }}
+        />
+      )}
+      {gameState === 'mapeditor' && (
+        <MapEditor
+          onSave={(_map: SavedMap) => { updateGameState('mpmenu'); setShowMatchSetup(true) }}
+          onCancel={() => { updateGameState('mpmenu'); setShowMatchSetup(true) }}
         />
       )}
 
