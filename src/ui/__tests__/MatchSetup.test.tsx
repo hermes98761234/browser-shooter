@@ -18,4 +18,13 @@ describe('MatchSetup join policy', () => {
     fireEvent.click(screen.getByText('Create Room'))
     expect(onConfirm).toHaveBeenCalledWith(expect.objectContaining({ joinPolicy: 'free', password: 's3cret' }))
   })
+
+  it('lobby + password is passed through on confirm', () => {
+    const onConfirm = vi.fn()
+    render(<MatchSetup onConfirm={onConfirm} onBack={vi.fn()} />)
+    // joinPolicy defaults to 'lobby' — password field should now be visible
+    fireEvent.change(screen.getByPlaceholderText(/password/i), { target: { value: 'secret' } })
+    fireEvent.click(screen.getByText('Create Room'))
+    expect(onConfirm).toHaveBeenCalledWith(expect.objectContaining({ joinPolicy: 'lobby', password: 'secret' }))
+  })
 })

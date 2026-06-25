@@ -87,16 +87,14 @@ export function MatchSetup({ onConfirm, onBack }: { onConfirm: (c: MatchConfig) 
           <button style={btn(joinPolicy === 'lobby')} onClick={() => setJoinPolicy('lobby')}>Lobby</button>
           <button style={btn(joinPolicy === 'free')} onClick={() => setJoinPolicy('free')}>Free</button>
         </div>
-        {joinPolicy === 'free' && (
-          <input
-            placeholder="Password (optional)"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            style={{ marginTop: 8, padding: 8, fontFamily: 'monospace', fontSize: 16,
-              background: '#1d1d2a', color: '#fff', border: '1px solid #3a3a55',
-              width: 'min(220px, calc(100vw - 64px))', boxSizing: 'border-box' }}
-          />
-        )}
+        <input
+          placeholder="Password (optional)"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          style={{ marginTop: 8, padding: 8, fontFamily: 'monospace', fontSize: 16,
+            background: '#1d1d2a', color: '#fff', border: '1px solid #3a3a55',
+            width: 'min(220px, calc(100vw - 64px))', boxSizing: 'border-box' }}
+        />
       </div>
 
       <div style={{ display: 'flex', gap: 12, marginTop: 12 }}>
@@ -107,7 +105,7 @@ export function MatchSetup({ onConfirm, onBack }: { onConfirm: (c: MatchConfig) 
             : { mode, damagePolicy: policy, fragLimit: frag }),
           joinPolicy,
           zoneId,
-          ...(joinPolicy === 'free' && password ? { password } : {}),
+          ...(password ? { password } : {}),
         })}>Create Room</button>
       </div>
       </div>
