@@ -30,7 +30,7 @@ export const PreJoinPrompt: React.FC<PreJoinPromptProps> = ({ protected: isProte
         boxShadow: '0 0 40px rgba(0,0,0,0.8)',
       }}>
         <div style={{ fontSize: 10, color: '#5aff8a', letterSpacing: 3, opacity: 0.8 }}>JOIN MATCH</div>
-        <h3 style={{ margin: 0, fontSize: 18, letterSpacing: 2, color: '#fff' }}>SELECT TEAM</h3>
+        {showTeam && <h3 style={{ margin: 0, fontSize: 18, letterSpacing: 2, color: '#fff' }}>SELECT TEAM</h3>}
 
         {showTeam && (
           <div style={{ display: 'flex', gap: 10 }}>

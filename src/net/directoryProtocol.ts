@@ -16,7 +16,7 @@ export interface DirectoryEntry {
   status: ServerStatus
   mode?: string
   joinPolicy?: JoinPolicy   // 'lobby' (default) | 'free'
-  protected?: boolean       // true when a free game has a non-empty password
+  protected?: boolean       // true when a game has a non-empty password
 }
 
 /** Messages carried on the directory channel (distinct from the game NetMessage protocol). */
