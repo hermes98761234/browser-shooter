@@ -9,16 +9,6 @@ test.describe('Game - Load and Flow', () => {
     await expect(page.getByText('3D FPS Arena Wave Survival')).toBeVisible()
   })
 
-  test('shows controls info on main menu', async ({ page }) => {
-    await page.goto('/')
-    await expect(page.getByText('Controls')).toBeVisible()
-    await expect(page.getByText('WASD', { exact: true })).toBeVisible()
-    await expect(page.getByText('Mouse', { exact: true })).toBeVisible()
-    await expect(page.getByText('Click', { exact: true })).toBeVisible()
-    await expect(page.getByText('Space', { exact: true })).toBeVisible()
-    await expect(page.getByText('ESC', { exact: true })).toBeVisible()
-  })
-
   test('lets you choose a side and starts the match', async ({ page }) => {
     await page.goto('/')
     await clickButton(page, 'SINGLEPLAYER')

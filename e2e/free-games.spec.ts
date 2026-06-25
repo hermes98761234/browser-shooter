@@ -103,7 +103,7 @@ test.describe('free games, passwords, disconnect', () => {
 
     // Select Free join policy → password input appears
     await host.getByRole('button', { name: /^free$/i }).click({ force: true })
-    await host.getByPlaceholder(/password \(optional\)/i).fill('s3cret')
+    await host.getByPlaceholder(/password \(optional\)/i).last().fill('s3cret')
     await host.getByRole('button', { name: /create room/i }).last().click({ force: true })
 
     // Wait for room code; if broker unreachable, skip

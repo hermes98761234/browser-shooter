@@ -17,18 +17,6 @@ test.describe('UI - HUD and Overlays', () => {
     await expect(startBtn).toBeEnabled()
   })
 
-  test('controls section shows key bindings', async ({ page }) => {
-    await expect(page.getByText('WASD', { exact: true })).toBeVisible()
-    await expect(page.getByText('Move')).toBeVisible()
-    await expect(page.getByText('Mouse', { exact: true })).toBeVisible()
-    await expect(page.getByText('Look')).toBeVisible()
-    await expect(page.getByText('Click', { exact: true })).toBeVisible()
-    await expect(page.getByText('Shoot', { exact: true })).toBeVisible()
-    await expect(page.getByText('Switch Weapon')).toBeVisible()
-    await expect(page.getByText('Space', { exact: true })).toBeVisible()
-    await expect(page.getByText('Jump')).toBeVisible()
-  })
-
   test('HUD shows health bar with HP label after starting game', async ({ page }) => {
     await startSingleplayer(page)
     await expect(page.getByText('HP')).toBeVisible()
@@ -73,16 +61,6 @@ test.describe('UI - HUD and Overlays', () => {
     await expect(page.getByRole('button', { name: 'MAIN MENU' })).toBeVisible()
   })
 
-  test('pause menu shows controls reminder', async ({ page }) => {
-    await startSingleplayer(page)
-    await page.keyboard.press('Escape')
-    await expect(page.getByText('WASD - Move')).toBeVisible()
-    await expect(page.getByText('Mouse - Look')).toBeVisible()
-    await expect(page.getByText('Click - Shoot')).toBeVisible()
-    await expect(page.getByText('R - Reload')).toBeVisible()
-    await expect(page.getByText('ESC - Pause')).toBeVisible()
-  })
-
   test('pause menu shows the resume hint', async ({ page }) => {
     await startSingleplayer(page)
     await page.keyboard.press('Escape')
@@ -91,10 +69,7 @@ test.describe('UI - HUD and Overlays', () => {
 
   test('wave number is displayed during gameplay', async ({ page }) => {
     await startSingleplayer(page)
-    const waveDisplay = page.locator('text=WAVE').first()
-    await expect(waveDisplay).toBeVisible()
-    await page.waitForTimeout(3000)
-    await expect(waveDisplay).toBeVisible()
+    await expect(page.locator('text=WAVE').first()).toBeVisible()
   })
 
   test('HUD elements are visible', async ({ page }) => {

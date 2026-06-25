@@ -4,7 +4,7 @@ test.describe('Lobby Enhancement', () => {
   test('shows three connection options', async ({ page }) => {
     await page.goto('/')
     await page.click('text=Multiplayer')
-    await expect(page.locator('text=Quick Match')).toBeVisible()
+    await expect(page.getByRole('button', { name: /quick match/i })).toBeVisible()
     await expect(page.locator('text=Create Room')).toBeVisible()
   })
 

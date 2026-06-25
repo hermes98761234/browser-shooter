@@ -17,7 +17,8 @@ test('two players join the same room and see each other', async ({ browser }) =>
 
   await host.goto('/')
   await host.getByText(/multiplayer/i).click({ force: true })
-  await host.getByText(/host game/i).click({ force: true })
+  await host.getByRole('button', { name: /create room/i }).first().click({ force: true })
+  await host.getByRole('button', { name: /create room/i }).last().click({ force: true })
 
   // Wait for the room code to appear; if the broker never opens, skip.
   const codeLocator = host.locator('strong').first()
@@ -58,7 +59,8 @@ test('a hosted game appears in another player\'s server list and is joinable', a
 
   await host.goto('/')
   await host.getByText(/multiplayer/i).click({ force: true })
-  await host.getByText(/host game/i).click({ force: true })
+  await host.getByRole('button', { name: /create room/i }).first().click({ force: true })
+  await host.getByRole('button', { name: /create room/i }).last().click({ force: true })
 
   // Wait for the room code; if the broker never opens, skip.
   const codeLocator = host.locator('strong').first()
@@ -115,7 +117,8 @@ test('a hidden host keeps broadcasting snapshots to the joiner', async ({ browse
 
   await host.goto('/')
   await host.getByText(/multiplayer/i).click({ force: true })
-  await host.getByText(/host game/i).click({ force: true })
+  await host.getByRole('button', { name: /create room/i }).first().click({ force: true })
+  await host.getByRole('button', { name: /create room/i }).last().click({ force: true })
 
   // Wait for the room code; if the broker never opens, skip.
   const codeLocator = host.locator('strong').first()
