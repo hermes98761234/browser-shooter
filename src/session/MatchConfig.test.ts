@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { canDamage, defaultMatchConfig, defaultCompetitiveConfig } from './MatchConfig'
+import type { MatchConfig } from './MatchConfig'
 
 describe('canDamage', () => {
   it('team policy: only opposite teams', () => {
