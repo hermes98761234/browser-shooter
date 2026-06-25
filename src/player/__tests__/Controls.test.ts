@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { Controls } from '../Controls'
+import { DEFAULT_KEYMAP } from '../../settings/Settings'
 
 // jsdom doesn't implement pointer lock APIs — mock them globally
 if (!(document as any).exitPointerLock) {
@@ -239,6 +240,16 @@ describe('Controls', () => {
     })
     document.dispatchEvent(new Event('pointerlockchange'))
     expect(controls.shoot).toBe(false)
+  })
+
+  it('respects custom keymap — ArrowUp sets forward, KeyW does not', () => {
+    controls.destroy()
+    const customKeymap = { ...DEFAULT_KEYMAP, forward: 'ArrowUp' }
+    controls = new Controls(element, () => 'playing', customKeymap)
+    document.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW' }))
+    expect(controls.forward).toBe(false)
+    document.dispatchEvent(new KeyboardEvent('keydown', { code: 'ArrowUp' }))
+    expect(controls.forward).toBe(true)
   })
 })
 

@@ -1,6 +1,5 @@
+import { DEFAULT_KEYMAP, type Keymap } from '../settings/Settings'
 import type { GameState, Team } from '../types'
-
-const PUSH_TO_TALK_KEY = 'KeyK'
 
 export class Controls {
   forward = false
@@ -11,6 +10,7 @@ export class Controls {
   shoot = false
   private element: HTMLElement
   private getGameState: () => GameState
+  private keymap: Keymap
   private boundKeyDown: (e: KeyboardEvent) => void
   private boundKeyUp: (e: KeyboardEvent) => void
   private boundMouseDown: (e: MouseEvent) => void
@@ -19,7 +19,7 @@ export class Controls {
   onMouseMove: ((e: MouseEvent) => void) | null = null
   onCycleWeapon: (() => void) | null = null
   onToggleStore: (() => void) | null = null
-  /** Fired on Tab down (true) / up (false) to show/hide the scoreboard. */
+  /** Fired on scoreboard key down (true) / up (false) to show/hide the scoreboard. */
   onScoreboard: ((show: boolean) => void) | null = null
   onThrowGrenade: ((mode: 'long' | 'short') => void) | null = null
   /** Authority-only: add a bot to the given team / remove the last bot. */
@@ -36,9 +36,10 @@ export class Controls {
   private talkHeld = false
   private scoreboardHeld = false
 
-  constructor(element: HTMLElement, getGameState: () => GameState) {
+  constructor(element: HTMLElement, getGameState: () => GameState, keymap: Keymap = DEFAULT_KEYMAP) {
     this.element = element
     this.getGameState = getGameState
+    this.keymap = keymap
 
     this.boundKeyDown = (e: KeyboardEvent) => this.onKeyDown(e)
     this.boundKeyUp = (e: KeyboardEvent) => this.onKeyUp(e)
@@ -64,46 +65,46 @@ export class Controls {
   }
 
   private onKeyDown(e: KeyboardEvent) {
-    switch (e.code) {
-      case 'KeyW': this.forward = true; break
-      case 'KeyS': this.backward = true; break
-      case 'KeyA': this.left = true; break
-      case 'KeyD': this.right = true; break
-      case 'Space': this.jump = true; break
-      case 'Tab':
-        e.preventDefault()
-        if (!this.scoreboardHeld) { this.scoreboardHeld = true; this.onScoreboard?.(true) }
-        break
-      case 'KeyB': e.preventDefault(); this.onToggleStore?.(); break
-      case 'Digit4': this.onSelectGrenade?.('he'); break
-      case 'Digit5': this.onSelectGrenade?.('flash'); break
-      case 'Digit6': this.onSelectGrenade?.('smoke'); break
-      case 'KeyG': this.onCycleGrenade?.(); break
-      case 'BracketLeft': this.onAddBot?.('ct'); break
-      case 'BracketRight': this.onAddBot?.('t'); break
-      case 'Backslash': this.onRemoveBot?.(); break
-      case PUSH_TO_TALK_KEY:
-        if (!this.talkHeld) { this.talkHeld = true; this.onTalkStart?.() }
-        break
+    const km = this.keymap
+    if (e.code === km.forward) { this.forward = true; return }
+    if (e.code === km.backward) { this.backward = true; return }
+    if (e.code === km.left) { this.left = true; return }
+    if (e.code === km.right) { this.right = true; return }
+    if (e.code === km.jump) { this.jump = true; return }
+    if (e.code === km.scoreboard) {
+      e.preventDefault()
+      if (!this.scoreboardHeld) { this.scoreboardHeld = true; this.onScoreboard?.(true) }
+      return
+    }
+    if (e.code === km.buy) { e.preventDefault(); this.onToggleStore?.(); return }
+    if (e.code === km.selectGrenadeHE) { this.onSelectGrenade?.('he'); return }
+    if (e.code === km.selectGrenadeFlash) { this.onSelectGrenade?.('flash'); return }
+    if (e.code === km.selectGrenadeSmoke) { this.onSelectGrenade?.('smoke'); return }
+    if (e.code === km.cycleGrenade) { this.onCycleGrenade?.(); return }
+    if (e.code === km.addBotCT) { this.onAddBot?.('ct'); return }
+    if (e.code === km.addBotT) { this.onAddBot?.('t'); return }
+    if (e.code === km.removeBot) { this.onRemoveBot?.(); return }
+    if (e.code === km.pushToTalk) {
+      if (!this.talkHeld) { this.talkHeld = true; this.onTalkStart?.() }
     }
   }
 
   private onKeyUp(e: KeyboardEvent) {
-    switch (e.code) {
-      case 'KeyW': this.forward = false; break
-      case 'KeyS': this.backward = false; break
-      case 'KeyA': this.left = false; break
-      case 'KeyD': this.right = false; break
-      case 'Space': this.jump = false; break
-      case 'Tab':
-        e.preventDefault()
-        this.scoreboardHeld = false
-        this.onScoreboard?.(false)
-        break
-      case PUSH_TO_TALK_KEY:
-        this.talkHeld = false
-        this.onTalkStop?.()
-        break
+    const km = this.keymap
+    if (e.code === km.forward) { this.forward = false; return }
+    if (e.code === km.backward) { this.backward = false; return }
+    if (e.code === km.left) { this.left = false; return }
+    if (e.code === km.right) { this.right = false; return }
+    if (e.code === km.jump) { this.jump = false; return }
+    if (e.code === km.scoreboard) {
+      e.preventDefault()
+      this.scoreboardHeld = false
+      this.onScoreboard?.(false)
+      return
+    }
+    if (e.code === km.pushToTalk) {
+      this.talkHeld = false
+      this.onTalkStop?.()
     }
   }
 
@@ -119,9 +120,6 @@ export class Controls {
         if (document.pointerLockElement !== this.element) {
           this.element.requestPointerLock()
         }
-        // With a grenade selected, left click long-throws; otherwise it fires
-        // the gun. Doing both at once (the old behavior) made every shot also
-        // lob a grenade.
         if (this.onIsGrenadeSelected?.()) {
           this.onThrowGrenade?.('long')
         } else {
