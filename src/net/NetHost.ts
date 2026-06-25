@@ -23,12 +23,14 @@ export class NetHost {
   private hostRosterCb: ((teammates: VoiceRosterEntry[]) => void) | null = null
   private remoteVoiceStartCb: ((playerId: string, name: string) => void) | null = null
   private remoteVoiceStopCb: ((playerId: string) => void) | null = null
+  private clientTeamChangedCb: ((playerId: string, name: string, team: Team) => void) | null = null
 
   setHostVoice(playerId: string, peerId: string): void {
     this.hostVoice = { playerId, peerId }
     this.refreshVoiceRoster()
   }
   onHostRoster(cb: (teammates: VoiceRosterEntry[]) => void): void { this.hostRosterCb = cb }
+  onClientTeamChanged(cb: (playerId: string, name: string, team: Team) => void): void { this.clientTeamChangedCb = cb }
   onRemoteVoiceStart(cb: (playerId: string, name: string) => void): void { this.remoteVoiceStartCb = cb }
   onRemoteVoiceStop(cb: (playerId: string) => void): void { this.remoteVoiceStopCb = cb }
 
@@ -119,6 +121,7 @@ export class NetHost {
         if (entity && (msg.team === 'ct' || msg.team === 't')) {
           entity.team = msg.team; entity.player.position.copy(pickSpawn(msg.team, this.session.map)); this.refreshVoiceRoster()
           this.broadcast({ type: 'teamChanged', playerId, name: entity.name, team: msg.team })
+          this.clientTeamChangedCb?.(playerId, entity.name, msg.team)
         }
       } else if (msg.type === 'plantBomb' && msg.playerId === playerId) {
         this.session.tryPlant(playerId)

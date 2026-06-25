@@ -403,6 +403,9 @@ function App() {
     data.session = fresh
     const netHost = new NetHost(fresh, config)
     data.netHost = netHost
+    netHost.onClientTeamChanged((_id, name, team) => {
+      setRoster((prev) => moveToTeam(prev, name, team))
+    })
     fresh.waveManager.auto = false
     setLobbyPlayers([settingsRef.current.playerName])
     setRoster({ ct: myTeam === 'ct' ? [settingsRef.current.playerName] : [], t: myTeam === 't' ? [settingsRef.current.playerName] : [] })
