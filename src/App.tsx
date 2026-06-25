@@ -52,7 +52,6 @@ import { resolveCrosshair } from './settings/Crosshair'
 import { stepBloom } from './weapons/CrosshairBloom'
 import { MatchSetup } from './ui/MatchSetup'
 import { MapEditor } from './ui/MapEditor'
-import type { SavedMap } from './zones/mapStore'
 import { RoundState } from './session/RoundManager'
 import { KillFeed, type KillLine } from './ui/KillFeed'
 import type { HitZone } from './systems/DamageZones'
@@ -1460,7 +1459,7 @@ function App() {
       )}
       {gameState === 'mapeditor' && (
         <MapEditor
-          onSave={(_map: SavedMap) => { updateGameState('mpmenu'); setShowMatchSetup(true) }}
+          onSave={() => { updateGameState('mpmenu'); setShowMatchSetup(true) }}
           onCancel={() => { updateGameState('mpmenu'); setShowMatchSetup(true) }}
         />
       )}

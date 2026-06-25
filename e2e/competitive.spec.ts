@@ -104,8 +104,8 @@ test.describe('Competitive Mode', () => {
 
     // Wait for buy phase to end (buyPhaseDuration = 15s), then verify round timer
     await expect(host.getByText(/BUY PHASE/)).toBeVisible({ timeout: 10_000 })
-    // Round timer appears after buy phase expires — wait up to 20s for transition
-    await expect(host.getByText(/BUY PHASE/)).not.toBeVisible({ timeout: 20_000 })
+    // Round timer appears after buy phase expires — wait up to 60s (CI runs game-time at ~45% speed)
+    await expect(host.getByText(/BUY PHASE/)).not.toBeVisible({ timeout: 60_000 })
     // The round timer shows a number followed by 's' (e.g. "114s")
     await expect(host.locator('div').filter({ hasText: /^\d+s$/ })).toBeVisible({ timeout: 5_000 })
 
