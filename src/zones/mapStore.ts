@@ -18,11 +18,14 @@ export function loadMaps(): SavedMap[] {
   }
 }
 
-export function saveMap(map: SavedMap): void {
+export function saveMap(map: SavedMap): boolean {
   try {
     const maps = loadMaps().filter((m) => m.id !== map.id)
     localStorage.setItem(KEY, JSON.stringify([...maps, map]))
-  } catch { /* storage full — silently skip */ }
+    return true
+  } catch {
+    return false
+  }
 }
 
 export function deleteMap(id: string): void {

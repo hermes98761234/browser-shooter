@@ -65,7 +65,14 @@ export function MatchSetup({
       try {
         const parsed = JSON.parse(ev.target!.result as string)
         const zone: ZoneDef = parsed.zone ?? parsed
-        if (!zone.arenaSize || !Array.isArray(zone.structures)) {
+        if (
+          !zone.arenaSize ||
+          !Array.isArray(zone.structures) ||
+          !Array.isArray(zone.ctSpawns) ||
+          !Array.isArray(zone.tSpawns) ||
+          !Array.isArray(zone.bombsites) ||
+          zone.bombsites.length < 2
+        ) {
           setUploadError('Invalid map file.')
           return
         }
@@ -75,7 +82,11 @@ export function MatchSetup({
           createdAt: Date.now(),
           zone,
         }
-        saveMap(map)
+        const saved = saveMap(map)
+        if (!saved) {
+          setUploadError('Storage full — could not save map.')
+          return
+        }
         setMyMaps(loadMaps())
         selectCustomMap(map)
       } catch {

@@ -20,9 +20,11 @@ describe('mapStore', () => {
   it('starts empty', () => expect(loadMaps()).toEqual([]))
 
   it('saves and loads a map', () => {
+    expect(saveMap(makeMap('xyz', 'Test'))).toBe(true)
     saveMap(makeMap('abc', 'My Map'))
-    expect(loadMaps()).toHaveLength(1)
-    expect(loadMaps()[0].name).toBe('My Map')
+    expect(loadMaps()).toHaveLength(2)
+    expect(loadMaps()[0].name).toBe('Test')
+    expect(loadMaps()[1].name).toBe('My Map')
   })
 
   it('upserts by id', () => {

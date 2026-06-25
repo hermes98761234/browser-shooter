@@ -6,7 +6,7 @@ import type { GameMode, NetMessage, PlayerInput, SessionEvent, Snapshot, VoiceRo
 import type { Team } from '../types'
 import type { MatchConfig } from '../session/MatchConfig'
 import type { CollisionWorld } from '../engine/CollisionWorld'
-import { saveMap, findByName, newMapId } from '../zones/mapStore'
+import { saveMap, loadMaps, newMapId } from '../zones/mapStore'
 
 interface InterpEntry {
   snapshot: { position: THREE.Vector3; rotationY: number; rotationX: number; health: number; isDead: boolean }
@@ -148,7 +148,7 @@ export class NetClient {
       this.mode = msg.config.mode
       if (msg.config.customZone) {
         const zone = msg.config.customZone
-        if (!findByName(zone.name)) {
+        if (!loadMaps().find(m => m.zone.id === zone.id)) {
           saveMap({ id: newMapId(), name: zone.name, createdAt: Date.now(), zone })
         }
       }

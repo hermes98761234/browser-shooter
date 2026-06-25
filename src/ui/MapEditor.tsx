@@ -1,6 +1,6 @@
 // src/ui/MapEditor.tsx
 import React, { useState, useRef, useCallback } from 'react'
-import type { ZoneDef, ZoneStructure, StructureMaterial, ZoneBombsite } from '../zones/ZoneDef'
+import type { ZoneDef, ZoneStructure, StructureMaterial } from '../zones/ZoneDef'
 import { DAYLIGHT } from '../zones/ZoneDef'
 import { saveMap, newMapId } from '../zones/mapStore'
 import type { SavedMap } from '../zones/mapStore'
@@ -106,15 +106,37 @@ export function MapEditor({ initial, onSave, onCancel }: {
     const d = Math.max(1, bz - az)
 
     if (tool === 'eraser') {
-      // Remove nearest structure
       setZone((prev) => {
-        let best = -1, bestDist = Infinity
+        // Find nearest structure
+        let bestStructIdx = -1, bestStructDist = Infinity
         prev.structures.forEach((s, i) => {
           const dist = Math.hypot(s.center[0] - x, s.center[2] - z)
-          if (dist < bestDist) { bestDist = dist; best = i }
+          if (dist < bestStructDist) { bestStructDist = dist; bestStructIdx = i }
         })
-        if (best === -1 || bestDist > 5) return prev
-        return { ...prev, structures: prev.structures.filter((_, i) => i !== best) }
+        // Find nearest T-spawn
+        let bestTIdx = -1, bestTDist = Infinity
+        prev.tSpawns.forEach(([sx, sz], i) => {
+          const dist = Math.hypot(sx - x, sz - z)
+          if (dist < bestTDist) { bestTDist = dist; bestTIdx = i }
+        })
+        // Find nearest CT-spawn
+        let bestCTIdx = -1, bestCTDist = Infinity
+        prev.ctSpawns.forEach(([sx, sz], i) => {
+          const dist = Math.hypot(sx - x, sz - z)
+          if (dist < bestCTDist) { bestCTDist = dist; bestCTIdx = i }
+        })
+        // Remove whichever is closest, within 5 units
+        const best = Math.min(
+          bestStructIdx >= 0 ? bestStructDist : Infinity,
+          bestTIdx >= 0 ? bestTDist : Infinity,
+          bestCTIdx >= 0 ? bestCTDist : Infinity,
+        )
+        if (best > 5) return prev
+        if (best === bestStructDist && bestStructIdx >= 0)
+          return { ...prev, structures: prev.structures.filter((_, i) => i !== bestStructIdx) }
+        if (best === bestTDist && bestTIdx >= 0)
+          return { ...prev, tSpawns: prev.tSpawns.filter((_, i) => i !== bestTIdx) }
+        return { ...prev, ctSpawns: prev.ctSpawns.filter((_, i) => i !== bestCTIdx) }
       })
       return
     }
@@ -161,12 +183,17 @@ export function MapEditor({ initial, onSave, onCancel }: {
       createdAt: initial?.createdAt ?? Date.now(),
       zone: { ...zone, name: mapName.trim() || 'Unnamed', id: initial?.zone.id ?? zone.id },
     }
-    saveMap(map)
+    const saved = saveMap(map)
+    if (!saved) {
+      // Still call onSave so the map is usable this session even if not persisted
+      onSave(map)
+      return
+    }
     onSave(map)
   }
 
   function handleDownload() {
-    const payload = JSON.stringify({ version: 1, name: mapName, zone }, null, 2)
+    const payload = JSON.stringify({ version: 1, name: mapName, zone: { ...zone, name: mapName } }, null, 2)
     const url = URL.createObjectURL(new Blob([payload], { type: 'application/json' }))
     const a = document.createElement('a')
     a.href = url; a.download = `${mapName.replace(/\s+/g, '-').toLowerCase()}.json`
@@ -215,7 +242,7 @@ export function MapEditor({ initial, onSave, onCancel }: {
         <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
           {ARENA_SIZES.map((s) => (
             <button key={s} style={btn(zone.arenaSize === s)}
-              onClick={() => setZone((prev) => ({ ...makeDefaultZone(s), structures: prev.structures, name: prev.name }))}>
+              onClick={() => setZone((prev) => ({ ...makeDefaultZone(s), structures: prev.structures, ctSpawns: prev.ctSpawns, tSpawns: prev.tSpawns, bombsites: prev.bombsites, name: prev.name }))}>
               {s * 2}
             </button>
           ))}
@@ -234,7 +261,7 @@ export function MapEditor({ initial, onSave, onCancel }: {
           <div style={{ fontSize: 11, opacity: 0.5 }}>
             {zone.structures.length} structures · {zone.tSpawns.length}T · {zone.ctSpawns.length}CT
           </div>
-          <button style={btn(false)} onClick={() => setZone((prev) => ({ ...prev, structures: [] }))}>Clear</button>
+          <button style={btn(false)} onClick={() => setZone((prev) => ({ ...prev, structures: [], tSpawns: [], ctSpawns: [] }))}>Clear</button>
           <button style={btn(false)} onClick={handleDownload}>Download</button>
           <button style={btn(false)} onClick={onCancel}>Cancel</button>
           <button style={btn(true)} onClick={handleSave}>Save Map</button>
