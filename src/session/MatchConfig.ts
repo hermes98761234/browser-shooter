@@ -14,6 +14,7 @@ export interface MatchConfig {
   joinPolicy?: JoinPolicy   // 'lobby' (default) | 'free'
   password?: string         // only meaningful when joinPolicy === 'free'; blank/undefined = open
   zoneId?: string           // selected zone id; undefined falls back to the default zone (Arid)
+  randomSeed?: number       // seed for the random zone; host generates once, clients receive via welcome
 }
 
 export function defaultMatchConfig(): MatchConfig {

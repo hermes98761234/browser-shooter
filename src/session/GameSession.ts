@@ -80,7 +80,7 @@ export class GameSession {
 
   constructor(config: MatchConfig = defaultMatchConfig()) {
     this.config = config
-    this.map = getZone(config.zoneId)
+    this.map = getZone(config.zoneId, config.randomSeed)
     this.scoreboard = new Scoreboard(config.fragLimit)
     this.addPlayer(LOCAL_ID, 'You', 'ct')
 

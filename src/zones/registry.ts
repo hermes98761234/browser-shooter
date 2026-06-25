@@ -14,8 +14,7 @@ export const ZONES: ZoneDef[] = [ARID, HAZE, EMBER, REACTOR, CROSSING, RANDOM]
 export const DEFAULT_ZONE_ID = ARID.id
 
 /** Look up a zone by id, falling back to the default (Arid) for unknown/undefined ids. */
-export function getZone(id?: string): ZoneDef {
-  // ponytail: generate fresh each session so 'random' is never the same map twice
-  if (id === 'random') return generateRandomZone()
+export function getZone(id?: string, seed?: number): ZoneDef {
+  if (id === 'random') return generateRandomZone(seed)
   return ZONES.find((z) => z.id === id) ?? ARID
 }
