@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest'
 import { ZONES, DEFAULT_ZONE_ID, getZone } from './registry'
 
 describe('zone registry', () => {
-  it('provides the five zones in order', () => {
-    expect(ZONES.map((z) => z.id)).toEqual(['arid', 'haze', 'ember', 'reactor', 'crossing'])
+  it('provides the six zones in order', () => {
+    expect(ZONES.map((z) => z.id)).toEqual(['arid', 'haze', 'ember', 'reactor', 'crossing', 'random'])
   })
 
   it('defaults to arid', () => {
@@ -17,7 +17,11 @@ describe('zone registry', () => {
   })
 
   it('looks up each zone by id', () => {
-    for (const z of ZONES) expect(getZone(z.id)).toBe(z)
+    for (const z of ZONES) {
+      // 'random' generates a fresh zone each call, so check id not object identity
+      if (z.id === 'random') expect(getZone(z.id).id).toBe('random')
+      else expect(getZone(z.id)).toBe(z)
+    }
   })
 
   describe.each(ZONES)('zone "$id"', (zone) => {
@@ -27,7 +31,7 @@ describe('zone registry', () => {
     })
 
     it('uses the standard arena size', () => {
-      if (zone.id === 'arid') expect(zone.arenaSize).toBe(50)
+      if (zone.id === 'arid' || zone.id === 'random') expect(zone.arenaSize).toBe(50)
       else expect(zone.arenaSize).toBe(30)
     })
 
