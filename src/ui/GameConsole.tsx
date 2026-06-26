@@ -75,6 +75,7 @@ export const GameConsole: React.FC<GameConsoleProps> = ({
   if (!open) return null
 
   function onKeyDown(e: React.KeyboardEvent) {
+    e.stopPropagation()   // prevents game hotkeys firing while console is open
     if (e.code === 'Escape' || e.code === 'Backquote') { e.preventDefault(); onClose(); return }
     if (e.code === 'Enter') { e.preventDefault(); onSend(input); setInput('') }
   }

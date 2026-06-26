@@ -277,6 +277,7 @@ function App() {
       at: Date.now(),
     }
     setChatMessages(prev => [...prev.slice(-199), newMsg])
+    setConsoleOpen(false)   // close after sending
     if (data.role === 'client' && data.netClient?.playerId) {
       data.netClient.transport.send({
         type: 'chat',
