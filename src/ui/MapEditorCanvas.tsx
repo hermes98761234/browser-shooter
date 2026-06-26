@@ -38,6 +38,13 @@ function SceneContent({
   const [dragCur, setDragCur] = useState<{ x: number; z: number } | null>(null)
   const isMaterial = STRUCTURE_MATERIALS.includes(tool as StructureMaterial)
 
+  const a = zone.arenaSize
+
+  const borderGeom = React.useMemo(
+    () => new THREE.BoxGeometry(a * 2, 0.01, a * 2),
+    [a]
+  )
+
   React.useEffect(() => {
     topSnapRef.current = {
       snap: () => {
@@ -47,6 +54,7 @@ function SceneContent({
         controlsRef.current?.update()
       },
     }
+    return () => { topSnapRef.current = null }
   }, [camera, zone.arenaSize, topSnapRef])
 
   function onFloorDown(e: ThreeEvent<PointerEvent>) {
@@ -94,8 +102,6 @@ function SceneContent({
     else onSelectStructure(null)
   }
 
-  const a = zone.arenaSize
-
   const preview = (() => {
     if (!dragStart.current || !dragCur || !isMaterial) return null
     const ax = Math.min(dragStart.current.x, dragCur.x), bx = Math.max(dragStart.current.x, dragCur.x)
@@ -132,7 +138,7 @@ function SceneContent({
 
       {/* Arena border */}
       <lineSegments position={[0, 0.02, 0]}>
-        <edgesGeometry args={[new THREE.BoxGeometry(a * 2, 0.01, a * 2)]} />
+        <edgesGeometry args={[borderGeom]} />
         <lineBasicMaterial color="#ff6600" />
       </lineSegments>
 
