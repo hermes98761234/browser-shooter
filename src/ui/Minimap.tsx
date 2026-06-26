@@ -60,7 +60,10 @@ export const Minimap: React.FC<MinimapProps> = ({
         for (const s of structures) {
           const sx = cx + (s.center[0] - playerPosition.x) * scale
           const sy = cy + (s.center[2] - playerPosition.z) * scale
-          ctx.fillRect(sx - (s.size[0] * scale) / 2, sy - (s.size[2] * scale) / 2, s.size[0] * scale, s.size[2] * scale)
+          // ponytail: clamp to 2px so 0.5-unit walls aren't sub-pixel invisible
+          const sw = Math.max(s.size[0] * scale, 2)
+          const sd = Math.max(s.size[2] * scale, 2)
+          ctx.fillRect(sx - sw / 2, sy - sd / 2, sw, sd)
         }
       }
 
