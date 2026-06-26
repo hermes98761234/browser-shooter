@@ -559,9 +559,11 @@ function App() {
           if (ev.victimId === data.netClient?.playerId) data.audio.playPlayerHit()
           break
         }
-        case 'playerKilledPlayer':
-          pushKill(ev.attackerId, ev.victimId, ev.teamkill, ev.zone)
+        case 'playerKilledPlayer': {
+          const nameOf = (id: string) => data.lastPlayers?.find(p => p.id === id)?.name ?? id
+          pushKill(nameOf(ev.attackerId), nameOf(ev.victimId), ev.teamkill, ev.zone)
           break
+        }
         case 'matchOver':
           break // handled via snapshot.scores in updateClient
         case 'bombPlanted':
@@ -778,18 +780,25 @@ function App() {
       if (gameStateRef.current !== 'playing') return
       const gm = data.grenadeManager
       if (!gm?.selected) return
-      const session = data.session
       const thrown = gm.selected
-      if (session.throwGrenade(session.localId, thrown, mode)) {
+      const client = data.netClient
+      if (client) {
+        // Client: send to host — host simulates and broadcasts via snapshot
+        client.transport.send({ type: 'throwGrenade', playerId: client.playerId!, grenadeType: thrown, mode })
         gm.remove(thrown)
-        setGrenadeInventory({
-          he: gm.getCount('he'),
-          flash: gm.getCount('flash'),
-          smoke: gm.getCount('smoke'),
-        })
-        if (!gm.has(thrown)) {
-          setSelectedGrenade(gm.selected)
-        }
+      } else {
+        // Singleplayer / host: throw directly in authoritative session
+        const session = data.session
+        if (!session.throwGrenade(session.localId, thrown, mode)) return
+        gm.remove(thrown)
+      }
+      setGrenadeInventory({
+        he: gm.getCount('he'),
+        flash: gm.getCount('flash'),
+        smoke: gm.getCount('smoke'),
+      })
+      if (!gm.has(thrown)) {
+        setSelectedGrenade(gm.selected)
       }
     }
 

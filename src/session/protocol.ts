@@ -144,6 +144,7 @@ export type NetMessage =
   | { type: 'setTeam'; playerId: string; team: Team }
   | { type: 'plantBomb'; playerId: string }
   | { type: 'defuseBomb'; playerId: string; hasKit: boolean }
+  | { type: 'throwGrenade'; playerId: string; grenadeType: 'he' | 'flash' | 'smoke'; mode: 'long' | 'short' }
   | { type: 'voiceRoster'; teammates: VoiceRosterEntry[] }
   | { type: 'voiceStart'; playerId: string; name: string }
   | { type: 'voiceStop'; playerId: string }

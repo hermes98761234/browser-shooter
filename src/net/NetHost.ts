@@ -127,6 +127,8 @@ export class NetHost {
         this.session.tryPlant(playerId)
       } else if (msg.type === 'defuseBomb' && msg.playerId === playerId) {
         this.session.tryDefuse(playerId, msg.hasKit)
+      } else if (msg.type === 'throwGrenade' && msg.playerId === playerId) {
+        this.session.throwGrenade(playerId, msg.grenadeType, msg.mode)
       } else if (msg.type === 'voiceStart' && msg.playerId === playerId) {
         this.relayVoice(msg, playerId)
       } else if (msg.type === 'voiceStop' && msg.playerId === playerId) {
