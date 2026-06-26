@@ -33,6 +33,8 @@ export class Controls {
   /** Fired on push-to-talk key down / up (hold to transmit voice). */
   onTalkStart: (() => void) | null = null
   onTalkStop: (() => void) | null = null
+  /** Fired on video toggle key down — toggles camera on/off. */
+  onVideoToggle: (() => void) | null = null
   private talkHeld = false
   private scoreboardHeld = false
 
@@ -87,6 +89,7 @@ export class Controls {
     if (e.code === km.pushToTalk) {
       if (!this.talkHeld) { this.talkHeld = true; this.onTalkStart?.() }
     }
+    if (e.code === km.toggleVideo) { this.onVideoToggle?.(); return }
   }
 
   private onKeyUp(e: KeyboardEvent) {

@@ -19,6 +19,7 @@ export interface Keymap {
   selectGrenadeFlash: string
   selectGrenadeSmoke: string
   pushToTalk: string
+  toggleVideo: string
   addBotCT: string
   addBotT: string
   removeBot: string
@@ -40,6 +41,7 @@ export const DEFAULT_KEYMAP: Keymap = {
   selectGrenadeFlash: 'Digit5',
   selectGrenadeSmoke: 'Digit6',
   pushToTalk: 'KeyK',
+  toggleVideo: 'KeyV',
   addBotCT: 'BracketLeft',
   addBotT: 'BracketRight',
   removeBot: 'Backslash',

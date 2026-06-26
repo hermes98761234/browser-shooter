@@ -59,6 +59,7 @@ const GROUPS: { label: string; actions: { key: keyof Keymap; label: string }[] }
     label: 'COMMUNICATION',
     actions: [
       { key: 'pushToTalk', label: 'Push to Talk' },
+      { key: 'toggleVideo', label: 'Toggle Video' },
     ],
   },
   {
