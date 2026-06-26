@@ -2,11 +2,12 @@ import React from 'react'
 
 interface PauseMenuProps {
   onResume: () => void
+  onSettings: () => void
   onMainMenu: () => void
   onHelp: () => void
 }
 
-export const PauseMenu: React.FC<PauseMenuProps> = ({ onResume, onMainMenu, onHelp }) => {
+export const PauseMenu: React.FC<PauseMenuProps> = ({ onResume, onSettings, onMainMenu, onHelp }) => {
   return (
     <div style={{
       position: 'absolute',
@@ -50,6 +51,24 @@ export const PauseMenu: React.FC<PauseMenuProps> = ({ onResume, onMainMenu, onHe
         }}
       >
         RESUME
+      </button>
+
+      <button
+        className="ui-btn"
+        onClick={onSettings}
+        style={{
+          padding: '12px 36px',
+          fontSize: 16,
+          background: 'rgba(255,255,255,0.1)',
+          color: 'white',
+          border: '1px solid #555',
+          borderRadius: 8,
+          cursor: 'pointer',
+          marginBottom: 16,
+          minWidth: 'min(240px, calc(100vw - 48px))',
+        }}
+      >
+        SETTINGS
       </button>
 
       <button

@@ -10,7 +10,7 @@ export class Controls {
   shoot = false
   private element: HTMLElement
   private getGameState: () => GameState
-  private keymap: Keymap
+  keymap: Keymap
   private boundKeyDown: (e: KeyboardEvent) => void
   private boundKeyUp: (e: KeyboardEvent) => void
   private boundMouseDown: (e: MouseEvent) => void

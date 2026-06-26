@@ -182,6 +182,7 @@ function App() {
   const storeOpenRef = useRef(false)
   const showScoreboardRef = useRef(false)
   const settingsRef = useRef(settings)
+  const settingsReturnRef = useRef<'menu' | 'paused'>('menu')
   const crosshairRef = useRef<CrosshairRuntime>({
     config: resolveCrosshair(settings.crosshair, 'pistol'),
     bloom: 0,
@@ -196,6 +197,7 @@ function App() {
     setSettings(next)
     settingsRef.current = next
     saveSettings(next)
+    if (gameDataRef.current.controls) gameDataRef.current.controls.keymap = next.keymap
   }, [])
 
   useEffect(() => { storeOpenRef.current = storeOpen }, [storeOpen])
@@ -1374,7 +1376,7 @@ function App() {
           <MainMenu
             onSingleplayer={() => updateGameState('teamselect')}
             onMultiplayer={() => updateGameState('mpmenu')}
-            onSettings={() => updateGameState('settings')}
+            onSettings={() => { settingsReturnRef.current = 'menu'; updateGameState('settings') }}
             onAbout={() => setShowAbout(true)}
             onHelp={() => setShowHelp(true)}
           />
@@ -1387,7 +1389,7 @@ function App() {
         <SettingsMenu
           settings={settings}
           onChange={updateSettings}
-          onBack={() => updateGameState('menu')}
+          onBack={() => updateGameState(settingsReturnRef.current)}
           onKeybinds={() => updateGameState('keybinds')}
         />
       )}
@@ -1627,6 +1629,7 @@ function App() {
             engineRef.current?.resume()
             updateGameState('playing')
           }}
+          onSettings={() => { settingsReturnRef.current = 'paused'; updateGameState('settings') }}
           onHelp={() => setShowInGameHelp(true)}
           onMainMenu={() => {
             engineRef.current?.stop()
