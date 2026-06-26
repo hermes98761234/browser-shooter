@@ -1,7 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { BlockPropertiesPanel } from '../BlockPropertiesPanel'
-import { DAYLIGHT } from '../../zones/ZoneDef'
 import type { ZoneStructure } from '../../zones/ZoneDef'
 
 const wall: ZoneStructure = { center: [0, 1.5, 0], size: [4, 3, 2], material: 'wall' }
@@ -16,6 +15,8 @@ describe('BlockPropertiesPanel', () => {
     expect((inputs[1] as HTMLInputElement).value).toBe('1.5') // Y
     expect((inputs[3] as HTMLInputElement).value).toBe('4')   // W
     expect((inputs[4] as HTMLInputElement).value).toBe('3')   // H
+    expect((inputs[2] as HTMLInputElement).value).toBe('0')   // Z
+    expect((inputs[5] as HTMLInputElement).value).toBe('2')   // D
   })
 
   it('calls onUpdate with new center when X input changes', () => {
