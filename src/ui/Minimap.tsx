@@ -9,6 +9,7 @@ interface MinimapProps {
   arenaSize: number
   bombsites?: { id: string; position: { x: number; z: number } }[]
   bombPosition?: { x: number; z: number }
+  structures?: { center: [number, number, number]; size: [number, number, number] }[]
 }
 
 export const Minimap: React.FC<MinimapProps> = ({
@@ -19,11 +20,12 @@ export const Minimap: React.FC<MinimapProps> = ({
   arenaSize,
   bombsites,
   bombPosition,
+  structures,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [isMobile, setIsMobile] = React.useState(() => window.matchMedia('(max-width: 767px)').matches)
-  const propsRef = useRef({ playerPosition, playerRotation, enemies, allies, arenaSize, bombsites, bombPosition })
-  propsRef.current = { playerPosition, playerRotation, enemies, allies, arenaSize, bombsites, bombPosition }
+  const propsRef = useRef({ playerPosition, playerRotation, enemies, allies, arenaSize, bombsites, bombPosition, structures })
+  propsRef.current = { playerPosition, playerRotation, enemies, allies, arenaSize, bombsites, bombPosition, structures }
 
   React.useEffect(() => {
     const mql = window.matchMedia('(max-width: 767px)')
@@ -40,7 +42,7 @@ export const Minimap: React.FC<MinimapProps> = ({
     let raf: number
 
     const draw = () => {
-      const { playerPosition, playerRotation, enemies, allies, arenaSize, bombsites, bombPosition } = propsRef.current
+      const { playerPosition, playerRotation, enemies, allies, arenaSize, bombsites, bombPosition, structures } = propsRef.current
       const size = isMobile ? 80 : 150
       const scale = size / (arenaSize * 2.5)
 
@@ -52,6 +54,15 @@ export const Minimap: React.FC<MinimapProps> = ({
 
       const cx = size / 2
       const cy = size / 2
+
+      if (structures) {
+        ctx.fillStyle = '#3a3a3a'
+        for (const s of structures) {
+          const sx = cx + (s.center[0] - playerPosition.x) * scale
+          const sy = cy + (s.center[2] - playerPosition.z) * scale
+          ctx.fillRect(sx - (s.size[0] * scale) / 2, sy - (s.size[2] * scale) / 2, s.size[0] * scale, s.size[2] * scale)
+        }
+      }
 
       ctx.save()
       ctx.translate(cx, cy)

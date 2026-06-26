@@ -1511,6 +1511,7 @@ function App() {
             arenaSize={ARENA_SIZE}
             bombsites={gameDataRef.current.session.bombsites.map(s => ({ id: s.id, position: s.center }))}
             bombPosition={gameDataRef.current.session.bomb.position ?? undefined}
+            structures={gameDataRef.current.session.map.structures}
           />
           <WaveAnnounce wave={wave} visible={showWaveAnnounce} />
           <DamageOverlay indicator={damageIndicator} />
