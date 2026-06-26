@@ -30,4 +30,14 @@ describe('NetClient PvP', () => {
     deliver({ type: 'start' })
     expect(started).toBe(true)
   })
+
+  it('fires onChat when a chat message arrives', () => {
+    const { t, deliver } = fakeTransport()
+    const c = new NetClient(t)
+    const got: NetMessage[] = []
+    c.onChat((msg) => got.push(msg))
+    deliver({ type: 'chat', playerId: 'p2', name: 'Bob', team: 'ct', scope: 'all', text: 'hello' })
+    expect(got).toHaveLength(1)
+    expect(got[0]).toMatchObject({ type: 'chat', name: 'Bob', scope: 'all', text: 'hello' })
+  })
 })

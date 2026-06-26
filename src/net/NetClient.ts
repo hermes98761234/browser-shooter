@@ -40,6 +40,7 @@ export class NetClient {
   private voiceRosterCb: ((teammates: VoiceRosterEntry[]) => void) | null = null
   private voiceStartCb: ((playerId: string, name: string) => void) | null = null
   private voiceStopCb: ((playerId: string) => void) | null = null
+  private chatCb: ((msg: Extract<NetMessage, { type: 'chat' }>) => void) | null = null
   private interpBuffers = new Map<string, InterpEntry[]>()
 
   constructor(public transport: Transport) {
@@ -138,6 +139,7 @@ export class NetClient {
   onVoiceRoster(cb: (teammates: VoiceRosterEntry[]) => void): void { this.voiceRosterCb = cb }
   onVoiceStart(cb: (playerId: string, name: string) => void): void { this.voiceStartCb = cb }
   onVoiceStop(cb: (playerId: string) => void): void { this.voiceStopCb = cb }
+  onChat(cb: (msg: Extract<NetMessage, { type: 'chat' }>) => void): void { this.chatCb = cb }
   sendVoiceStart(playerId: string, name: string): void { this.transport.send({ type: 'voiceStart', playerId, name }) }
   sendVoiceStop(playerId: string): void { this.transport.send({ type: 'voiceStop', playerId }) }
 
@@ -177,6 +179,8 @@ export class NetClient {
       this.voiceStartCb?.(msg.playerId, msg.name)
     } else if (msg.type === 'voiceStop') {
       this.voiceStopCb?.(msg.playerId)
+    } else if (msg.type === 'chat') {
+      this.chatCb?.(msg)
     }
   }
 
