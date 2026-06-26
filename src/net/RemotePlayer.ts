@@ -42,6 +42,7 @@ export class RemotePlayer {
 
   pushState(s: EntityState, time?: number): void {
     this.isDead = s.isDead
+    if (s.isDead) this.setTalking(false)
     this.buffer.push({
       position: new THREE.Vector3(s.position.x, s.position.y, s.position.z),
       rotationY: s.rotationY,

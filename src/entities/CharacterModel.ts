@@ -51,7 +51,9 @@ export function buildCharacter(opts: CharacterOptions): THREE.Group {
 
 /** The character's floating nameplate sprite, if it has one (added when `name` is set). */
 export function getNameTag(group: THREE.Group): THREE.Sprite | null {
-  return (group.children.find((c) => c instanceof THREE.Sprite) as THREE.Sprite) ?? null
+  return (group.children.find(
+    (c) => c instanceof THREE.Sprite && c.userData.role === 'nameTag'
+  ) as THREE.Sprite) ?? null
 }
 
 /** Green circle sprite shown above a player's head while they are talking. */
@@ -147,5 +149,6 @@ function makeNameTag(name: string): THREE.Sprite {
   const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, depthTest: false }))
   sprite.position.set(0, 2.4, 0)
   sprite.scale.set(1.5, 0.375, 1)
+  sprite.userData.role = 'nameTag'
   return sprite
 }
