@@ -9,13 +9,31 @@
 [![CI](https://github.com/hermes98761234/browser-shooter/actions/workflows/ci.yml/badge.svg)](https://github.com/hermes98761234/browser-shooter/actions/workflows/ci.yml)
 [![Deploy](https://github.com/hermes98761234/browser-shooter/actions/workflows/deploy.yml/badge.svg)](https://github.com/hermes98761234/browser-shooter/actions/workflows/deploy.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](#license)
-[![Tests](https://img.shields.io/badge/tests-775%20unit%20%2B%20E2E-brightgreen.svg)](#testing)
+[![Tests](https://img.shields.io/badge/tests-810%2B%20unit%20%2B%20E2E-brightgreen.svg)](#testing)
 
 ![Three.js](https://img.shields.io/badge/Three.js-000000?logo=three.js&logoColor=white)
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.6-3178C6?logo=typescript&logoColor=white)
 ![Vite](https://img.shields.io/badge/Vite-6-646CFF?logo=vite&logoColor=white)
 ![WebRTC](https://img.shields.io/badge/Multiplayer-PeerJS%20%2F%20WebRTC-FF6600)
+
+</div>
+
+---
+
+## Screenshots
+
+<div align="center">
+
+![Demo](screenshots/demo.gif)
+
+| Main Menu | In-Game |
+|:---------:|:-------:|
+| ![Main Menu](screenshots/main-menu.png) | ![Gameplay](screenshots/gameplay.png) |
+
+| Map Editor |
+|:----------:|
+| ![Map Editor](screenshots/map-editor.png) |
 
 </div>
 
@@ -28,7 +46,7 @@ Browser Shooter is a fast-paced 3D FPS built with **Three.js** and **React**. Ev
 It ships with two distinct experiences:
 
 - 🧟 **Singleplayer** — Classic arena **wave survival**. Fight escalating waves of enemies, collect pickups, chase a persistent high score. Add AI bots to fill out the arena.
-- 🔫 **Multiplayer** — Peer-to-peer **PvP** with a full **CS-style competitive mode**: Terrorists vs. Counter-Terrorists, round-based play, a plantable/defusable **C4 bomb objective**, a money **economy**, and a **buy menu** — on five hand-built competitive maps, with AI teammates and opponents.
+- 🔫 **Multiplayer** — Peer-to-peer **PvP** with a full **CS-style competitive mode**: Terrorists vs. Counter-Terrorists, round-based play, a plantable/defusable **C4 bomb objective**, a money **economy**, and a **buy menu** — on five hand-built competitive maps plus a procedurally generated random map, with AI teammates and opponents.
 
 ## Game Modes
 
@@ -46,7 +64,10 @@ It ships with two distinct experiences:
 - **Deep weapon roster** — Pistols (USP, Glock, Deagle), rifles (M4, AUG, AK-47, Galil), MP5, Shotgun, and the AWP, each with distinct damage, fire rate, spread, range, and reload.
 - **Grenades** — HE grenade, Flashbang (with screen-flash blinding), and Smoke grenade, with full and short throws.
 - **AI bots** — CS-style team bots that buy, navigate, fight, and play the objective. Add/remove them on the fly.
-- **Five competitive maps** — Dust II, Inferno, Mirage, Nuke, and Overpass, selectable from the room setup.
+- **Six maps** — Dust II, Inferno, Mirage, Nuke, Overpass, and a procedurally generated **Random** map, selectable from the room setup.
+- **3D Map Editor** — Drag-and-drop block placement with orbit camera, material picker, spawn/bombsite markers, and one-click save. Accessible from the singleplayer zone select screen.
+- **Rebindable controls** — Full keybind editor (Settings → Keybinds) with CS-style per-key capture and live in-game updates.
+- **Lobby passwords** — Password-protect rooms for both lobby and free-join policies.
 - **Voice chat** — In-game push-to-talk voice over the peer mesh, with on-screen speaker indicators.
 - **Configurable crosshair** — Live crosshair editor with dynamic bloom that reacts to movement and firing.
 - **Enemy variety & AI** — Grunts, Runners, and Tanks with chase/attack behavior and difficulty scaling.
@@ -77,7 +98,9 @@ It ships with two distinct experiences:
 | `M` | Toggle mute |
 | `H` | Help |
 | `ESC` | Pause / Resume |
-| `[` `]` `\` | Add / remove bots |
+| `[` `]` `\` | Add CT bot / Add T bot / Remove last bot |
+
+> All keys are rebindable via **Settings → Keybinds**.
 
 ## Tech Stack
 
@@ -85,10 +108,11 @@ It ships with two distinct experiences:
 |------------|---------|
 | [Three.js](https://threejs.org/) | 3D rendering, scene graph, materials, shadows |
 | [React 19](https://react.dev/) | UI layer — HUD, menus, overlays |
+| [React Three Fiber](https://docs.pmnd.rs/react-three-fiber) | 3D Map Editor scene |
 | [TypeScript](https://www.typescriptlang.org/) | Type-safe game logic and tooling |
 | [Vite 6](https://vitejs.dev/) | Build tool and dev server |
 | [PeerJS / WebRTC](https://peerjs.com/) | Peer-to-peer multiplayer signalling & transport, voice |
-| [Vitest](https://vitest.dev/) | Unit testing (775 tests across 93 files) |
+| [Vitest](https://vitest.dev/) | Unit testing (810+ tests across 93 files) |
 | [Playwright](https://playwright.dev/) | End-to-end browser testing (10 spec files) |
 
 ## Getting Started
@@ -151,13 +175,13 @@ browser-shooter/
 │   ├── enemies/         # Singleplayer enemy AI, defs, wave manager
 │   ├── engine/          # Three.js engine — renderer, camera, arena, lighting, game loop
 │   ├── entities/        # Shared 3D character model
-│   ├── maps/            # Competitive maps (Dust II, Inferno, Mirage, Nuke, Overpass) + registry
+│   ├── maps/            # Competitive maps (Dust II, Inferno, Mirage, Nuke, Overpass, Random) + registry
 │   ├── net/             # P2P networking — host/client, PeerJS, directory, matchmaking, lag comp
 │   ├── player/          # Player state, controls, purchase application
 │   ├── session/         # Authoritative game session — rounds, bomb, economy, spawns, scoreboard
-│   ├── settings/        # Settings & crosshair persistence
+│   ├── settings/        # Settings, crosshair & keybind persistence
 │   ├── systems/         # Health, ammo, score, pickups
-│   ├── ui/              # React components — HUD, menus, buy menu, scoreboard, overlays, touch
+│   ├── ui/              # React components — HUD, menus, buy menu, scoreboard, overlays, touch, map editor
 │   ├── voice/           # Push-to-talk voice chat over the peer mesh
 │   ├── weapons/         # Weapon defs, manager, viewmodel, grenades, store catalog, crosshair bloom
 │   ├── App.tsx          # Root component & game-state orchestration
@@ -177,13 +201,6 @@ Pushing to `main` triggers GitHub Actions:
 2. **Deploy** — Automatic deployment to [GitHub Pages](https://hermes98761234.github.io/browser-shooter/).
 
 Tag with `v*` (e.g. `v1.0.0`) to trigger a release build with a distributable zip attached to the GitHub Release.
-
-## Known Follow-ups
-
-PvP is functional and host-authoritative. Two client-side polish gaps remain (the host side is correct):
-
-- [ ] **Client lobby rosters are empty.** The host knows who is on CT vs T but doesn't broadcast roster/team changes, so a joined client's roster panels render empty. Fix: have the host push the roster (names + teams) to clients on join and on `setTeam`.
-- [ ] **Client kill feed shows raw player IDs.** Remote players aren't in the client's local player map, so the client kill feed prints e.g. `player-2`. Fix: carry attacker/victim names in the `playerKilledPlayer` event (or resolve them from the snapshot).
 
 ## License
 

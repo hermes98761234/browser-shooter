@@ -11,10 +11,10 @@ export const HelpModal = ({ onClose, inGame }: HelpModalProps) => {
     }}>
       <div style={{
         background: '#15151f', border: '1px solid #3a3a55', padding: 32,
-        minWidth: 320, maxWidth: 400, maxHeight: '70vh', overflowY: 'auto',
+        minWidth: 320, maxWidth: 420, maxHeight: '80vh', overflowY: 'auto',
       }}>
         <h2 style={{ margin: '0 0 20px', color: '#ff6600' }}>Help</h2>
-        
+
         <div style={{ marginBottom: 20 }}>
           <h3 style={{ marginBottom: 12, fontSize: 14, color: '#8a8aad' }}>CONTROLS</h3>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 20px', fontSize: 14 }}>
@@ -28,22 +28,26 @@ export const HelpModal = ({ onClose, inGame }: HelpModalProps) => {
             <span style={{ opacity: 0.6 }}>R</span><span>Reload</span>
             <span style={{ opacity: 0.6 }}>Space</span><span>Jump</span>
             <span style={{ opacity: 0.6 }}>B</span><span>Buy Menu</span>
+            <span style={{ opacity: 0.6 }}>5</span><span>Plant Bomb (T, in bombsite)</span>
+            <span style={{ opacity: 0.6 }}>E</span><span>Defuse Bomb (CT, near bomb)</span>
             <span style={{ opacity: 0.6 }}>Tab</span><span>Scoreboard</span>
+            <span style={{ opacity: 0.6 }}>K</span><span>Push-to-Talk (Voice)</span>
             <span style={{ opacity: 0.6 }}>M</span><span>Mute Sound</span>
             <span style={{ opacity: 0.6 }}>H</span><span>Help</span>
-            <span style={{ opacity: 0.6 }}>K</span><span>Push-to-Talk (Voice)</span>
             <span style={{ opacity: 0.6 }}>ESC</span><span>Pause</span>
+            <span style={{ opacity: 0.6 }}>[</span><span>Add CT Bot</span>
+            <span style={{ opacity: 0.6 }}>]</span><span>Add T Bot</span>
+            <span style={{ opacity: 0.6 }}>\</span><span>Remove Last Bot</span>
           </div>
+          <p style={{ margin: '10px 0 0', fontSize: 12, opacity: 0.5 }}>
+            All keys are rebindable via <strong>Settings → Keybinds</strong>.
+          </p>
         </div>
 
         <div style={{ marginBottom: 20 }}>
           <h3 style={{ marginBottom: 12, fontSize: 14, color: '#8a8aad' }}>COMPETITIVE MODE (Bomb)</h3>
           <div style={{ fontSize: 13, lineHeight: 1.6, opacity: 0.8 }}>
             <p style={{ margin: '0 0 8px' }}>Available in <strong>Multiplayer → Create Room → Competitive (CS-style)</strong></p>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 20px' }}>
-              <span style={{ opacity: 0.6 }}>5</span><span>Plant Bomb (T side, in bombsite)</span>
-              <span style={{ opacity: 0.6 }}>E</span><span>Defuse Bomb (CT side, near bomb)</span>
-            </div>
             <p style={{ margin: '12px 0 0', fontSize: 12, opacity: 0.6 }}>
               T side: Carry bomb to site A or B, hold 5 to plant (3s). Bomb explodes after 40s = T wins.
               <br />CT side: Defuse before explosion, hold E near bomb (5s with kit, 10s without) = CT wins.
@@ -52,14 +56,25 @@ export const HelpModal = ({ onClose, inGame }: HelpModalProps) => {
         </div>
 
         <div style={{ marginBottom: 20 }}>
+          <h3 style={{ marginBottom: 12, fontSize: 14, color: '#8a8aad' }}>MAP EDITOR</h3>
+          <div style={{ fontSize: 13, lineHeight: 1.6, opacity: 0.8 }}>
+            <p style={{ margin: '0 0 8px' }}>Access via <strong>Singleplayer → Custom Maps → + Create</strong>.</p>
+            <p style={{ margin: '0 0 8px' }}>
+              Drag to place blocks, click to select and edit properties (size, material, position).
+              Place T/CT spawns and bomb sites, then hit <strong>Save Map</strong> to use it in-game.
+            </p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 20px' }}>
+              <span style={{ opacity: 0.6 }}>Left drag</span><span>Place block</span>
+              <span style={{ opacity: 0.6 }}>Right drag</span><span>Orbit camera</span>
+              <span style={{ opacity: 0.6 }}>Scroll</span><span>Zoom</span>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ marginBottom: 20 }}>
           <h3 style={{ marginBottom: 12, fontSize: 14, color: '#8a8aad' }}>HOW TO WORK WITH BOTS</h3>
           <div style={{ fontSize: 13, lineHeight: 1.6, opacity: 0.8 }}>
             <p style={{ margin: '0 0 8px' }}>Add AI bots in <strong>Singleplayer</strong> or as the <strong>host in Multiplayer</strong>.</p>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 20px' }}>
-              <span style={{ opacity: 0.6 }}>[</span><span>Add CT Bot</span>
-              <span style={{ opacity: 0.6 }}>]</span><span>Add T Bot</span>
-              <span style={{ opacity: 0.6 }}>\</span><span>Remove Last Bot</span>
-            </div>
             <p style={{ margin: '12px 0 0', fontSize: 12, opacity: 0.6 }}>
               Bots use the same weapon system as players and appear on the scoreboard with names and K/D.
               <br />Max 9 bots per session. Bots are not available to clients — only the host or single-player player can add them.
@@ -85,8 +100,8 @@ export const HelpModal = ({ onClose, inGame }: HelpModalProps) => {
             </div>
             <p style={{ margin: '0 0 4px' }}><strong>Join policy</strong> — how players get in:</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '4px 12px' }}>
-              <span style={{ opacity: 0.6 }}>Lobby</span><span>Players wait in a lobby; the host starts the match.</span>
-              <span style={{ opacity: 0.6 }}>Free</span><span>Players can drop into a running match (optional password).</span>
+              <span style={{ opacity: 0.6 }}>Lobby</span><span>Players wait in a lobby; the host starts the match. Password optional.</span>
+              <span style={{ opacity: 0.6 }}>Free</span><span>Players can drop into a running match. Password optional.</span>
             </div>
           </div>
         </div>
@@ -99,7 +114,7 @@ export const HelpModal = ({ onClose, inGame }: HelpModalProps) => {
             </div>
           </div>
         )}
-        
+
         <button onClick={onClose} style={{
           width: '100%', padding: 12, background: '#3a3a55', color: '#fff',
           border: 'none', cursor: 'pointer', fontSize: 14,
