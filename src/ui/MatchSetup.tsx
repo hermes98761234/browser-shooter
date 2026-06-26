@@ -34,11 +34,12 @@ const smallBtn: React.CSSProperties = {
 }
 
 export function MatchSetup({
-  onConfirm, onBack, onCreateMap,
+  onConfirm, onBack, onCreateMap, onEditMap,
 }: {
   onConfirm: (c: MatchConfig) => void
   onBack: () => void
   onCreateMap: () => void
+  onEditMap: (map: SavedMap) => void
 }) {
   const [mode, setMode] = useState<GameMode>('pvp')
   const [policy, setPolicy] = useState<DamagePolicy>('team')
@@ -160,15 +161,18 @@ export function MatchSetup({
                 {myMaps.map((m) => {
                   const active = zoneId === 'custom' && customZone?.id === m.zone.id
                   return (
-                    <button key={m.id} onClick={() => selectCustomMap(m)} style={{
-                      cursor: 'pointer', fontFamily: 'monospace', textAlign: 'left',
-                      padding: '8px 12px', width: 170, boxSizing: 'border-box',
-                      background: active ? '#ff6600' : '#1d1d2a', color: active ? '#000' : '#fff',
-                      border: active ? '1px solid #ff6600' : '1px solid #3a3a55',
-                    }}>
-                      <div style={{ fontSize: 14, fontWeight: 'bold' }}>{m.name}</div>
-                      <div style={{ fontSize: 11, opacity: 0.6, marginTop: 3 }}>{m.zone.arenaSize * 2}×{m.zone.arenaSize * 2} · {m.zone.structures.length} objs</div>
-                    </button>
+                    <div key={m.id} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <button onClick={() => selectCustomMap(m)} style={{
+                        cursor: 'pointer', fontFamily: 'monospace', textAlign: 'left',
+                        padding: '8px 12px', width: 170, boxSizing: 'border-box',
+                        background: active ? '#ff6600' : '#1d1d2a', color: active ? '#000' : '#fff',
+                        border: active ? '1px solid #ff6600' : '1px solid #3a3a55',
+                      }}>
+                        <div style={{ fontSize: 14, fontWeight: 'bold' }}>{m.name}</div>
+                        <div style={{ fontSize: 11, opacity: 0.6, marginTop: 3 }}>{m.zone.arenaSize * 2}×{m.zone.arenaSize * 2} · {m.zone.structures.length} objs</div>
+                      </button>
+                      <button style={smallBtn} onClick={() => onEditMap(m)}>Edit</button>
+                    </div>
                   )
                 })}
               </div>

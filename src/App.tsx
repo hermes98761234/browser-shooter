@@ -161,6 +161,7 @@ function App() {
   const [showInGameHelp, setShowInGameHelp] = useState(false)
   const [scoreboardPlayers, setScoreboardPlayers] = useState<EntityState[]>([])
   const [showMatchSetup, setShowMatchSetup] = useState(false)
+  const [editingMap, setEditingMap] = useState<import('./zones/mapStore').SavedMap | undefined>(undefined)
   const [myTeam, setMyTeam] = useState<Team>('ct')
   const [roster, setRoster] = useState<{ ct: string[]; t: string[] }>({ ct: [], t: [] })
   const [killFeed, setKillFeed] = useState<KillLine[]>([])
@@ -1468,13 +1469,15 @@ function App() {
         <MatchSetup
           onBack={() => setShowMatchSetup(false)}
           onConfirm={(c) => { setShowMatchSetup(false); void hostGame(c).catch(() => setJoinError('Could not start hosting.')) }}
-          onCreateMap={() => { setShowMatchSetup(false); updateGameState('mapeditor') }}
+          onCreateMap={() => { setEditingMap(undefined); setShowMatchSetup(false); updateGameState('mapeditor') }}
+          onEditMap={(map) => { setEditingMap(map); setShowMatchSetup(false); updateGameState('mapeditor') }}
         />
       )}
       {gameState === 'mapeditor' && (
         <MapEditor
-          onSave={() => { updateGameState('mpmenu'); setShowMatchSetup(true) }}
-          onCancel={() => { updateGameState('mpmenu'); setShowMatchSetup(true) }}
+          initial={editingMap}
+          onSave={() => { setEditingMap(undefined); updateGameState('mpmenu'); setShowMatchSetup(true) }}
+          onCancel={() => { setEditingMap(undefined); updateGameState('mpmenu'); setShowMatchSetup(true) }}
         />
       )}
 
