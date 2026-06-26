@@ -41,4 +41,8 @@ export class RemotePlayerManager {
     for (const rp of this.players.values()) { this.scene.remove(rp.group); rp.dispose() }
     this.players.clear()
   }
+
+  setTalking(playerId: string, on: boolean): void {
+    this.players.get(playerId)?.setTalking(on)
+  }
 }

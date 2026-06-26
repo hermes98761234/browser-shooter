@@ -54,6 +54,24 @@ export function getNameTag(group: THREE.Group): THREE.Sprite | null {
   return (group.children.find((c) => c instanceof THREE.Sprite) as THREE.Sprite) ?? null
 }
 
+/** Green circle sprite shown above a player's head while they are talking. */
+export function buildTalkingSprite(): THREE.Sprite {
+  const canvas = document.createElement('canvas')
+  canvas.width = 32; canvas.height = 32
+  const ctx = canvas.getContext('2d')!
+  ctx.beginPath()
+  ctx.arc(16, 16, 14, 0, Math.PI * 2)
+  ctx.fillStyle = '#22ff44'
+  ctx.fill()
+  const tex = new THREE.CanvasTexture(canvas)
+  const mat = new THREE.SpriteMaterial({ map: tex, depthTest: false })
+  const sprite = new THREE.Sprite(mat)
+  sprite.scale.set(0.25, 0.25, 1)
+  sprite.position.set(0, 2.65, 0)
+  sprite.visible = false
+  return sprite
+}
+
 /** Build a limb as a pivot group at `(x, pivotY)` with the mesh hanging below it. */
 function makeLimb(
   geo: THREE.BoxGeometry,

@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { animateCharacter, buildCharacter, getNameTag } from '../entities/CharacterModel'
+import { animateCharacter, buildCharacter, getNameTag, buildTalkingSprite } from '../entities/CharacterModel'
 import { EYE_HEIGHT } from '../player/Player'
 import type { EntityState } from '../session/protocol'
 import type { Team, WeaponType } from '../types'
@@ -26,6 +26,7 @@ export class RemotePlayer {
   private vestMesh: THREE.Mesh | null = null
   private helmetMesh: THREE.Mesh | null = null
   private nameTag: THREE.Sprite | null
+  private talkingSprite: THREE.Sprite
   private readonly prevPos = new THREE.Vector3()
   private hasPrevPos = false
 
@@ -35,6 +36,8 @@ export class RemotePlayer {
     this.thirdPersonWeapon = new ThirdPersonWeapon('pistol')
     this.thirdPersonWeapon.group.position.set(0.42, 1.3, -0.35)
     this.group.add(this.thirdPersonWeapon.group)
+    this.talkingSprite = buildTalkingSprite()
+    this.group.add(this.talkingSprite)
   }
 
   pushState(s: EntityState, time?: number): void {
@@ -116,6 +119,9 @@ export class RemotePlayer {
     if (!this.isDead) animateCharacter(this.group, speed, dt)
   }
 
+  setTalking(on: boolean): void { this.talkingSprite.visible = on }
+  isTalking(): boolean { return this.talkingSprite.visible }
+
   private applyTeamColor(color: number): void {
     const seen = new Set<THREE.MeshStandardMaterial>()
     this.group.traverse((o) => {
@@ -178,6 +184,8 @@ export class RemotePlayer {
     this.setArmor(false)
     this.setHelmet(false)
     this.thirdPersonWeapon.dispose()
+    ;(this.talkingSprite.material as THREE.SpriteMaterial).map?.dispose()
+    ;(this.talkingSprite.material as THREE.SpriteMaterial).dispose()
     this.group.traverse((o) => {
       if (o instanceof THREE.Mesh) { o.geometry.dispose(); (o.material as THREE.Material).dispose() }
     })
