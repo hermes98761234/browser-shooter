@@ -260,7 +260,7 @@ function App() {
     const trimmed = text.trim()
     if (!trimmed) { setConsoleOpen(false); return }
     const data = gameDataRef.current
-    const cmd = parseChatCommand(trimmed, data.lastPlayers.map(p => p.name))
+    const cmd = parseChatCommand(trimmed, data.lastPlayers.map(p => p.name).filter((n): n is string => !!n))
     if (!cmd) {
       setChatMessages(prev => [...prev.slice(-199), {
         id: chatSeqRef.current++, from: '', scope: 'all' as const,
@@ -1649,7 +1649,7 @@ function App() {
             messages={chatMessages}
             onSend={handleSend}
             onClose={() => setConsoleOpen(false)}
-            playerNames={gameDataRef.current.lastPlayers.map(p => p.name)}
+            playerNames={gameDataRef.current.lastPlayers.map(p => p.name).filter((n): n is string => !!n)}
           />
           {voiceNotice && (
             <div style={{ position: 'absolute', left: 16, bottom: 64, zIndex: 60,
