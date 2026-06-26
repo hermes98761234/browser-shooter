@@ -296,6 +296,8 @@ function App() {
   const startGame = useCallback(() => {
     const data = gameDataRef.current
     resetNetworking()
+    // Pin random seed so session and scene both generate the same map
+    if (data.matchConfig.zoneId === 'random') data.matchConfig = { ...data.matchConfig, randomSeed: Date.now() }
     const scene = engineRef.current?.scene
     for (const enemy of data.session.enemies) { scene?.remove(enemy.mesh); enemy.dispose() }
     for (const pickup of data.session.pickups) { scene?.remove(pickup.mesh); pickup.dispose() }
