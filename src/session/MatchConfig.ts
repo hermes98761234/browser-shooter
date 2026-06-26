@@ -17,6 +17,7 @@ export interface MatchConfig {
   zoneId?: string           // selected zone id; undefined falls back to the default zone (Arid)
   randomSeed?: number       // seed for the random zone; host generates once, clients receive via welcome
   customZone?: ZoneDef     // full zone definition when zoneId === 'custom'
+  voiceMode?: 'team' | 'proximity'
 }
 
 export function defaultMatchConfig(): MatchConfig {
