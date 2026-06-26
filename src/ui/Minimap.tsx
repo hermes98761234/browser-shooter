@@ -49,9 +49,6 @@ export const Minimap: React.FC<MinimapProps> = ({
       ctx.fillStyle = 'rgba(0, 0, 0, 0.6)'
       ctx.fillRect(0, 0, size, size)
 
-      ctx.strokeStyle = '#444'
-      ctx.strokeRect(10, 10, size - 20, size - 20)
-
       const cx = size / 2
       const cy = size / 2
 
