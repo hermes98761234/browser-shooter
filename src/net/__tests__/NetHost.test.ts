@@ -95,6 +95,72 @@ describe('NetHost', () => {
       expect(local?.ping).toBe(0)
     }
   })
+
+  it('routes all-scope chat to all clients', () => {
+    const session = new GameSession()
+    const host = new NetHost(session, { mode: 'pvp', damagePolicy: 'ffa', fragLimit: 5 })
+    const [h1, c1] = createLinkedTransports()
+    const [h2, c2] = createLinkedTransports()
+    const recv1: NetMessage[] = []; const recv2: NetMessage[] = []
+    c1.onMessage(m => recv1.push(m)); c2.onMessage(m => recv2.push(m))
+
+    host.addClient('p2', 'Bob', h1, 'ct')
+    host.addClient('p3', 'Carol', h2, 't')
+
+    host.routeChat({ type: 'chat', playerId: 'p2', name: 'Bob', team: 'ct', scope: 'all', text: 'hi all' })
+
+    // p3 (c2) should receive it; p2 (c1) should NOT (no echo to sender)
+    expect(recv2.some(m => m.type === 'chat' && m.type === 'chat' && m.text === 'hi all')).toBe(true)
+    const chatToSender = recv1.filter(m => m.type === 'chat')
+    expect(chatToSender).toHaveLength(0)
+  })
+
+  it('routes team-scope chat only to same-team clients', () => {
+    const session = new GameSession()
+    const host = new NetHost(session, { mode: 'pvp', damagePolicy: 'ffa', fragLimit: 5 })
+    const [h1, c1] = createLinkedTransports()
+    const [h2, c2] = createLinkedTransports()
+    const recv1: NetMessage[] = []; const recv2: NetMessage[] = []
+    c1.onMessage(m => recv1.push(m)); c2.onMessage(m => recv2.push(m))
+
+    host.addClient('p2', 'Bob', h1, 'ct')
+    host.addClient('p3', 'Carol', h2, 't')
+
+    host.routeChat({ type: 'chat', playerId: 'p2', name: 'Bob', team: 'ct', scope: 'team', text: 'ct only' })
+
+    // Carol is on 't' — should NOT receive
+    expect(recv2.filter(m => m.type === 'chat')).toHaveLength(0)
+  })
+
+  it('routes player-scope chat only to the named player', () => {
+    const session = new GameSession()
+    const host = new NetHost(session, { mode: 'pvp', damagePolicy: 'ffa', fragLimit: 5 })
+    const [h1, c1] = createLinkedTransports()
+    const [h2, c2] = createLinkedTransports()
+    const recv1: NetMessage[] = []; const recv2: NetMessage[] = []
+    c1.onMessage(m => recv1.push(m)); c2.onMessage(m => recv2.push(m))
+
+    host.addClient('p2', 'Bob', h1, 'ct')
+    host.addClient('p3', 'Carol', h2, 't')
+
+    host.routeChat({ type: 'chat', playerId: 'p2', name: 'Bob', team: 'ct', scope: 'player', targetName: 'Carol', text: 'hey carol' })
+
+    expect(recv2.some(m => m.type === 'chat')).toBe(true)
+    expect(recv1.filter(m => m.type === 'chat')).toHaveLength(0)
+  })
+
+  it('fires onChat for the host when a client sends an all-scope message', () => {
+    const session = new GameSession()
+    const host = new NetHost(session, { mode: 'pvp', damagePolicy: 'ffa', fragLimit: 5 })
+    const [h1, c1] = createLinkedTransports()
+    const hostRecv: NetMessage[] = []
+    host.onChat(m => hostRecv.push(m))
+
+    host.addClient('p2', 'Bob', h1, 'ct')
+    c1.send({ type: 'chat', playerId: 'p2', name: 'Bob', team: 'ct', scope: 'all', text: 'hello host' })
+
+    expect(hostRecv.some(m => m.type === 'chat')).toBe(true)
+  })
 })
 
 describe('NetHost join policy', () => {

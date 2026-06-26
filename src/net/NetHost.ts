@@ -24,6 +24,7 @@ export class NetHost {
   private remoteVoiceStartCb: ((playerId: string, name: string) => void) | null = null
   private remoteVoiceStopCb: ((playerId: string) => void) | null = null
   private clientTeamChangedCb: ((playerId: string, name: string, team: Team) => void) | null = null
+  private chatCb: ((msg: Extract<NetMessage, { type: 'chat' }>) => void) | null = null
 
   setHostVoice(playerId: string, peerId: string): void {
     this.hostVoice = { playerId, peerId }
@@ -31,6 +32,7 @@ export class NetHost {
   }
   onHostRoster(cb: (teammates: VoiceRosterEntry[]) => void): void { this.hostRosterCb = cb }
   onClientTeamChanged(cb: (playerId: string, name: string, team: Team) => void): void { this.clientTeamChangedCb = cb }
+  onChat(cb: (msg: Extract<NetMessage, { type: 'chat' }>) => void): void { this.chatCb = cb }
   onRemoteVoiceStart(cb: (playerId: string, name: string) => void): void { this.remoteVoiceStartCb = cb }
   onRemoteVoiceStop(cb: (playerId: string) => void): void { this.remoteVoiceStopCb = cb }
 
@@ -133,6 +135,8 @@ export class NetHost {
         this.relayVoice(msg, playerId)
       } else if (msg.type === 'voiceStop' && msg.playerId === playerId) {
         this.relayVoice(msg, playerId)
+      } else if (msg.type === 'chat' && msg.playerId === playerId) {
+        this.routeChat(msg)
       }
     })
     const players = this.session.playerIds()
@@ -153,6 +157,25 @@ export class NetHost {
   /** Notify clients when the host changes their own team. */
   broadcastTeamChange(playerId: string, name: string, team: Team): void {
     this.broadcast({ type: 'teamChanged', playerId, name, team })
+  }
+
+  routeChat(msg: Extract<NetMessage, { type: 'chat' }>): void {
+    const senderTeam = this.session.getPlayer(msg.playerId)?.team
+    for (const link of this.links) {
+      if (link.playerId === msg.playerId) continue  // no echo to sender
+      if (msg.scope === 'team' && this.session.getPlayer(link.playerId)?.team !== senderTeam) continue
+      if (msg.scope === 'player' && this.session.getPlayer(link.playerId)?.name !== msg.targetName) continue
+      link.transport.send(msg)
+    }
+    // Notify the host player if they are a valid recipient and didn't send the message
+    if (msg.playerId !== this.session.localId) {
+      const hostPlayer = this.session.getPlayer(this.session.localId)
+      const hostReceives =
+        msg.scope === 'all' ||
+        (msg.scope === 'team' && hostPlayer?.team === senderTeam) ||
+        (msg.scope === 'player' && hostPlayer?.name === msg.targetName)
+      if (hostReceives) this.chatCb?.(msg)
+    }
   }
 
   /** Tell every client to leave the lobby and begin the match. */
