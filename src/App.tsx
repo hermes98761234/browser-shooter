@@ -1508,7 +1508,7 @@ function App() {
             playerRotation={playerRot}
             enemies={enemyPositions}
             allies={allyPositions}
-            arenaSize={ARENA_SIZE}
+            arenaSize={gameDataRef.current.session.map.arenaSize}
             bombsites={gameDataRef.current.session.bombsites.map(s => ({ id: s.id, position: s.center }))}
             bombPosition={gameDataRef.current.session.bomb.position ?? undefined}
             structures={gameDataRef.current.session.map.structures}
