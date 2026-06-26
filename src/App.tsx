@@ -339,7 +339,12 @@ function App() {
         if (data.role === 'host') data.netHost?.localVoiceStop()
         else data.netClient?.sendVoiceStop(id)
       },
-      onSpeakersChanged: (list) => setSpeakers(list),
+      onSpeakersChanged: (list) => {
+        setSpeakers(list)
+        const speakingIds = new Set(list.map(s => s.playerId))
+        const rp = gameDataRef.current.remotePlayers
+        for (const id of rp?.ids() ?? []) rp?.setTalking(id, speakingIds.has(id))
+      },
       playStream: (peerId, stream) => data.audioSink.play(peerId, stream),
       stopStream: (peerId) => data.audioSink.stop(peerId),
     })
