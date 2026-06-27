@@ -48,8 +48,11 @@ export class VideoChat {
         this.camStream.getVideoTracks().forEach(t => { t.enabled = false })
         this.activated = true
       })()
-      await this.activating
-      this.activating = null
+      try {
+        await this.activating
+      } finally {
+        this.activating = null
+      }
       if (this.disposed) return
     }
     this.cameraOn = !this.cameraOn
