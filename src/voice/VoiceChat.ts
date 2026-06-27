@@ -33,6 +33,7 @@ export class VoiceChat {
   private now: () => number
   private heartbeatMs: number
 
+  private peerIdByPlayerId = new Map<string, string>()
   private incomingCallHandler?: (call: VoiceCall) => void
 
   constructor(private deps: VoiceChatDeps) {
@@ -44,6 +45,7 @@ export class VoiceChat {
   }
 
   setRoster(teammates: VoiceRosterEntry[]): void {
+    for (const e of teammates) this.peerIdByPlayerId.set(e.playerId, e.peerId)
     this.roster = teammates
     if (this.activated) this.reconcile()
   }
@@ -79,8 +81,11 @@ export class VoiceChat {
   }
 
   peerDisconnected(playerId: string): void {
-    const entry = this.roster.find(r => r.playerId === playerId)
-    if (entry) this.closeCall(entry.peerId)
+    const peerId = this.peerIdByPlayerId.get(playerId)
+    if (peerId) {
+      this.closeCall(peerId)
+      this.peerIdByPlayerId.delete(playerId)
+    }
     this.registry.remove(playerId)
     this.emit()
   }

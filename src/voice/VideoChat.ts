@@ -19,6 +19,7 @@ export class VideoChat {
   private disposed = false
   private activating: Promise<void> | null = null  // serialises concurrent toggles
   private closing = new Set<string>()
+  private peerIdByPlayerId = new Map<string, string>()
   private incomingCallHandler?: (call: VoiceCall) => void
 
   constructor(private deps: VideoChatDeps) {
@@ -27,6 +28,7 @@ export class VideoChat {
   }
 
   setRoster(teammates: VoiceRosterEntry[]): void {
+    for (const e of teammates) this.peerIdByPlayerId.set(e.playerId, e.peerId)
     this.roster = teammates
     if (this.activated && this.cameraOn) this.reconcile()
   }
@@ -64,8 +66,11 @@ export class VideoChat {
   }
 
   peerDisconnected(playerId: string): void {
-    const entry = this.roster.find(r => r.playerId === playerId)
-    if (entry) this.closeCall(entry.peerId)
+    const peerId = this.peerIdByPlayerId.get(playerId)
+    if (peerId) {
+      this.closeCall(peerId)
+      this.peerIdByPlayerId.delete(playerId)
+    }
   }
 
   dispose(): void {

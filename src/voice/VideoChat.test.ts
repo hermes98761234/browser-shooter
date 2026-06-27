@@ -141,6 +141,21 @@ describe('VideoChat', () => {
     expect(call.closed).toBe(true)
   })
 
+  it('peerDisconnected closes call even when player already removed from roster', async () => {
+    const s = setup('aaa')
+    s.chat.setRoster([{ playerId: 'p2', peerId: 'bbb', name: 'P2' }])
+    await s.chat.toggleCamera()
+    const call = s.peer.calls[0]
+    expect(call.closed).toBe(false)
+
+    // Roster update removes p2 before playerLeft fires
+    s.chat.setRoster([])
+
+    // playerLeft fires — must still close the call
+    s.chat.peerDisconnected('p2')
+    expect(call.closed).toBe(true)
+  })
+
   it('dispose closes all calls and stops camera tracks', async () => {
     const s = setup('aaa')
     s.chat.setRoster([{ playerId: 'other', peerId: 'bbb', name: 'Other' }])
