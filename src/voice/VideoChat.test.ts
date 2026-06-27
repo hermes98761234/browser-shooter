@@ -183,6 +183,37 @@ describe('VideoChat', () => {
 })
 
 describe('BrowserCamProvider track liveness', () => {
+  it('concurrent getStream calls with ended tracks share one re-acquisition', async () => {
+    let callCount = 0
+    const track = { readyState: 'live' as string, stop: vi.fn() }
+    const stream1 = { getVideoTracks: () => [track] } as unknown as MediaStream
+    const stream2 = { getVideoTracks: () => [] } as unknown as MediaStream
+    const gum = vi.fn().mockImplementation(() =>
+      Promise.resolve(callCount++ === 0 ? stream1 : stream2)
+    )
+    const originalMD = Object.getOwnPropertyDescriptor(navigator, 'mediaDevices')
+    Object.defineProperty(navigator, 'mediaDevices', {
+      value: { getUserMedia: gum }, configurable: true,
+    })
+
+    const { BrowserCamProvider } = await import('./VoiceTransport')
+    const provider = new (BrowserCamProvider as any)()
+
+    // First acquisition
+    const s1 = await provider.getStream()
+    expect(gum).toHaveBeenCalledTimes(1)
+
+    // Mark the track as ended (use stable track reference so it's visible to the implementation)
+    track.readyState = 'ended'
+
+    // Two concurrent calls — both see ended track synchronously → should share one new acquisition
+    const [s2, s3] = await Promise.all([provider.getStream(), provider.getStream()])
+    expect(gum).toHaveBeenCalledTimes(2)  // only one re-acquisition
+    expect(s2).toBe(s3)                    // same promise result
+
+    if (originalMD) Object.defineProperty(navigator, 'mediaDevices', originalMD)
+  })
+
   it('re-acquires stream when cached tracks are ended', async () => {
     // Simulate what happens in the browser after tracks are stopped
     const liveTrack1 = { readyState: 'live', stop: vi.fn() }

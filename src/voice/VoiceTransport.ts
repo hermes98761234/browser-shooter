@@ -81,26 +81,22 @@ export interface CamProvider {
 
 export class BrowserCamProvider implements CamProvider {
   private stream: Promise<MediaStream> | null = null
+  private resolvedStream: MediaStream | null = null
 
   getStream(): Promise<MediaStream> {
-    if (this.stream) {
-      return this.stream.then(s => {
-        const tracks = s.getVideoTracks()
-        if (tracks.length > 0 && tracks.every(t => t.readyState === 'ended')) {
-          // Synchronously replace this.stream so concurrent callers share the new acquisition
-          this.stream = navigator.mediaDevices.getUserMedia({ video: true, audio: false }).catch((err) => {
-            this.stream = null
-            throw err
-          })
-          return this.stream
-        }
-        return s
-      })
+    // Synchronous liveness check — runs before any caller returns
+    if (this.resolvedStream !== null) {
+      const tracks = this.resolvedStream.getVideoTracks()
+      if (tracks.length > 0 && tracks.every(t => t.readyState === 'ended')) {
+        this.stream = null
+        this.resolvedStream = null
+      }
     }
-    this.stream = navigator.mediaDevices.getUserMedia({ video: true, audio: false }).catch((err) => {
-      this.stream = null
-      throw err
-    })
+    if (!this.stream) {
+      this.stream = navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+        .then(s => { this.resolvedStream = s; return s })
+        .catch((err) => { this.stream = null; this.resolvedStream = null; throw err })
+    }
     return this.stream
   }
 }
