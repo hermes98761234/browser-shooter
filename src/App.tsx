@@ -186,6 +186,8 @@ function App() {
   const [consolePrefill, setConsolePrefill] = useState('')
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
   const chatSeqRef = useRef(0)
+  const voiceNoticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const videoNoticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const lastWaveRef = useRef(0)
   const ownedRef = useRef<string[]>([])
@@ -864,7 +866,8 @@ function App() {
       if (!chat) return
       chat.startTalking().catch(() => {
         setVoiceNotice('Microphone unavailable — push-to-talk disabled')
-        setTimeout(() => setVoiceNotice(null), 4000)
+        clearTimeout(voiceNoticeTimerRef.current ?? undefined)
+        voiceNoticeTimerRef.current = setTimeout(() => setVoiceNotice(null), 4000)
       })
     }
     data.controls.onTalkStop = () => {
@@ -878,7 +881,8 @@ function App() {
         setLocalVideoStream(vc.localStream)
       }).catch(() => {
         setVideoNotice('Camera unavailable — video disabled')
-        setTimeout(() => setVideoNotice(null), 4000)
+        clearTimeout(videoNoticeTimerRef.current ?? undefined)
+        videoNoticeTimerRef.current = setTimeout(() => setVideoNotice(null), 4000)
       })
     }
 

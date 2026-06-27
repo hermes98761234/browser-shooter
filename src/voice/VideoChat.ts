@@ -93,7 +93,11 @@ export class VideoChat {
 
   private openCall(peerId: string): void {
     if (this.calls.has(peerId) || !this.camStream) return
-    this.wireCall(this.deps.peer.call(peerId, this.camStream))
+    try {
+      this.wireCall(this.deps.peer.call(peerId, this.camStream))
+    } catch {
+      // peer destroyed or ICE failure — reconcile will retry on next roster/toggle
+    }
   }
 
   private handleIncoming(call: VoiceCall): void {

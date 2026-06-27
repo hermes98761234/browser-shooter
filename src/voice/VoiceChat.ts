@@ -134,7 +134,11 @@ export class VoiceChat {
 
   private openCall(peerId: string): void {
     if (this.calls.has(peerId) || !this.mic) return
-    this.wireCall(this.deps.peer.call(peerId, this.mic))
+    try {
+      this.wireCall(this.deps.peer.call(peerId, this.mic))
+    } catch {
+      // peer destroyed — reconcile will retry on next roster update
+    }
   }
 
   private handleIncoming(call: VoiceCall): void {
