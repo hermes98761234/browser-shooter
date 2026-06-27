@@ -198,6 +198,23 @@ describe('VideoChat', () => {
     expect(s.peer.calls[1].closed).toBe(false)
   })
 
+  it('ignores stream event arriving after call is closed (no ghost tile)', async () => {
+    const s = setup('aaa')
+    s.chat.setRoster([{ playerId: 'p2', peerId: 'bbb', name: 'P2' }])
+    await s.chat.toggleCamera()
+
+    const call = s.peer.calls[0]
+    // Close the call before the stream event arrives
+    call.close()
+    s.onStreamsChanged.mockClear()
+
+    // Simulate buffered stream event arriving after close
+    call.emitStream(fakeCamStream())
+
+    // Must not add a ghost stream entry
+    expect(s.onStreamsChanged).not.toHaveBeenCalled()
+  })
+
   it('dispose while activating stops the acquired stream and does not crash', async () => {
     let resolveStream!: (s: MediaStream) => void
     const slowStream = new Promise<MediaStream>(res => { resolveStream = res })

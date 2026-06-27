@@ -109,6 +109,7 @@ export class VideoChat {
   private wireCall(call: VoiceCall): void {
     this.calls.set(call.peerId, call)
     call.onStream((stream) => {
+      if (this.calls.get(call.peerId) !== call) return  // ignore buffered events after cleanup or re-call
       this.streams.set(call.peerId, stream)
       this.emit()
     })

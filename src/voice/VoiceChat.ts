@@ -149,7 +149,10 @@ export class VoiceChat {
 
   private wireCall(call: VoiceCall): void {
     this.calls.set(call.peerId, call)
-    call.onStream((stream) => this.deps.playStream(call.peerId, stream))
+    call.onStream((stream) => {
+      if (this.calls.get(call.peerId) !== call) return  // ignore buffered events after cleanup or re-call
+      this.deps.playStream(call.peerId, stream)
+    })
     call.onClose(() => this.cleanupCall(call.peerId))
   }
 
