@@ -121,6 +121,8 @@ export class VideoChat {
     this.calls.delete(peerId)
     this.streams.delete(peerId)
     this.emit()
+    // Retry: if camera is still on, reconcile will re-open this call if appropriate
+    if (this.cameraOn) this.reconcile()
   }
 
   private emit(): void {

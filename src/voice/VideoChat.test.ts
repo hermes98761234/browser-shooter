@@ -166,6 +166,24 @@ describe('VideoChat', () => {
     expect(s.peer.calls.every(c => c.closed)).toBe(true) // no open calls
   })
 
+  it('retries call after remote rejects due to camera off (initiator reconciles on cleanup)', async () => {
+    // aaa < bbb, so aaa initiates
+    const s = setup('aaa')
+    s.chat.setRoster([{ playerId: 'p2', peerId: 'bbb', name: 'P2' }])
+    await s.chat.toggleCamera()   // camera ON, opens call to bbb
+
+    const firstCall = s.peer.calls[0]
+    expect(firstCall.peerId).toBe('bbb')
+
+    // Simulate remote rejection: bbb closes the call (camera was off on bbb's side)
+    firstCall.close()  // fires onClose → cleanupCall → should trigger reconcile → retry
+
+    // After retry, a second call should have been placed
+    expect(s.peer.calls).toHaveLength(2)
+    expect(s.peer.calls[1].peerId).toBe('bbb')
+    expect(s.peer.calls[1].closed).toBe(false)
+  })
+
   it('dispose while activating stops the acquired stream and does not crash', async () => {
     let resolveStream!: (s: MediaStream) => void
     const slowStream = new Promise<MediaStream>(res => { resolveStream = res })
