@@ -58,6 +58,8 @@ export class PeerJsVoicePeer implements VoicePeer {
     return new PeerJsVoiceCall(this.peer.call(peerId, stream))
   }
   onIncomingCall(cb: (call: VoiceCall) => void): void {
+    const existing = this.callbacks.get(cb)
+    if (existing) this.peer.removeListener('call', existing)
     const wrapper = (conn: MediaConnection) => {
       if (conn.metadata?.type === 'video') return  // video calls handled by PeerJsVideoPeer
       cb(new PeerJsVoiceCall(conn))
@@ -110,6 +112,8 @@ export class PeerJsVideoPeer implements VoicePeer {
     return new PeerJsVoiceCall(this.peer.call(peerId, stream, { metadata: { type: 'video' } }))
   }
   onIncomingCall(cb: (call: VoiceCall) => void): void {
+    const existing = this.callbacks.get(cb)
+    if (existing) this.peer.removeListener('call', existing)
     const wrapper = (conn: MediaConnection) => {
       if (conn.metadata?.type !== 'video') return  // ignore voice calls
       cb(new PeerJsVoiceCall(conn))
