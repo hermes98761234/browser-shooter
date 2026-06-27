@@ -141,35 +141,18 @@ describe('VideoChat', () => {
     expect(call.closed).toBe(true)
   })
 
-  it('peerDisconnected uses peerIdByPlayerId Map — Map entry consumed after roster cleared', async () => {
-    // zzz > aaa, so zzz never initiates — use incoming-call path to get a live call
-    const s = setup('zzz')
-    s.chat.setRoster([{ playerId: 'p2', peerId: 'aaa', name: 'P2' }])
-    await s.chat.toggleCamera()
+  it('peerIdByPlayerId Map: populated by setRoster, retained after roster cleared, consumed by peerDisconnected', async () => {
+    const s = setup('aaa')
+    const chat = s.chat as any  // access private Map for verification
 
-    // Receive incoming call from aaa (zzz answers because zzz > aaa)
-    const incoming = new FakeCall('aaa')
-    s.peer.fireIncoming(incoming)
-    expect(incoming.answered).toBe(true)
-    expect(incoming.closed).toBe(false)
+    s.chat.setRoster([{ playerId: 'p2', peerId: 'bbb', name: 'P2' }])
+    expect(chat.peerIdByPlayerId.get('p2')).toBe('bbb')   // Map populated
 
-    // Race: roster update removes p2 before playerLeft fires.
-    // reconcile() runs (cameraOn=true) and closes the call to aaa.
-    s.chat.setRoster([])
-    expect(incoming.closed).toBe(true)
+    s.chat.setRoster([])                                   // roster cleared, Map retains entry
+    expect(chat.peerIdByPlayerId.get('p2')).toBe('bbb')   // Map retained — old code would have nothing
 
-    // playerLeft fires after roster update.
-    // Old code: roster.find() → undefined → silently skips closeCall
-    // New code: peerIdByPlayerId.get('p2') → 'aaa' → closeCall (no-op, already gone) → Map entry deleted
-    // Key guarantee: no crash and Map entry is consumed
-    s.chat.peerDisconnected('p2')
-
-    // Verify the Map entry was consumed: p2 rejoins and must receive a fresh incoming call
-    s.chat.setRoster([{ playerId: 'p2', peerId: 'aaa', name: 'P2' }])
-    const incoming2 = new FakeCall('aaa')
-    s.peer.fireIncoming(incoming2)
-    expect(incoming2.answered).toBe(true)
-    expect(incoming2.closed).toBe(false)
+    s.chat.peerDisconnected('p2')                          // Map entry consumed
+    expect(chat.peerIdByPlayerId.has('p2')).toBe(false)   // entry cleaned up
   })
 
   it('dispose closes all calls and stops camera tracks', async () => {
