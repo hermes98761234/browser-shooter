@@ -233,7 +233,7 @@ describe('BrowserCamProvider track liveness', () => {
     const provider = new (BrowserCamProvider as any)()
 
     // First acquisition
-    const s1 = await provider.getStream()
+    await provider.getStream()
     expect(gum).toHaveBeenCalledTimes(1)
 
     // Mark the track as ended (use stable track reference so it's visible to the implementation)
