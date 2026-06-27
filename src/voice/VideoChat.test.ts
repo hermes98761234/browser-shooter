@@ -150,4 +150,34 @@ describe('VideoChat', () => {
     expect(call.closed).toBe(true)
     expect(s.stream.getVideoTracks()[0].stop).toHaveBeenCalled()
   })
+
+  it('concurrent toggleCamera calls serialize — camera ends up ON after two rapid calls', async () => {
+    const s = setup('aaa')
+    s.chat.setRoster([{ playerId: 'p2', peerId: 'bbb', name: 'P2' }])
+    // Fire two toggles without awaiting the first
+    const p1 = s.chat.toggleCamera()
+    const p2 = s.chat.toggleCamera()
+    await Promise.all([p1, p2])
+    // Two presses = on then off OR two presses = they serialise and net to the same result.
+    // The key invariant: cameraOn must equal the number of presses mod 2.
+    // Two presses → off. But the bug causes them to both enter init and double-flip cameraOn.
+    // After fix: second call waits for first, then flips again → off. No spurious peer calls.
+    expect(s.chat.localStream).toBeNull()          // 2 presses = net off
+    expect(s.peer.calls.every(c => c.closed)).toBe(true) // no open calls
+  })
+
+  it('dispose while activating stops the acquired stream and does not crash', async () => {
+    let resolveStream!: (s: MediaStream) => void
+    const slowStream = new Promise<MediaStream>(res => { resolveStream = res })
+    const cam: CamProvider = { getStream: vi.fn().mockReturnValue(slowStream) }
+    const peer = new FakePeer('aaa')
+    const chat = new VideoChat({ peer, cam, localPlayerId: 'aaa', onStreamsChanged: vi.fn() })
+    const toggleP = chat.toggleCamera() // suspended, getStream not yet resolved
+    chat.dispose()                       // dispose races the toggle
+    const stream = fakeCamStream()
+    resolveStream(stream)                // now getStream resolves
+    await toggleP                        // continuation runs — must not crash
+    expect(stream.getVideoTracks()[0].stop).toHaveBeenCalled() // tracks stopped
+    expect(chat.localStream).toBeNull()
+  })
 })

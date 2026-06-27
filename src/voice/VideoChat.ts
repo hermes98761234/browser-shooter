@@ -16,6 +16,8 @@ export class VideoChat {
   private camStream: MediaStream | null = null
   private cameraOn = false
   private activated = false
+  private disposed = false
+  private activating: Promise<void> | null = null  // serialises concurrent toggles
   private incomingCallHandler?: (call: VoiceCall) => void
 
   constructor(private deps: VideoChatDeps) {
@@ -29,10 +31,23 @@ export class VideoChat {
   }
 
   async toggleCamera(): Promise<void> {
+    if (this.activating) {
+      await this.activating  // wait for in-flight activation to finish, then continue
+    }
     if (!this.activated) {
-      this.camStream = await this.deps.cam.getStream()
-      this.camStream.getVideoTracks().forEach(t => { t.enabled = false })
-      this.activated = true
+      this.activating = (async () => {
+        const stream = await this.deps.cam.getStream()
+        if (this.disposed) {
+          stream.getVideoTracks().forEach(t => t.stop())
+          return
+        }
+        this.camStream = stream
+        this.camStream.getVideoTracks().forEach(t => { t.enabled = false })
+        this.activated = true
+      })()
+      await this.activating
+      this.activating = null
+      if (this.disposed) return
     }
     this.cameraOn = !this.cameraOn
     this.camStream!.getVideoTracks().forEach(t => { t.enabled = this.cameraOn })
@@ -53,6 +68,7 @@ export class VideoChat {
   }
 
   dispose(): void {
+    this.disposed = true
     for (const peerId of [...this.calls.keys()]) this.closeCall(peerId)
     this.camStream?.getVideoTracks().forEach(t => t.stop())
     this.camStream = null

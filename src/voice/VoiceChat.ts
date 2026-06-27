@@ -27,6 +27,7 @@ export class VoiceChat {
   private calls = new Map<string, VoiceCall>() // peerId -> call
   private mic: MediaStream | null = null
   private activated = false
+  private disposed = false
   private talking = false
   private lastSent = 0
   private now: () => number
@@ -97,6 +98,7 @@ export class VoiceChat {
   }
 
   dispose(): void {
+    this.disposed = true
     for (const peerId of [...this.calls.keys()]) this.closeCall(peerId)
     this.mic?.getAudioTracks().forEach(t => t.stop())
     this.mic = null
@@ -106,7 +108,12 @@ export class VoiceChat {
   }
 
   private async activate(): Promise<void> {
-    this.mic = await this.deps.mic.getStream()
+    const stream = await this.deps.mic.getStream()
+    if (this.disposed) {
+      stream.getAudioTracks().forEach(t => t.stop())
+      return
+    }
+    this.mic = stream
     this.setMicEnabled(false)
     this.activated = true
     this.reconcile()
