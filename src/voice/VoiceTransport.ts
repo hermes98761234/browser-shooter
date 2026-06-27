@@ -84,11 +84,15 @@ export class BrowserCamProvider implements CamProvider {
 
   getStream(): Promise<MediaStream> {
     if (this.stream) {
-      // Invalidate cache if all video tracks are ended (e.g. after dispose())
       return this.stream.then(s => {
-        if (s.getVideoTracks().every(t => t.readyState === 'ended')) {
-          this.stream = null
-          return this.getStream()
+        const tracks = s.getVideoTracks()
+        if (tracks.length > 0 && tracks.every(t => t.readyState === 'ended')) {
+          // Synchronously replace this.stream so concurrent callers share the new acquisition
+          this.stream = navigator.mediaDevices.getUserMedia({ video: true, audio: false }).catch((err) => {
+            this.stream = null
+            throw err
+          })
+          return this.stream
         }
         return s
       })

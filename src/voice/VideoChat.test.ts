@@ -186,7 +186,6 @@ describe('BrowserCamProvider track liveness', () => {
   it('re-acquires stream when cached tracks are ended', async () => {
     // Simulate what happens in the browser after tracks are stopped
     const liveTrack1 = { readyState: 'live', stop: vi.fn() }
-    const deadTrack = { readyState: 'ended', stop: vi.fn() }
     const liveTrack2 = { readyState: 'live', stop: vi.fn() }
 
     const stream1 = { getVideoTracks: () => [liveTrack1] } as unknown as MediaStream
