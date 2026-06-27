@@ -193,25 +193,25 @@ describe('WaveAnnounce', () => {
 
 describe('MainMenu', () => {
   it('renders game title', () => {
-    render(<MainMenu onSingleplayer={() => {}} onMultiplayer={() => {}} onSettings={() => {}} onAbout={() => {}} onHelp={() => {}} />)
+    render(<MainMenu onSingleplayer={() => {}} onMultiplayer={() => {}} onPlanetary={() => {}} onSettings={() => {}} onAbout={() => {}} onHelp={() => {}} />)
     expect(screen.getByText('BROWSER SHOOTER')).toBeInTheDocument()
   })
 
   it('renders singleplayer and multiplayer buttons', () => {
-    render(<MainMenu onSingleplayer={() => {}} onMultiplayer={() => {}} onSettings={() => {}} onAbout={() => {}} onHelp={() => {}} />)
+    render(<MainMenu onSingleplayer={() => {}} onMultiplayer={() => {}} onPlanetary={() => {}} onSettings={() => {}} onAbout={() => {}} onHelp={() => {}} />)
     expect(screen.getByText('SINGLEPLAYER')).toBeInTheDocument()
     expect(screen.getByText('MULTIPLAYER')).toBeInTheDocument()
   })
 
   it('renders about and help buttons', () => {
-    render(<MainMenu onSingleplayer={() => {}} onMultiplayer={() => {}} onSettings={() => {}} onAbout={() => {}} onHelp={() => {}} />)
+    render(<MainMenu onSingleplayer={() => {}} onMultiplayer={() => {}} onPlanetary={() => {}} onSettings={() => {}} onAbout={() => {}} onHelp={() => {}} />)
     expect(screen.getByText('ABOUT')).toBeInTheDocument()
     expect(screen.getByText('HELP')).toBeInTheDocument()
   })
 
   it('calls onSingleplayer when singleplayer button is clicked', () => {
     const onSingleplayer = vi.fn()
-    render(<MainMenu onSingleplayer={onSingleplayer} onMultiplayer={() => {}} onSettings={() => {}} onAbout={() => {}} onHelp={() => {}} />)
+    render(<MainMenu onSingleplayer={onSingleplayer} onMultiplayer={() => {}} onPlanetary={() => {}} onSettings={() => {}} onAbout={() => {}} onHelp={() => {}} />)
     screen.getByText('SINGLEPLAYER').click()
     expect(onSingleplayer).toHaveBeenCalledTimes(1)
   })
@@ -220,7 +220,7 @@ describe('MainMenu', () => {
 describe('MainMenu mode select', () => {
   it('fires onSingleplayer and onMultiplayer', () => {
     const sp = vi.fn(); const mp = vi.fn()
-    render(<MainMenu onSingleplayer={sp} onMultiplayer={mp} onSettings={() => {}} onAbout={() => {}} onHelp={() => {}} />)
+    render(<MainMenu onSingleplayer={sp} onMultiplayer={mp} onPlanetary={() => {}} onSettings={() => {}} onAbout={() => {}} onHelp={() => {}} />)
     fireEvent.click(screen.getByText(/singleplayer/i))
     fireEvent.click(screen.getByText(/multiplayer/i))
     expect(sp).toHaveBeenCalledTimes(1)

@@ -4,13 +4,14 @@ import { BattlefieldBackground } from './BattlefieldBackground'
 interface MainMenuProps {
   onSingleplayer: () => void
   onMultiplayer: () => void
+  onPlanetary: () => void
   onSettings: () => void
   onAbout: () => void
   onHelp: () => void
 }
 
 export const MainMenu: React.FC<MainMenuProps> = ({
-  onSingleplayer, onMultiplayer, onSettings, onAbout, onHelp,
+  onSingleplayer, onMultiplayer, onPlanetary, onSettings, onAbout, onHelp,
 }) => {
   return (
     <div style={{
@@ -49,6 +50,10 @@ export const MainMenu: React.FC<MainMenuProps> = ({
           padding: '16px 40px', fontSize: 'clamp(18px, 5vw, 22px)', fontWeight: 'bold', background: '#3399ff',
           color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer',
         }}>MULTIPLAYER</button>
+        <button className="ui-btn" onClick={onPlanetary} style={{
+          padding: '16px 40px', fontSize: 'clamp(18px, 5vw, 22px)', fontWeight: 'bold', background: '#228844',
+          color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer',
+        }}>PLANETARY</button>
         <button className="ui-btn" onClick={onSettings} style={{
           padding: '16px 40px', fontSize: 'clamp(18px, 5vw, 22px)', fontWeight: 'bold', background: '#444',
           color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer',

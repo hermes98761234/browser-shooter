@@ -6,7 +6,7 @@ export interface Vec3 {
   z: number
 }
 
-export type GameState = 'menu' | 'mpmenu' | 'settings' | 'keybinds' | 'teamselect' | 'playing' | 'paused' | 'gameover' | 'matchover' | 'mapeditor'
+export type GameState = 'menu' | 'mpmenu' | 'settings' | 'keybinds' | 'teamselect' | 'playing' | 'paused' | 'gameover' | 'matchover' | 'mapeditor' | 'planetary'
 
 export interface WeaponDef {
   name: string

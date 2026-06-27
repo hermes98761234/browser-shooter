@@ -52,6 +52,7 @@ import { resolveCrosshair } from './settings/Crosshair'
 import { stepBloom } from './weapons/CrosshairBloom'
 import { MatchSetup } from './ui/MatchSetup'
 import { MapEditor } from './ui/MapEditor'
+import { PlanetaryMode } from './planetary/PlanetaryMode'
 import { KeybindsScreen } from './ui/KeybindsScreen'
 import { RoundState } from './session/RoundManager'
 import { KillFeed, type KillLine } from './ui/KillFeed'
@@ -1505,6 +1506,7 @@ function App() {
           <MainMenu
             onSingleplayer={() => updateGameState('teamselect')}
             onMultiplayer={() => updateGameState('mpmenu')}
+            onPlanetary={() => updateGameState('planetary')}
             onSettings={() => { settingsReturnRef.current = 'menu'; updateGameState('settings') }}
             onAbout={() => setShowAbout(true)}
             onHelp={() => setShowHelp(true)}
@@ -1638,6 +1640,10 @@ function App() {
             }
           }}
         />
+      )}
+
+      {gameState === 'planetary' && (
+        <PlanetaryMode onExit={() => updateGameState('menu')} />
       )}
 
       {gameState === 'playing' && (
