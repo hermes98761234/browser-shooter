@@ -50,6 +50,18 @@ export function PlanetaryMode({ onExit }: PlanetaryModeProps) {
   const [showScoreboard, setShowScoreboard] = useState(false)
   const [roundState, setRoundState] = useState<{ state: RoundState; round: number; ctScore: number; tScore: number; buyTimer: number; roundTimer: number } | null>(null)
   const [scoreboardPlayers, setScoreboardPlayers] = useState<EntityState[]>([])
+  const [killFeed, setKillFeed] = useState<{ id: number; attacker: string; victim: string; ts?: number }[]>([])
+  const [isDead, setIsDead] = useState(false)
+  const [respawnIn, setRespawnIn] = useState<number | null>(null)
+  const killSeqRef = useRef(0)
+
+  // Auto-clear kill feed entries after 5 seconds
+  useEffect(() => {
+    const id = setInterval(() => {
+      setKillFeed(prev => prev.filter(k => k.ts && Date.now() - k.ts < 5000))
+    }, 500)
+    return () => clearInterval(id)
+  }, [])
 
   // Engine is created lazily after the user picks a drop-in location.
   // This avoids two concurrent MapLibre/WebGL contexts during the picker phase.
@@ -99,8 +111,9 @@ export function PlanetaryMode({ onExit }: PlanetaryModeProps) {
       // Add bot character models to the Three.js scene
       const botMeshes = new Map<string, THREE.Group>()
       const TEAM_COLOR = { ct: 0x3a6ea5, t: 0xa5703a } as const
-      for (const [id, entity] of session.playerMap) {
+      for (const id of session.playerIds()) {
         if (id === session.localId) continue
+        const entity = session.getPlayer(id)!
         const mesh = buildCharacter({ tint: TEAM_COLOR[entity.team], name: entity.name })
         engine.scene.add(mesh)
         botMeshes.set(id, mesh)
@@ -109,9 +122,6 @@ export function PlanetaryMode({ onExit }: PlanetaryModeProps) {
       // Add viewmodel (first-person gun) to the camera
       const viewmodel = new Viewmodel(engine.camera)
       engine.scene.add(engine.camera) // ensure camera is in scene graph
-
-      // Add particle system
-      const particleSystem = new ParticleSystem(engine.scene)
 
       sessionRef.current = session
 
@@ -152,11 +162,35 @@ export function PlanetaryMode({ onExit }: PlanetaryModeProps) {
               break
             case 'roundEnd':
               setShowBuyMenu(false)
+              setIsDead(false)
+              setRespawnIn(null)
               setRoundState(prev => prev ? { ...prev, state: RoundState.Over, ctScore: ev.ctScore, tScore: ev.tScore } : null)
               break
             case 'matchOver':
               setShowBuyMenu(false)
               setRoundState(prev => prev ? { ...prev, state: RoundState.Over } : null)
+              break
+            case 'playerKilledPlayer': {
+              const a = session.getPlayer(ev.attackerId)?.name ?? 'Unknown'
+              const v = session.getPlayer(ev.victimId)?.name ?? 'Unknown'
+              const id = killSeqRef.current++
+              setKillFeed(prev => [...prev.slice(-4), { id, attacker: a, victim: v, ts: Date.now() }])
+              if (ev.victimId === session.localId) {
+                setIsDead(true)
+              }
+              break
+            }
+            case 'playerDied':
+              if (ev.playerId === session.localId) {
+                setIsDead(true)
+                setRespawnIn(session.respawnQueue.isPending(session.localId) ? session.respawnQueue.remaining(session.localId) : null)
+              }
+              break
+            case 'playerRespawned':
+              if (ev.playerId === session.localId) {
+                setIsDead(false)
+                setRespawnIn(null)
+              }
               break
             case 'bombPlanted':
               break
@@ -383,6 +417,39 @@ export function PlanetaryMode({ onExit }: PlanetaryModeProps) {
           <div style={{ width: 2, height: 14, background: '#0f0', position: 'absolute', left: -1, top: 10 }} />
           <div style={{ width: 14, height: 2, background: '#0f0', position: 'absolute', top: -1, left: -20 }} />
           <div style={{ width: 14, height: 2, background: '#0f0', position: 'absolute', top: -1, left: 10 }} />
+        </div>
+      )}
+
+      {!showPicker && killFeed.length > 0 && (
+        <div style={{
+          position: 'absolute', top: 80, right: 16, display: 'flex', flexDirection: 'column',
+          gap: 4, zIndex: 50, pointerEvents: 'none',
+        }}>
+          {killFeed.slice(-5).map(k => (
+            <div key={k.id} style={{
+              background: 'rgba(0,0,0,0.6)', color: '#fff', padding: '4px 8px',
+              fontSize: 12, fontFamily: 'monospace', borderRadius: 4,
+            }}>
+              <span style={{ color: '#3a6ea5' }}>{k.attacker}</span>
+              <span style={{ color: '#888' }}> → </span>
+              <span style={{ color: '#a5703a' }}>{k.victim}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {!showPicker && isDead && (
+        <div style={{
+          position: 'absolute', top: '40%', left: '50%', transform: 'translate(-50%, -50%)',
+          color: '#ff3300', fontSize: 24, fontFamily: 'monospace', fontWeight: 'bold',
+          textShadow: '0 0 12px rgba(0,0,0,0.9)', pointerEvents: 'none', zIndex: 55,
+        }}>
+          YOU DIED
+          {respawnIn !== null && (
+            <div style={{ fontSize: 16, color: '#ffaa00', marginTop: 8 }}>
+              Respawn in {Math.ceil(respawnIn)}s
+            </div>
+          )}
         </div>
       )}
 
