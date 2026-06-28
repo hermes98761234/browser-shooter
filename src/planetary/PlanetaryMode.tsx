@@ -13,7 +13,6 @@ import { HUD } from '../ui/HUD'
 import { BuyMenu } from '../ui/BuyMenu'
 import { Scoreboard } from '../ui/Scoreboard'
 import { Viewmodel } from '../weapons/Viewmodel'
-import { ParticleSystem } from '../effects/ParticleSystem'
 import { buildCharacter } from '../entities/CharacterModel'
 import { offsetLngLat } from './geoUtils'
 import type { EntityState } from '../session/protocol'
@@ -417,6 +416,20 @@ export function PlanetaryMode({ onExit }: PlanetaryModeProps) {
           <div style={{ width: 2, height: 14, background: '#0f0', position: 'absolute', left: -1, top: 10 }} />
           <div style={{ width: 14, height: 2, background: '#0f0', position: 'absolute', top: -1, left: -20 }} />
           <div style={{ width: 14, height: 2, background: '#0f0', position: 'absolute', top: -1, left: 10 }} />
+        </div>
+      )}
+
+      {!showPicker && roundState && roundState.state !== 'over' && (
+        <div style={{
+          position: 'absolute', top: 16, left: '50%', transform: 'translateX(-50%)',
+          display: 'flex', gap: 16, zIndex: 50, pointerEvents: 'none',
+          fontFamily: 'monospace', fontSize: 14,
+        }}>
+          <span style={{ color: '#3a6ea5', fontWeight: 'bold' }}>CT {roundState.ctScore}</span>
+          <span style={{ color: '#888' }}>
+            {roundState.state === 'buying' ? `BUY ${Math.ceil(roundState.buyTimer)}s` : `${Math.ceil(roundState.roundTimer)}s`}
+          </span>
+          <span style={{ color: '#a5703a', fontWeight: 'bold' }}>{roundState.tScore} T</span>
         </div>
       )}
 
