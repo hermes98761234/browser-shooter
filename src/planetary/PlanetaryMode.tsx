@@ -513,10 +513,12 @@ export function PlanetaryMode({ onExit }: PlanetaryModeProps) {
 
       <button
         onClick={() => setShowPicker(true)}
+        onPointerDown={(e) => e.stopPropagation()}
         style={{
           position: 'absolute', top: 16, left: 16, padding: '6px 12px',
           background: 'rgba(0,0,0,0.6)', color: 'white', border: '1px solid #555',
           borderRadius: 4, cursor: 'pointer', fontSize: 12, fontFamily: 'monospace',
+          zIndex: 100,
         }}
       >
         [M] Map
@@ -524,10 +526,12 @@ export function PlanetaryMode({ onExit }: PlanetaryModeProps) {
 
       <button
         onClick={onExit}
+        onPointerDown={(e) => e.stopPropagation()}
         style={{
           position: 'absolute', top: 52, left: 16, padding: '6px 12px',
           background: 'rgba(0,0,0,0.6)', color: 'white', border: '1px solid #555',
           borderRadius: 4, cursor: 'pointer', fontSize: 12, fontFamily: 'monospace',
+          zIndex: 100,
         }}
       >
         [V] View CS Mode
@@ -535,10 +539,12 @@ export function PlanetaryMode({ onExit }: PlanetaryModeProps) {
 
       <button
         onClick={onExit}
+        onPointerDown={(e) => e.stopPropagation()}
         style={{
           position: 'absolute', top: 16, right: 16, padding: '6px 12px',
           background: 'rgba(0,0,0,0.6)', color: 'white', border: '1px solid #555',
           borderRadius: 4, cursor: 'pointer', fontSize: 12, fontFamily: 'monospace',
+          zIndex: 100,
         }}
       >
         Exit
