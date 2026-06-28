@@ -10,6 +10,9 @@ export class PlanetaryCollision {
   private world = new CollisionWorld()
   private lastLng = NaN
   private lastLat = NaN
+  private _rebuildVersion = 0
+
+  get rebuildVersion(): number { return this._rebuildVersion }
 
   constructor(
     private map: Pick<maplibregl.Map, 'queryRenderedFeatures'>,
@@ -31,6 +34,7 @@ export class PlanetaryCollision {
   }
 
   private rebuild(refLng: number, refLat: number) {
+    this._rebuildVersion += 1
     this.world.boxes.length = 0
     const metersPerDegLon = 111320 * Math.cos((refLat * Math.PI) / 180)
     const metersPerDegLat = 111320

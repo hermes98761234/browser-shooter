@@ -55,6 +55,7 @@ export function PlanetaryMode({ onExit }: PlanetaryModeProps) {
   const [isDead, setIsDead] = useState(false)
   const [respawnIn, setRespawnIn] = useState<number | null>(null)
   const killSeqRef = useRef(0)
+  const lastBuildingsVersionRef = useRef(-1)
   const mouseShootRef = useRef(false)
   const [mobileControls] = useState(() => mobileControlsActive(loadSettings()))
   const [csMode, setCsMode] = useState(false)
@@ -250,10 +251,11 @@ export function PlanetaryMode({ onExit }: PlanetaryModeProps) {
         // 6. Rebuild collision near the player; mirror the boxes into the visible scene.
         const center = engine.map.getCenter()
         if (collisionRef.current) {
-          const before = collisionRef.current.collisionWorld.boxes.length
           session.collisionWorld = collisionRef.current.update(center.lng, center.lat)
-          // update() is a no-op within 50 m; only re-mesh when the box set actually changed.
-          if (collisionRef.current.collisionWorld.boxes.length !== before || before === 0) {
+          // Re-mesh exactly when (and only when) the collision world was actually rebuilt.
+          const v = collisionRef.current.rebuildVersion
+          if (v !== lastBuildingsVersionRef.current) {
+            lastBuildingsVersionRef.current = v
             engine.setBuildings(collisionRef.current.collisionWorld.boxes)
           }
         }

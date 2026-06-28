@@ -44,6 +44,17 @@ describe('PlanetaryCollision', () => {
     expect(world.boxes.length).toBe(0)
   })
 
+  it('bumps rebuildVersion only when it actually re-scans', () => {
+    const map = makeMap([squareBuilding])
+    const pc = new PlanetaryCollision(map as any)
+    pc.update(0, 0)
+    const v1 = pc.rebuildVersion
+    pc.update(0.0001, 0.0001) // ~15m, no re-scan
+    expect(pc.rebuildVersion).toBe(v1)
+    pc.update(0, 0.001) // ~111m, re-scan
+    expect(pc.rebuildVersion).toBe(v1 + 1)
+  })
+
   it('places boxes in the injected origin frame regardless of scan center', () => {
     const map = makeMap([squareBuilding])
     // Origin-relative converter: meters east/south of lng/lat (0,0).
