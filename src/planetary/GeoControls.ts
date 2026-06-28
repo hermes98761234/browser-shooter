@@ -1,25 +1,22 @@
-import type maplibregl from 'maplibre-gl'
 import { emptyInput, type PlayerInput } from '../session/protocol'
 
-const MOUSE_SENSITIVITY = 0.3  // degrees per pixel
-const PITCH_MIN = 0
-const PITCH_MAX = 85
+const MOUSE_SENSITIVITY = 0.002 // radians per pixel (matches multiplayer onMouseMove)
+const PITCH_MIN = -Math.PI / 2 + 0.01
+const PITCH_MAX = Math.PI / 2 - 0.01
 
+/**
+ * FPS-style input for Planetary Mode. WASD for movement, mouse for look.
+ * Does NOT modify the MapLibre camera — that is driven by the Three.js camera.
+ */
 export class GeoControls {
+  yaw: number = 0
+  pitch: number = 0
   private keys = new Set<string>()
-  private bearing: number
-  private pitch: number
   private attached = false
 
-  constructor(
-    private map: Pick<maplibregl.Map, 'getCenter' | 'setCenter' | 'setBearing' | 'setPitch' | 'getBearing' | 'getPitch'>,
-    private container: HTMLElement,
-  ) {
-    this.bearing = (map.getBearing as () => number)()
-    this.pitch = (map.getPitch as () => number)()
-  }
+  constructor(private container: HTMLElement) {}
 
-  attach() {
+  attach(): void {
     if (this.attached) return
     this.attached = true
     this.container.addEventListener('keydown', this.onKeyDown)
@@ -27,7 +24,7 @@ export class GeoControls {
     this.container.addEventListener('mousemove', this.onMouseMove)
   }
 
-  detach() {
+  detach(): void {
     if (!this.attached) return
     this.attached = false
     this.container.removeEventListener('keydown', this.onKeyDown)
@@ -36,8 +33,11 @@ export class GeoControls {
     this.keys.clear()
   }
 
-  getBearing(): number { return this.bearing }
-  getPitch(): number { return this.pitch }
+  /** Initialize look direction from current player rotation */
+  setLook(yaw: number, pitch: number): void {
+    this.yaw = yaw
+    this.pitch = pitch
+  }
 
   getInput(): PlayerInput {
     return {
@@ -46,20 +46,17 @@ export class GeoControls {
       backward: this.keys.has('KeyS') || this.keys.has('ArrowDown'),
       left: this.keys.has('KeyA') || this.keys.has('ArrowLeft'),
       right: this.keys.has('KeyD') || this.keys.has('ArrowRight'),
+      jump: this.keys.has('Space'),
     }
   }
 
-  private onKeyDown = (e: KeyboardEvent) => this.keys.add(e.code)
-  private onKeyUp = (e: KeyboardEvent) => this.keys.delete(e.code)
+  private onKeyDown = (e: KeyboardEvent): void => { this.keys.add(e.code) }
+  private onKeyUp = (e: KeyboardEvent): void => { this.keys.delete(e.code) }
 
-  private onMouseMove = (e: MouseEvent) => {
-    const movementX = e.movementX ?? 0
-    const movementY = e.movementY ?? 0
-    this.bearing = ((this.bearing + movementX * MOUSE_SENSITIVITY) + 360) % 360
-    this.pitch = Math.max(PITCH_MIN, Math.min(PITCH_MAX, this.pitch - movementY * MOUSE_SENSITIVITY))
-    this.map.setBearing(this.bearing)
-    this.map.setPitch(this.pitch)
+  private onMouseMove = (e: MouseEvent): void => {
+    if (document.pointerLockElement !== this.container) return
+    this.yaw -= e.movementX * MOUSE_SENSITIVITY
+    this.pitch -= e.movementY * MOUSE_SENSITIVITY
+    this.pitch = Math.max(PITCH_MIN, Math.min(PITCH_MAX, this.pitch))
   }
-
-
 }
