@@ -1,45 +1,45 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-
-vi.mock('maplibre-gl', () => ({}))
+import { describe, it, expect, beforeEach } from 'vitest'
 
 import { GeoControls } from '../GeoControls'
 
-function makeMap(center = { lng: 0, lat: 0 }) {
-  return {
-    getCenter: vi.fn(() => center),
-    setCenter: vi.fn((c: [number, number]) => { center.lng = c[0]; center.lat = c[1] }),
-    setBearing: vi.fn(),
-    setPitch: vi.fn(),
-    getBearing: vi.fn(() => 0),
-    getPitch: vi.fn(() => 60),
-  }
-}
-
 describe('GeoControls', () => {
-  let map: ReturnType<typeof makeMap>
   let container: HTMLElement
   let controls: GeoControls
 
   beforeEach(() => {
-    map = makeMap()
     container = document.createElement('div')
-    controls = new GeoControls(map as any, container)
+    controls = new GeoControls(container)
     controls.attach()
   })
+
+  function createMouseMoveEvent(movementX: number, movementY: number): MouseEvent {
+    const event = new MouseEvent('mousemove', { bubbles: true })
+    Object.defineProperty(event, 'movementX', { value: movementX })
+    Object.defineProperty(event, 'movementY', { value: movementY })
+    return event
+  }
 
   it('reports forward on KeyW press', () => {
     container.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW', bubbles: true }))
     expect(controls.getInput().forward).toBe(true)
   })
 
-  it('clamps pitch to 85 max', () => {
-    container.dispatchEvent(new MouseEvent('mousemove', { movementX: 0, movementY: -10000, bubbles: true }))
-    expect(controls.getPitch()).toBeLessThanOrEqual(85)
+  it('clamps pitch to max', () => {
+    Object.defineProperty(document, 'pointerLockElement', {
+      value: container,
+      configurable: true,
+    })
+    container.dispatchEvent(createMouseMoveEvent(0, -10000))
+    expect(controls.pitch).toBeLessThanOrEqual(Math.PI / 2)
   })
 
-  it('clamps pitch to 0 min', () => {
-    container.dispatchEvent(new MouseEvent('mousemove', { movementX: 0, movementY: 10000, bubbles: true }))
-    expect(controls.getPitch()).toBeGreaterThanOrEqual(0)
+  it('clamps pitch to min', () => {
+    Object.defineProperty(document, 'pointerLockElement', {
+      value: container,
+      configurable: true,
+    })
+    container.dispatchEvent(createMouseMoveEvent(0, 10000))
+    expect(controls.pitch).toBeGreaterThanOrEqual(-Math.PI / 2)
   })
 
   it('detach stops responding to keydown', () => {

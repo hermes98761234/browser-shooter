@@ -61,6 +61,22 @@ export class PlanetaryEngine {
   }
 
   /**
+   * Position and orient the Three.js camera from the player's position and
+   * look direction. The map center is already at the player each frame, so
+   * the camera only needs the eye-height Y offset and the look rotation.
+   *
+   * @param playerPos  Mercator position of the player (map center).
+   * @param yaw        Player yaw in radians (0 = north, clockwise +).
+   * @param pitch      Player pitch in radians (positive = looking up).
+   * @param mapBearing MapLibre bearing in radians (map rotation).
+   */
+  setViewFromPlayer(playerPos: THREE.Vector3, yaw: number, pitch: number, mapBearing: number) {
+    this.camera.position.set(0, playerPos.y, 0)
+    this.camera.quaternion.setFromEuler(new THREE.Euler(pitch, yaw + mapBearing, 0, 'YXZ'))
+    this.camera.updateMatrixWorld(true)
+  }
+
+  /**
    * Convert local game-space coordinates (meters from drop point) to
    * Mercator world coordinates for placement in the Three.js scene.
    *
@@ -113,13 +129,10 @@ export class PlanetaryEngine {
         this.threeRenderer.autoClear = false
       },
       render: (_gl: WebGL2RenderingContext, matrix: number[]) => {
-        // The modelViewProjectionMatrix converts from Mercator world coordinates
-        // to clip space. Set the Three.js camera to identity (position at origin,
-        // no rotation) and let the MVP matrix handle the full transform.
+        // MapLibre provides the projection matrix (Mercator-to-clip).
+        // The view is set externally via setViewFromPlayer().
         this.camera.projectionMatrix.fromArray(matrix)
-        this.camera.position.set(0, 0, 0)
-        this.camera.rotation.set(0, 0, 0)
-        this.camera.updateMatrixWorld()
+        this.camera.updateMatrixWorld(true)
         this.threeRenderer?.resetState()
         this.threeRenderer?.render(this.scene, this.camera)
       },

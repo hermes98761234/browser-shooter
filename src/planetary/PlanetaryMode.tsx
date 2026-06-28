@@ -77,16 +77,10 @@ export function PlanetaryMode({ onExit }: PlanetaryModeProps) {
 
     engine.onReady(() => {
       if (!mounted) return
-      const controls = new GeoControls(engine.map, containerRef.current!)
+      const controls = new GeoControls(containerRef.current!)
       controls.attach()
+      controls.setLook(0, 0) // initial: looking north, level
       controlsRef.current = controls
-
-      // Disable MapLibre's built-in camera handlers that fight the FPS controls
-      engine.map.dragPan.disable()
-      engine.map.dragRotate.disable()
-      engine.map.scrollZoom.disable()
-      engine.map.doubleClickZoom.disable()
-      engine.map.touchZoomRotate.disable()
 
       collisionRef.current = new PlanetaryCollision(engine.map)
 
@@ -139,25 +133,30 @@ export function PlanetaryMode({ onExit }: PlanetaryModeProps) {
           input.shoot = input.shoot || mouseShootRef.current
         }
 
-        // 2. Look: merge touch look delta into GeoControls bearing/pitch
-        const gcBearing = engine.map.getBearing()
-        const gcPitch = engine.map.getPitch()
+        // 2. Look: write GeoControls yaw/pitch into player rotation
         if (touchLookRef.current.yaw !== 0 || touchLookRef.current.pitch !== 0) {
-          const newBearing = (gcBearing + touchLookRef.current.yaw * 60 + 360) % 360
-          const newPitch = Math.max(0, Math.min(85, gcPitch + touchLookRef.current.pitch * 60))
-          engine.map.setBearing(newBearing)
-          engine.map.setPitch(newPitch)
+          controlsRef.current!.yaw -= touchLookRef.current.yaw * 60 * 0.002
+          controlsRef.current!.pitch -= touchLookRef.current.pitch * 60 * 0.002
+          controlsRef.current!.pitch = Math.max(-Math.PI / 2 + 0.01, Math.min(Math.PI / 2 - 0.01, controlsRef.current!.pitch))
           touchLookRef.current.yaw = 0
           touchLookRef.current.pitch = 0
         }
-        input.yaw = (engine.map.getBearing() * Math.PI) / 180
-        input.pitch = (engine.map.getPitch() * Math.PI) / 180
+        const gc = controlsRef.current!
+        session.player.rotation.y = gc.yaw
+        session.player.rotation.x = gc.pitch
+        input.yaw = gc.yaw
+        input.pitch = gc.pitch
 
         // 3. Apply input to the session so the logical player moves
         session.applyInput(session.localId, input)
 
         // 4. Step the session (movement, combat, bots)
         const events = session.step(dt)
+
+        // 4. Update the Three.js camera from player state
+        const p = session.player.position
+        const mapBearing = (engine.map.getBearing() * Math.PI) / 180
+        engine.setViewFromPlayer(p, session.player.rotation.y, session.player.rotation.x, mapBearing)
 
         // 5. Process session events for round flow
         let scoreboardDirty = false
@@ -242,10 +241,12 @@ export function PlanetaryMode({ onExit }: PlanetaryModeProps) {
           })))
         }
 
-        // 5. Sync map center to player's world position
-        const p = session.player.position
+        // 5. Keep map centered on player for tile loading (view direction is from Three.js camera)
         const [lng, lat] = engine.localToLngLat(p.x, p.z)
         engine.map.setCenter([lng, lat])
+        // Fix pitch near-horizontal so the projection is stable; bearing stays at 0
+        engine.map.setPitch(75)
+        engine.map.setBearing(0)
 
         // 6. Update collision world
         const center = engine.map.getCenter()
