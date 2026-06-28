@@ -6,8 +6,13 @@ import { MapPicker } from './MapPicker'
 import { RoundBoundary } from './RoundBoundary'
 import { GameSession } from '../session/GameSession'
 import { defaultCompetitiveConfig } from '../session/MatchConfig'
+import { Bombsite } from '../session/Bombsite'
+import { RoundState } from '../session/RoundManager'
 import { HUD } from '../ui/HUD'
+import { BuyMenu } from '../ui/BuyMenu'
+import { Scoreboard } from '../ui/Scoreboard'
 import { offsetLngLat } from './geoUtils'
+import type { EntityState } from '../session/protocol'
 
 interface PlanetaryModeProps {
   onExit: () => void
@@ -37,12 +42,19 @@ export function PlanetaryMode({ onExit }: PlanetaryModeProps) {
   const [hudState, setHudState] = useState<HudState>({
     health: 100, maxHealth: 100, ammo: 30, maxAmmo: 30, weaponName: 'pistol', money: 800,
   })
+  const [showBuyMenu, setShowBuyMenu] = useState(false)
+  const [showScoreboard, setShowScoreboard] = useState(false)
+  const [roundState, setRoundState] = useState<{ state: RoundState; round: number; ctScore: number; tScore: number; buyTimer: number; roundTimer: number } | null>(null)
+  const [scoreboardPlayers, setScoreboardPlayers] = useState<EntityState[]>([])
 
   // Engine is created lazily after the user picks a drop-in location.
   // This avoids two concurrent MapLibre/WebGL contexts during the picker phase.
+  const originRef = useRef<[number, number]>([0, 0])
   useEffect(() => {
     if (!startCenter || !containerRef.current) return
     let mounted = true
+    const [oLng, oLat] = startCenter
+    originRef.current = [oLng, oLat]
     const engine = new PlanetaryEngine(containerRef.current, startCenter)
     engineRef.current = engine
 
@@ -64,8 +76,22 @@ export function PlanetaryMode({ onExit }: PlanetaryModeProps) {
       const config = defaultCompetitiveConfig()
       const session = new GameSession(config)
       session.collisionWorld = collisionRef.current.collisionWorld
+
+      // Place 2 bombsites near the drop location (in meters from origin)
+      session.bombsites = [
+        new Bombsite('A', { x: 20, y: 0, z: 20 }),
+        new Bombsite('B', { x: -20, y: 0, z: -20 }),
+      ]
+
       for (let i = 0; i < 3; i++) session.addBot('ct')
       for (let i = 0; i < 2; i++) session.addBot('t')
+
+      // Set up round manager for competitive play
+      if (session.roundManager) {
+        session.roundManager.state = RoundState.Buying
+        session.roundManager.buyPhaseTimer = config.buyPhaseDuration ?? 15
+      }
+
       sessionRef.current = session
 
       let last = performance.now()
@@ -84,11 +110,65 @@ export function PlanetaryMode({ onExit }: PlanetaryModeProps) {
         session.applyInput(session.localId, input)
 
         // 4. Step the session (movement, combat, bots)
-        session.step(dt)
+        const events = session.step(dt)
+
+        // 5. Process session events for round flow
+        for (const ev of events) {
+          switch (ev.type) {
+            case 'roundStart':
+              setRoundState({
+                state: RoundState.Active,
+                round: ev.round,
+                ctScore: ev.ctScore,
+                tScore: ev.tScore,
+                buyTimer: 0,
+                roundTimer: 115,
+              })
+              break
+            case 'buyPhaseStart':
+              setShowBuyMenu(true)
+              setRoundState(prev => prev ? { ...prev, state: RoundState.Buying, buyTimer: ev.duration } : null)
+              break
+            case 'roundEnd':
+              setShowBuyMenu(false)
+              setRoundState(prev => prev ? { ...prev, state: RoundState.Over, ctScore: ev.ctScore, tScore: ev.tScore } : null)
+              break
+            case 'matchOver':
+              setShowBuyMenu(false)
+              setRoundState(prev => prev ? { ...prev, state: RoundState.Over } : null)
+              break
+            case 'bombPlanted':
+              break
+            case 'bombExploded':
+            case 'bombDefused':
+              break
+          }
+        }
+
+        // Update round state from session
+        if (session.roundManager) {
+          setRoundState({
+            state: session.roundManager.state,
+            round: session.roundManager.round,
+            ctScore: session.roundManager.ctScore,
+            tScore: session.roundManager.tScore,
+            buyTimer: session.roundManager.buyPhaseTimer,
+            roundTimer: session.roundManager.roundTimer,
+          })
+        }
+
+        // Update scoreboard data
+        setScoreboardPlayers(session.getSnapshot().players.map(p => ({
+          id: p.id, kind: 'player', type: 'player',
+          position: p.position, rotationY: p.rotationY, rotationX: p.rotationX,
+          health: p.health, isDead: p.isDead, weaponType: p.weaponType,
+          name: p.name, team: p.team, isBot: p.isBot,
+          respawnIn: p.respawnIn, hasArmor: p.hasArmor, hasHelmet: p.hasHelmet,
+        })))
 
         // 5. Sync map center to player's world position
         const p = session.player.position
-        const [lng, lat] = offsetLngLat(startCenter[0], startCenter[1], p.x, -p.z)
+        const [lng, lat] = offsetLngLat(originRef.current[0], originRef.current[1], p.x, -p.z)
         engine.map.setCenter([lng, lat])
 
         // 6. Update collision world
@@ -130,6 +210,38 @@ export function PlanetaryMode({ onExit }: PlanetaryModeProps) {
       engineRef.current = null
     }
   }, [startCenter])
+
+  // Keyboard handler for buy menu, scoreboard, bomb plant/defuse
+  useEffect(() => {
+    if (showPicker) return
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.code === 'KeyB') {
+        setShowBuyMenu(prev => !prev)
+      } else if (e.code === 'Tab') {
+        e.preventDefault()
+        setShowScoreboard(true)
+      } else if (e.code === 'Digit5') {
+        if (sessionRef.current) {
+          sessionRef.current.tryPlant(sessionRef.current.localId)
+        }
+      } else if (e.code === 'KeyE') {
+        if (sessionRef.current) {
+          sessionRef.current.tryDefuse(sessionRef.current.localId, false)
+        }
+      }
+    }
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.code === 'Tab') {
+        setShowScoreboard(false)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    window.addEventListener('keyup', handleKeyUp)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+      window.removeEventListener('keyup', handleKeyUp)
+    }
+  }, [showPicker])
 
   const handleTeleport = useCallback((lng: number, lat: number) => {
     // Anchor the boundary immediately so the game loop never sees [0,0] as center
@@ -186,6 +298,34 @@ export function PlanetaryMode({ onExit }: PlanetaryModeProps) {
         />
       )}
 
+      {!showPicker && showBuyMenu && (
+        <BuyMenu
+          team="ct"
+          money={hudState.money}
+          owned={[]}
+          onBuy={(itemId) => {
+            const session = sessionRef.current
+            if (!session) return
+            import('../weapons/StoreCatalog').then(({ findItem, canAffordItem }) => {
+              import('../player/applyPurchase').then(({ applyItem }) => {
+                const item = findItem(itemId)
+                if (item && session.economy && canAffordItem(itemId, session.economy.money, session.player, session.weaponManager)) {
+                  session.economy.spendMoney(item.price)
+                  applyItem(item, session.player, session.weaponManager)
+                }
+              })
+            })
+          }}
+          onClose={() => setShowBuyMenu(false)}
+        />
+      )}
+
+      {!showPicker && showScoreboard && (
+        <Scoreboard
+          players={scoreboardPlayers}
+        />
+      )}
+
       {!showPicker && boundaryStatus !== 'safe' && (
         <div style={{
           position: 'absolute', top: '20%', left: '50%', transform: 'translateX(-50%)',
@@ -206,6 +346,17 @@ export function PlanetaryMode({ onExit }: PlanetaryModeProps) {
         }}
       >
         [M] Map
+      </button>
+
+      <button
+        onClick={onExit}
+        style={{
+          position: 'absolute', top: 52, left: 16, padding: '6px 12px',
+          background: 'rgba(0,0,0,0.6)', color: 'white', border: '1px solid #555',
+          borderRadius: 4, cursor: 'pointer', fontSize: 12, fontFamily: 'monospace',
+        }}
+      >
+        [V] View CS Mode
       </button>
 
       <button
