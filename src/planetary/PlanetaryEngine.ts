@@ -21,7 +21,6 @@ export class PlanetaryEngine {
       center: [0, 0],
       zoom: 17,
       pitch: 60,
-      antialias: true,
     })
 
     this.map.on('load', () => {
@@ -53,7 +52,7 @@ export class PlanetaryEngine {
         this.threeRenderer?.render(this.scene, this.camera)
         this.map.triggerRepaint()
       },
-    } as maplibregl.CustomLayerInterface)
+    } as unknown as maplibregl.CustomLayerInterface)
   }
 
   dispose() {
