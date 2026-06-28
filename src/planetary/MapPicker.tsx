@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import type { Team } from '../types'
@@ -23,6 +23,7 @@ export function MapPicker({ playerPositions, onTeleport, onClose }: MapPickerPro
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
   const markersRef = useRef<maplibregl.Marker[]>([])
+  const [selectedLocation, setSelectedLocation] = useState<[number, number] | null>(null)
 
   useEffect(() => {
     if (!containerRef.current) return
@@ -33,7 +34,10 @@ export function MapPicker({ playerPositions, onTeleport, onClose }: MapPickerPro
       center: [0, 20],
     })
     map.addControl(new maplibregl.NavigationControl())
-    map.on('click', e => onTeleport(e.lngLat.lng, e.lngLat.lat))
+    map.on('click', e => {
+      setSelectedLocation([e.lngLat.lng, e.lngLat.lat])
+      onTeleport(e.lngLat.lng, e.lngLat.lat)
+    })
     mapRef.current = map
     return () => { map.remove(); mapRef.current = null }
   }, [])
@@ -51,12 +55,24 @@ export function MapPicker({ playerPositions, onTeleport, onClose }: MapPickerPro
     return () => { markersRef.current.forEach(m => m.remove()) }
   }, [playerPositions])
 
+  // Green dot showing where the user will drop in
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !selectedLocation) return
+    const el = document.createElement('div')
+    el.style.cssText = 'width:14px;height:14px;border-radius:50%;background:#00ff88;border:3px solid white;box-shadow:0 0 8px rgba(0,255,136,0.6)'
+    const marker = new maplibregl.Marker({ element: el })
+      .setLngLat(selectedLocation)
+      .addTo(map)
+    return () => { marker.remove() }
+  }, [selectedLocation])
+
   return (
     <div style={{ position: 'absolute', inset: 0, zIndex: 100 }}>
       <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
       <button
         aria-label="Close map picker"
-        onClick={onClose}
+        onClick={() => { setSelectedLocation(null); onClose() }}
         style={{
           position: 'absolute', top: 16, right: 16, zIndex: 101,
           padding: '8px 16px', background: '#222', color: 'white',
