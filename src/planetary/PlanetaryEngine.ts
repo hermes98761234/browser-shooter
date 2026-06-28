@@ -1,24 +1,17 @@
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import * as THREE from 'three'
+import type { BoxCollider } from '../engine/CollisionWorld'
 
 const STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty'
-
 const METERS_PER_DEG_LAT = 111320
 
-/**
- * Convert lng/lat to Mercator meters (EPSG:3857).
- * MapLibre's 3D custom layer uses Mercator coordinates internally.
- */
 function lngLatToMercator(lng: number, lat: number): [number, number] {
   const x = lng * METERS_PER_DEG_LAT * Math.cos((Math.min(Math.abs(lat), 89) * Math.PI) / 180)
   const y = lat * METERS_PER_DEG_LAT
   return [x, y]
 }
 
-/**
- * Convert Mercator meters back to lng/lat.
- */
 function mercatorToLngLat(x: number, y: number): [number, number] {
   const lat = y / METERS_PER_DEG_LAT
   const lng = x / (METERS_PER_DEG_LAT * Math.cos((Math.min(Math.abs(lat), 89) * Math.PI) / 180))
@@ -29,29 +22,44 @@ export class PlanetaryEngine {
   map: maplibregl.Map
   scene: THREE.Scene
   camera: THREE.PerspectiveCamera
-  private threeRenderer: THREE.WebGLRenderer | null = null
+  private renderer: THREE.WebGLRenderer | null = null
+  private buildings = new THREE.Group()
+  private buildingMat = new THREE.MeshStandardMaterial({ color: 0x8a8a8a, roughness: 0.9, metalness: 0 })
   private readyCbs: (() => void)[] = []
-
-  /** Mercator coordinates of the drop origin (startCenter). */
   private originMercator: [number, number] = [0, 0]
 
-  constructor(container: HTMLElement, center: [number, number] = [0, 0]) {
-    this.scene = new THREE.Scene()
-    this.camera = new THREE.PerspectiveCamera(75, 1, 0.1, 10000)
-
-    // Store the Mercator coordinates of the drop origin
+  constructor(private container: HTMLElement, center: [number, number] = [0, 0]) {
     this.originMercator = lngLatToMercator(center[0], center[1])
+
+    this.scene = new THREE.Scene()
+    this.scene.background = new THREE.Color(0x9ec7e8) // daytime sky
+    this.scene.fog = new THREE.Fog(0x9ec7e8, 120, 600)
+
+    this.camera = new THREE.PerspectiveCamera(75, 1, 0.1, 2000)
+
+    // Lights: soft ambient + sun.
+    this.scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1.0))
+    const sun = new THREE.DirectionalLight(0xffffff, 1.2)
+    sun.position.set(100, 200, 50)
+    this.scene.add(sun)
+
+    // Ground plane (large, lies at y=0 like the building bottoms).
+    const ground = new THREE.Mesh(
+      new THREE.PlaneGeometry(4000, 4000),
+      new THREE.MeshStandardMaterial({ color: 0x5b6b4a, roughness: 1 }),
+    )
+    ground.rotation.x = -Math.PI / 2
+    this.scene.add(ground)
+    this.scene.add(this.buildings)
 
     this.map = new maplibregl.Map({
       container,
       style: STYLE_URL,
       center,
       zoom: 17,
-      pitch: 60,
+      pitch: 0,
     })
-
     this.map.on('load', () => {
-      this.addGameObjectsLayer()
       this.readyCbs.forEach(cb => cb())
     })
   }
@@ -60,87 +68,79 @@ export class PlanetaryEngine {
     this.readyCbs.push(cb)
   }
 
-  /**
-   * Position and orient the Three.js camera from the player's position and
-   * look direction. The map center is already at the player each frame, so
-   * the camera only needs the eye-height Y offset and the look rotation.
-   *
-   * @param playerPos  Mercator position of the player (map center).
-   * @param yaw        Player yaw in radians (0 = north, clockwise +).
-   * @param pitch      Player pitch in radians (positive = looking up).
-   * @param mapBearing MapLibre bearing in radians (map rotation).
-   */
-  setViewFromPlayer(playerPos: THREE.Vector3, yaw: number, pitch: number, mapBearing: number) {
-    this.camera.position.set(0, playerPos.y, 0)
-    this.camera.quaternion.setFromEuler(new THREE.Euler(pitch, yaw + mapBearing, 0, 'YXZ'))
-    this.camera.updateMatrixWorld(true)
+  /** Position/orient the FPS camera. playerPos is the eye position (Player.EYE_HEIGHT baked in). */
+  setViewFromPlayer(playerPos: THREE.Vector3, yaw: number, pitch: number) {
+    this.camera.position.copy(playerPos)
+    this.camera.rotation.set(pitch, yaw, 0, 'YXZ')
   }
 
-  /**
-   * Convert local game-space coordinates (meters from drop point) to
-   * Mercator world coordinates for placement in the Three.js scene.
-   *
-   * Game space: X = east, Z = south (Three.js convention).
-   * Mercator: X = east, Y = north (we negate Z to get north).
-   */
+  /** Rebuild visible building meshes from the collision boxes (origin-relative meters). */
+  setBuildings(boxes: BoxCollider[]) {
+    this.disposeBuildings()
+    for (const b of boxes) {
+      const sx = b.max.x - b.min.x
+      const sy = b.max.y - b.min.y
+      const sz = b.max.z - b.min.z
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), this.buildingMat)
+      mesh.position.set((b.min.x + b.max.x) / 2, (b.min.y + b.max.y) / 2, (b.min.z + b.max.z) / 2)
+      this.buildings.add(mesh)
+    }
+  }
+
+  private disposeBuildings() {
+    for (const m of this.buildings.children) {
+      if (m instanceof THREE.Mesh) m.geometry.dispose()
+    }
+    this.buildings.clear()
+  }
+
+  /** Lazily create the WebGL renderer on first frame (kept out of constructor for jsdom tests). */
+  render() {
+    if (!this.renderer) {
+      const r = new THREE.WebGLRenderer({ antialias: true })
+      r.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+      const canvas = r.domElement
+      canvas.style.position = 'absolute'
+      canvas.style.inset = '0'
+      canvas.style.width = '100%'
+      canvas.style.height = '100%'
+      this.container.appendChild(canvas)
+      this.renderer = r
+    }
+    const w = this.container.clientWidth || 1
+    const h = this.container.clientHeight || 1
+    const size = this.renderer.getSize(new THREE.Vector2())
+    if (size.x !== w || size.y !== h) {
+      this.renderer.setSize(w, h, false)
+      this.camera.aspect = w / h
+      this.camera.updateProjectionMatrix()
+    }
+    this.renderer.render(this.scene, this.camera)
+  }
+
   localToMercator(localX: number, localZ: number, height = 0): THREE.Vector3 {
-    return new THREE.Vector3(
-      this.originMercator[0] + localX,
-      height,
-      this.originMercator[1] - localZ, // negate: game Z=south → Mercator Y=north
-    )
+    return new THREE.Vector3(this.originMercator[0] + localX, height, this.originMercator[1] - localZ)
   }
 
-  /**
-   * Convert Mercator world coordinates back to local game-space.
-   */
   mercatorToLocal(mx: number, my: number): [number, number] {
     return [mx - this.originMercator[0], this.originMercator[1] - my]
   }
 
-  /**
-   * Convert a lng/lat to local game-space coordinates relative to origin.
-   */
   lngLatToLocal(lng: number, lat: number): [number, number] {
     const [mx, my] = lngLatToMercator(lng, lat)
     return this.mercatorToLocal(mx, my)
   }
 
-  /**
-   * Convert local game-space coordinates to lng/lat.
-   */
   localToLngLat(localX: number, localZ: number): [number, number] {
     const mx = this.originMercator[0] + localX
     const my = this.originMercator[1] - localZ
     return mercatorToLngLat(mx, my)
   }
 
-  private addGameObjectsLayer() {
-    this.map.addLayer({
-      id: 'game-objects',
-      type: 'custom',
-      renderingMode: '3d',
-      onAdd: (_map: maplibregl.Map, gl: WebGL2RenderingContext) => {
-        this.threeRenderer = new THREE.WebGLRenderer({
-          canvas: _map.getCanvas(),
-          context: gl,
-          antialias: true,
-        })
-        this.threeRenderer.autoClear = false
-      },
-      render: (_gl: WebGL2RenderingContext, matrix: number[]) => {
-        // MapLibre provides the projection matrix (Mercator-to-clip).
-        // The view is set externally via setViewFromPlayer().
-        this.camera.projectionMatrix.fromArray(matrix)
-        this.camera.updateMatrixWorld(true)
-        this.threeRenderer?.resetState()
-        this.threeRenderer?.render(this.scene, this.camera)
-      },
-    } as unknown as maplibregl.CustomLayerInterface)
-  }
-
   dispose() {
-    this.threeRenderer?.dispose()
+    this.disposeBuildings()
+    this.renderer?.domElement.remove()
+    this.renderer?.dispose()
     this.map.remove()
   }
 }
