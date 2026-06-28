@@ -117,6 +117,9 @@ export function PlanetaryMode({ onExit }: PlanetaryModeProps) {
     // Anchor the boundary immediately so the game loop never sees [0,0] as center
     boundaryRef.current.update([[lng, lat]])
     setShowPicker(false)
+    // Wait for React to unmount the picker, then focus the game canvas so
+    // keydown/keyup events reach GeoControls without requiring a click first.
+    requestAnimationFrame(() => containerRef.current?.focus())
 
     if (!engineRef.current) {
       // First drop-in: create the engine at the chosen location
