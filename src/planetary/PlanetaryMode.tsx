@@ -306,19 +306,18 @@ export function PlanetaryMode({ onExit }: PlanetaryModeProps) {
         engine.render()
 
         // 10. Shooting feedback: detect fired-this-frame (same pattern as App.tsx).
+        const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(engine.camera.quaternion)
         let firedThisFrame = false
         const weapon = session.weaponManager.current
         if (!session.player.isDead && input.shoot && weapon.fireTimer > weapon.def.fireRate - dt) {
           firedThisFrame = true
           viewmodel.fire()
           audioRef.current?.playWeaponShoot(weaponVisual(weapon.type), session.player.position)
-          const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(engine.camera.quaternion)
           particleSystemRef.current?.muzzleFlash(session.player.position.clone().add(fwd), fwd)
         }
 
         // 11. Update audio listener position for 3D positional sound.
         if (audioRef.current) {
-          const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(engine.camera.quaternion)
           audioRef.current.updateListenerPosition(p.x, p.y, p.z)
           audioRef.current.updateListenerOrientation(fwd.x, fwd.y, fwd.z, 0, 1, 0)
         }
@@ -480,27 +479,23 @@ export function PlanetaryMode({ onExit }: PlanetaryModeProps) {
         />
       )}
 
-      {!showPicker && !showBuyMenu && (
-        <div style={{
-          position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
-          pointerEvents: 'none', zIndex: 50,
-        }}>
-          {(() => {
-            const gapScale = 1 + (bloom * BLOOM_PIXELS) / 20
-            const hOff = 20 * gapScale  // horizontal line distance from center
-            const vOff = 10 * gapScale  // vertical line distance from center
-            const lineStyle: React.CSSProperties = { background: '#0f0', position: 'absolute' }
-            return (
-              <>
-                <div style={{ ...lineStyle, width: 2, height: 14, left: -1, top: -vOff - 7 }} />
-                <div style={{ ...lineStyle, width: 2, height: 14, left: -1, top: vOff - 7 }} />
-                <div style={{ ...lineStyle, width: 14, height: 2, top: -1, left: -hOff - 7 }} />
-                <div style={{ ...lineStyle, width: 14, height: 2, top: -1, left: hOff - 7 }} />
-              </>
-            )
-          })()}
-        </div>
-      )}
+      {!showPicker && !showBuyMenu && (() => {
+        const gapScale = 1 + (bloom * BLOOM_PIXELS) / 20
+        const hOff = 20 * gapScale  // horizontal line distance from center
+        const vOff = 10 * gapScale  // vertical line distance from center
+        const lineStyle: React.CSSProperties = { background: '#0f0', position: 'absolute' }
+        return (
+          <div style={{
+            position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+            pointerEvents: 'none', zIndex: 50,
+          }}>
+            <div style={{ ...lineStyle, width: 2, height: 14, left: -1, top: -vOff - 7 }} />
+            <div style={{ ...lineStyle, width: 2, height: 14, left: -1, top: vOff - 7 }} />
+            <div style={{ ...lineStyle, width: 14, height: 2, top: -1, left: -hOff - 7 }} />
+            <div style={{ ...lineStyle, width: 14, height: 2, top: -1, left: hOff - 7 }} />
+          </div>
+        )
+      })()}
 
       {!showPicker && roundState && roundState.state !== 'over' && (
         <div style={{
