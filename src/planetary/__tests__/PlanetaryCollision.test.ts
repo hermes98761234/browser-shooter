@@ -59,8 +59,10 @@ describe('PlanetaryCollision', () => {
     const map = makeMap([squareBuilding])
     const pc = new PlanetaryCollision(map as any)
     pc.update(0, 0)
-    const opts = map.queryRenderedFeatures.mock.calls[0][1] as { layers: string[] }
-    expect(opts.layers).toContain('building-3d')
+    expect(map.queryRenderedFeatures).toHaveBeenCalledWith(
+      undefined,
+      expect.objectContaining({ layers: expect.arrayContaining(['building-3d']) }),
+    )
   })
 
   it('markStale forces a re-scan even within 50m', () => {
