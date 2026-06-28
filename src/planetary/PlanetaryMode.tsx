@@ -47,9 +47,9 @@ export function PlanetaryMode({ onExit }: PlanetaryModeProps) {
   const touchLookRef = useRef({ yaw: 0, pitch: 0 })
   const desktopControlsRef = useRef<Controls | null>(null)
   const particleSystemRef = useRef<ParticleSystem | null>(null)
-  const audioRef = useRef<SoundEffects | null>(null)
+  const viewmodelRef = useRef<Viewmodel | null>(null)
 
-  const [showPicker, setShowPicker] = useState(true)
+  const [showPicker, setShowPicker]
   const [startCenter, setStartCenter] = useState<[number, number] | null>(null)
   const [boundaryStatus, setBoundaryStatus] = useState<'safe' | 'warn' | 'out'>('safe')
   const [hudState, setHudState] = useState<HudState>({
@@ -123,6 +123,7 @@ export function PlanetaryMode({ onExit }: PlanetaryModeProps) {
 
       // Add viewmodel (first-person gun) to the camera
       const viewmodel = new Viewmodel(engine.camera)
+      viewmodelRef.current = viewmodel
       engine.scene.add(engine.camera) // ensure camera is in scene graph
 
       // Create feedback systems for shooting (muzzle flash, audio)
@@ -341,6 +342,8 @@ export function PlanetaryMode({ onExit }: PlanetaryModeProps) {
       cancelAnimationFrame(rafRef.current)
       controlsRef.current?.detach()
       desktopControlsRef.current?.destroy()
+      particleSystemRef.current?.clear()
+      viewmodelRef.current = null
       engine.dispose()
       engineRef.current = null
     }
@@ -454,6 +457,7 @@ export function PlanetaryMode({ onExit }: PlanetaryModeProps) {
                   if (item) {
                     session.economy!.spendMoney(item.price)
                     applyItem(item, session.player, session.weaponManager)
+                    viewmodelRef.current?.setWeapon(weaponVisual(session.weaponManager.current.type))
                   }
                 }
               })
@@ -598,7 +602,12 @@ export function PlanetaryMode({ onExit }: PlanetaryModeProps) {
           lookRef={touchLookRef}
           lookSensitivity={1}
           onReload={() => { if (sessionRef.current) sessionRef.current.weaponManager.current.reload() }}
-          onCycleWeapon={() => { if (sessionRef.current) sessionRef.current.weaponManager.cycleNext() }}
+          onCycleWeapon={() => {
+            if (!sessionRef.current) return
+            const wm = sessionRef.current.weaponManager
+            wm.cycleNext()
+            viewmodelRef.current?.setWeapon(weaponVisual(wm.current.type))
+          }}
           onToggleStore={() => setShowBuyMenu(prev => !prev)}
           onToggleScoreboard={() => setShowScoreboard(prev => !prev)}
           onSelectGrenade={() => {}}
