@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
-import * as THREE from 'three'
 import { PlanetaryEngine } from './PlanetaryEngine'
 import { GeoControls } from './GeoControls'
 import { PlanetaryCollision } from './PlanetaryCollision'
@@ -14,7 +13,6 @@ import { BuyMenu } from '../ui/BuyMenu'
 import { Scoreboard } from '../ui/Scoreboard'
 import { TouchControls } from '../ui/TouchControls'
 import { Viewmodel } from '../weapons/Viewmodel'
-import { buildCharacter } from '../entities/CharacterModel'
 import { Controls } from '../player/Controls'
 import { mobileControlsActive, loadSettings } from '../settings/Settings'
 import type { EntityState } from '../session/protocol'
@@ -59,6 +57,7 @@ export function PlanetaryMode({ onExit }: PlanetaryModeProps) {
   const killSeqRef = useRef(0)
   const mouseShootRef = useRef(false)
   const [mobileControls] = useState(() => mobileControlsActive(loadSettings()))
+  const [csMode, setCsMode] = useState(false)
 
   // Auto-clear kill feed entries after 5 seconds
   useEffect(() => {
@@ -101,27 +100,13 @@ export function PlanetaryMode({ onExit }: PlanetaryModeProps) {
         new Bombsite('B', { x: -20, y: 0, z: -20 }),
       ]
 
-      for (let i = 0; i < 3; i++) session.addBot('ct')
-      for (let i = 0; i < 2; i++) session.addBot('t')
-
-      // ponytail: large enough to never clamp in open-world play; bots already placed
+      // ponytail: large enough to never clamp in open-world play
       session.map.arenaSize = 5000
 
       // Set up round manager for competitive play
       if (session.roundManager) {
         session.roundManager.state = RoundState.Buying
         session.roundManager.buyPhaseTimer = config.buyPhaseDuration ?? 15
-      }
-
-      // Add bot character models to the Three.js scene
-      const botMeshes = new Map<string, THREE.Group>()
-      const TEAM_COLOR = { ct: 0x3a6ea5, t: 0xa5703a } as const
-      for (const id of session.playerIds()) {
-        if (id === session.localId) continue
-        const entity = session.getPlayer(id)!
-        const mesh = buildCharacter({ tint: TEAM_COLOR[entity.team], name: entity.name })
-        engine.scene.add(mesh)
-        botMeshes.set(id, mesh)
       }
 
       // Add viewmodel (first-person gun) to the camera
@@ -288,19 +273,7 @@ export function PlanetaryMode({ onExit }: PlanetaryModeProps) {
           money: session.economy?.money ?? 0,
         })
 
-        // 9. Sync bot meshes to their Mercator world positions
-        for (const [id, mesh] of botMeshes) {
-          const entity = session.getPlayer(id)
-          if (entity) {
-            const pos = entity.player.position
-            const worldPos = engine.localToMercator(pos.x, pos.z, pos.y)
-            mesh.position.copy(worldPos)
-            mesh.rotation.y = entity.player.rotation.y
-            mesh.visible = !entity.player.isDead
-          }
-        }
-
-        // 10. Update viewmodel
+        // 9. Update viewmodel
         viewmodel.update(dt, false)
 
         rafRef.current = requestAnimationFrame(loop)
@@ -380,7 +353,7 @@ export function PlanetaryMode({ onExit }: PlanetaryModeProps) {
   }, [])
 
   return (
-    <div style={{ position: 'absolute', inset: 0 }}>
+    <div style={{ position: 'absolute', inset: 0, filter: csMode ? 'saturate(0.7) contrast(1.1)' : 'none' }}>
       <div
         ref={containerRef}
         tabIndex={0}
@@ -528,16 +501,16 @@ export function PlanetaryMode({ onExit }: PlanetaryModeProps) {
       </button>
 
       <button
-        onClick={onExit}
+        onClick={() => setCsMode(v => !v)}
         onPointerDown={(e) => e.stopPropagation()}
         style={{
           position: 'absolute', top: 52, left: 16, padding: '6px 12px',
-          background: 'rgba(0,0,0,0.6)', color: 'white', border: '1px solid #555',
-          borderRadius: 4, cursor: 'pointer', fontSize: 12, fontFamily: 'monospace',
-          zIndex: 100,
+          background: csMode ? '#ff6600' : 'rgba(0,0,0,0.6)', color: 'white',
+          border: '1px solid #555', borderRadius: 4, cursor: 'pointer',
+          fontSize: 12, fontFamily: 'monospace', zIndex: 100,
         }}
       >
-        [V] View CS Mode
+        [V] {csMode ? 'View Default Mode' : 'View CS Mode'}
       </button>
 
       <button
