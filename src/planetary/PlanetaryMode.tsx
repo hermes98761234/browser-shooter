@@ -7,6 +7,7 @@ import { RoundBoundary } from './RoundBoundary'
 import { GameSession } from '../session/GameSession'
 import { defaultCompetitiveConfig } from '../session/MatchConfig'
 import { HUD } from '../ui/HUD'
+import { offsetLngLat } from './geoUtils'
 
 interface PlanetaryModeProps {
   onExit: () => void
@@ -71,16 +72,32 @@ export function PlanetaryMode({ onExit }: PlanetaryModeProps) {
       function loop(now: number) {
         const dt = Math.min((now - last) / 1000, 0.05)
         last = now
-        controls.update(dt)
 
+        // 1. Get input from GeoControls
+        const input = controls.getInput()
+
+        // 2. Mouse look (bearing/pitch)
+        input.yaw = engine.map.getBearing()
+        input.pitch = engine.map.getPitch()
+
+        // 3. Apply input to the session so the logical player moves
+        session.applyInput(session.localId, input)
+
+        // 4. Step the session (movement, combat, bots)
+        session.step(dt)
+
+        // 5. Sync map center to player's world position
+        const p = session.player.position
+        const [lng, lat] = offsetLngLat(startCenter[0], startCenter[1], p.x, -p.z)
+        engine.map.setCenter([lng, lat])
+
+        // 6. Update collision world
         const center = engine.map.getCenter()
-
         if (collisionRef.current) {
           session.collisionWorld = collisionRef.current.update(center.lng, center.lat)
         }
 
-        session.step(dt)
-
+        // 7. Round boundary check
         const status = boundaryRef.current.check(center.lng, center.lat)
         setBoundaryStatus(status)
         if (status === 'out' && !session.player.isDead) {
@@ -90,6 +107,7 @@ export function PlanetaryMode({ onExit }: PlanetaryModeProps) {
           }
         }
 
+        // 8. Update HUD state
         setHudState({
           health: session.player.health,
           maxHealth: session.player.maxHealth,

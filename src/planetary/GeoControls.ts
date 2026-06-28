@@ -1,5 +1,6 @@
 import type maplibregl from 'maplibre-gl'
 import { offsetLngLat } from './geoUtils'
+import { emptyInput, type PlayerInput } from '../session/protocol'
 
 const MOUSE_SENSITIVITY = 0.3  // degrees per pixel
 const MOVE_SPEED = 8           // meters per second
@@ -40,6 +41,16 @@ export class GeoControls {
   getBearing(): number { return this.bearing }
   getPitch(): number { return this.pitch }
 
+  getInput(): PlayerInput {
+    return {
+      ...emptyInput(),
+      forward: this.keys.has('KeyW') || this.keys.has('ArrowUp'),
+      backward: this.keys.has('KeyS') || this.keys.has('ArrowDown'),
+      left: this.keys.has('KeyA') || this.keys.has('ArrowLeft'),
+      right: this.keys.has('KeyD') || this.keys.has('ArrowRight'),
+    }
+  }
+
   private onKeyDown = (e: KeyboardEvent) => this.keys.add(e.code)
   private onKeyUp = (e: KeyboardEvent) => this.keys.delete(e.code)
 
@@ -52,18 +63,14 @@ export class GeoControls {
     this.map.setPitch(this.pitch)
   }
 
-  update(dt: number) {
-    let dx = 0, dz = 0
-    if (this.keys.has('KeyW') || this.keys.has('ArrowUp')) dz -= 1
-    if (this.keys.has('KeyS') || this.keys.has('ArrowDown')) dz += 1
-    if (this.keys.has('KeyA') || this.keys.has('ArrowLeft')) dx -= 1
-    if (this.keys.has('KeyD') || this.keys.has('ArrowRight')) dx += 1
-    if (dx === 0 && dz === 0) return
+  /** Move the map camera by the given bearing-relative offset (meters). */
+  moveBy(dt: number, bearing: number, forward: number, strafe: number) {
+    if (forward === 0 && strafe === 0) return
 
     const speed = MOVE_SPEED * dt
-    const bearingRad = (this.bearing * Math.PI) / 180
-    const east = (dx * Math.cos(bearingRad) - dz * Math.sin(bearingRad)) * speed
-    const north = (-dz * Math.cos(bearingRad) - dx * Math.sin(bearingRad)) * speed
+    const bearingRad = (bearing * Math.PI) / 180
+    const east = (strafe * Math.cos(bearingRad) - forward * Math.sin(bearingRad)) * speed
+    const north = (-forward * Math.cos(bearingRad) - strafe * Math.sin(bearingRad)) * speed
 
     const center = this.map.getCenter()
     const [lng, lat] = offsetLngLat(center.lng, center.lat, east, north)
