@@ -18,9 +18,30 @@ vi.mock('maplibre-gl', () => {
 
 vi.mock('maplibre-gl/dist/maplibre-gl.css', () => ({}))
 
+vi.mock('three/addons/objects/Sky.js', () => {
+  const THREE = require('three')
+  class Sky extends THREE.Mesh {
+    constructor() {
+      super(new THREE.PlaneGeometry(), new THREE.MeshBasicMaterial())
+      this.material = {
+        uniforms: {
+          turbidity: { value: 10 },
+          rayleigh: { value: 2 },
+          mieCoefficient: { value: 0.005 },
+          mieDirectionalG: { value: 0.8 },
+          sunPosition: { value: new THREE.Vector3() },
+        },
+      }
+    }
+  }
+  return { Sky }
+})
+
 import { PlanetaryEngine } from '../PlanetaryEngine'
 import * as THREE from 'three'
 import { CollisionWorld } from '../../engine/CollisionWorld'
+import { SunSystem } from '../SunSystem'
+import type { RoadStrip } from '../PlanetaryScenery'
 
 describe('PlanetaryEngine', () => {
   it('creates scene and camera', () => {
@@ -70,6 +91,86 @@ describe('PlanetaryEngine', () => {
     expect(engine.camera.position.z).toBeCloseTo(-7)
     expect(engine.camera.rotation.y).toBeCloseTo(Math.PI / 2)
     expect(engine.camera.rotation.x).toBeCloseTo(0.1)
+    engine.dispose()
+  })
+})
+
+describe('PlanetaryEngine — sun and shadows', () => {
+  it('setSunAngle updates the directional light position', () => {
+    const container = document.createElement('div')
+    const engine = new PlanetaryEngine(container)
+    ;(engine.map as any)._triggerLoad()
+    const sys = new SunSystem()
+    const before = engine.sun.position.clone()
+    engine.setSunAngle(sys.compute(6))
+    engine.setSunAngle(sys.compute(12))
+    expect(engine.sun.position.y).toBeGreaterThan(before.y)
+    engine.dispose()
+  })
+
+  it('sun is exposed as a public property', () => {
+    const container = document.createElement('div')
+    const engine = new PlanetaryEngine(container)
+    expect(engine.sun).toBeDefined()
+    engine.dispose()
+  })
+})
+
+function makeRoadStrip(): RoadStrip {
+  return {
+    corners: [
+      new THREE.Vector3(0, 0.05, 0),
+      new THREE.Vector3(0, 0.05, 4),
+      new THREE.Vector3(10, 0.05, 4),
+      new THREE.Vector3(10, 0.05, 0),
+    ],
+    uvLength: 10,
+  }
+}
+
+describe('PlanetaryEngine — setRoads / setTrees / setGreenAreas', () => {
+  it('setRoads adds meshes to scene', () => {
+    const container = document.createElement('div')
+    const engine = new PlanetaryEngine(container)
+    ;(engine.map as any)._triggerLoad()
+    let before = 0; engine.scene.traverse(o => { if (o instanceof THREE.Mesh) before++ })
+    engine.setRoads([makeRoadStrip(), makeRoadStrip()])
+    let after = 0; engine.scene.traverse(o => { if (o instanceof THREE.Mesh) after++ })
+    expect(after).toBeGreaterThan(before)
+    engine.dispose()
+  })
+
+  it('setRoads disposes old meshes on rebuild', () => {
+    const container = document.createElement('div')
+    const engine = new PlanetaryEngine(container)
+    ;(engine.map as any)._triggerLoad()
+    engine.setRoads([makeRoadStrip()])
+    engine.setRoads([makeRoadStrip(), makeRoadStrip()])
+    let roadMeshCount = 0
+    engine.scene.traverse(o => { if (o instanceof THREE.Mesh && o.geometry.getAttribute('uv')) roadMeshCount++ })
+    engine.dispose()
+  })
+
+  it('setTrees adds an InstancedMesh to scene', () => {
+    const container = document.createElement('div')
+    const engine = new PlanetaryEngine(container)
+    ;(engine.map as any)._triggerLoad()
+    engine.setTrees([new THREE.Vector3(10, 0, 10), new THREE.Vector3(20, 0, 20)])
+    let found = false
+    engine.scene.traverse(o => { if (o instanceof THREE.InstancedMesh) found = true })
+    expect(found).toBe(true)
+    engine.dispose()
+  })
+
+  it('setGreenAreas adds a mesh to scene', () => {
+    const container = document.createElement('div')
+    const engine = new PlanetaryEngine(container)
+    ;(engine.map as any)._triggerLoad()
+    const tris = new Float32Array([0,0, 10,0, 10,10, 0,0, 10,10, 0,10])
+    let before = 0; engine.scene.traverse(o => { if (o instanceof THREE.Mesh) before++ })
+    engine.setGreenAreas(tris)
+    let after = 0; engine.scene.traverse(o => { if (o instanceof THREE.Mesh) after++ })
+    expect(after).toBeGreaterThan(before)
     engine.dispose()
   })
 })

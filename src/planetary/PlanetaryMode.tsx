@@ -3,6 +3,8 @@ import * as THREE from 'three'
 import { PlanetaryEngine } from './PlanetaryEngine'
 import { GeoControls } from './GeoControls'
 import { PlanetaryCollision } from './PlanetaryCollision'
+import { PlanetaryScenery } from './PlanetaryScenery'
+import { SunSystem } from './SunSystem'
 import { MapPicker } from './MapPicker'
 import { RoundBoundary } from './RoundBoundary'
 import { GameSession } from '../session/GameSession'
@@ -49,6 +51,12 @@ export function PlanetaryMode({ onExit }: PlanetaryModeProps) {
   const particleSystemRef = useRef<ParticleSystem | null>(null)
   const audioRef = useRef<SoundEffects | null>(null)
   const viewmodelRef = useRef<Viewmodel | null>(null)
+  const sceneryRef = useRef<PlanetaryScenery | null>(null)
+  const sunSystemRef = useRef(new SunSystem())
+  const [sunHour, setSunHour] = useState(10.5)
+  const sunHourRef = useRef(10.5)
+  const lastSceneryVersionRef = useRef(-1)
+  useEffect(() => { sunHourRef.current = sunHour }, [sunHour])
 
   const [showPicker, setShowPicker] = useState(true)
   const [startCenter, setStartCenter] = useState<[number, number] | null>(null)
@@ -102,6 +110,13 @@ export function PlanetaryMode({ onExit }: PlanetaryModeProps) {
       // nothing. Re-scan whenever the map settles (tiles done) — the loop's version
       // gate then meshes the buildings. Also fires as the player enters new areas.
       engine.map.on('idle', () => collisionRef.current?.markStale())
+
+      const scenery = new PlanetaryScenery(
+        engine.map,
+        (lng, lat) => engine.lngLatToLocal(lng, lat),
+      )
+      sceneryRef.current = scenery
+      engine.map.on('idle', () => sceneryRef.current?.markStale())
 
       const config = defaultCompetitiveConfig()
       const session = new GameSession(config)
@@ -282,6 +297,22 @@ export function PlanetaryMode({ onExit }: PlanetaryModeProps) {
           }
         }
 
+        // 6b. Rebuild scenery (roads, trees, green areas) when stale
+        if (sceneryRef.current) {
+          sceneryRef.current.update(center.lng, center.lat)
+          const sv = sceneryRef.current.rebuildVersion
+          if (sv !== lastSceneryVersionRef.current) {
+            lastSceneryVersionRef.current = sv
+            const { roads, treePositions, greenTriangles } = sceneryRef.current.data
+            engine.setRoads(roads)
+            engine.setTrees(treePositions)
+            engine.setGreenAreas(greenTriangles)
+          }
+        }
+
+        // 6c. Update sun angle from current time-of-day
+        engine.setSunAngle(sunSystemRef.current.compute(sunHourRef.current))
+
         // 7. Round boundary check
         const status = boundaryRef.current.check(center.lng, center.lat)
         setBoundaryStatus(status)
@@ -344,6 +375,7 @@ export function PlanetaryMode({ onExit }: PlanetaryModeProps) {
       desktopControlsRef.current?.destroy()
       particleSystemRef.current?.clear()
       viewmodelRef.current = null
+      sceneryRef.current = null
       engine.dispose()
       engineRef.current = null
     }
@@ -558,11 +590,33 @@ export function PlanetaryMode({ onExit }: PlanetaryModeProps) {
       {/* Overlay buttons sit above TouchControls look pad (zIndex: 25).
           onPointerDown.stopPropagation prevents the full-screen look pad from
           eating touch events on mobile — without it, onClick never fires. */}
+      {!showPicker && (
+        <div
+          onPointerDown={(e) => e.stopPropagation()}
+          style={{
+            position: 'absolute', top: 16, left: 16, zIndex: 100,
+            display: 'flex', flexDirection: 'column', gap: 4,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ color: '#fff', fontSize: 11, fontFamily: 'monospace' }}>
+              ☀ {String(Math.floor(sunHour)).padStart(2, '0')}:{String(Math.round((sunHour % 1) * 60)).padStart(2, '0')}
+            </span>
+            <input
+              type="range" min={0} max={24} step={0.1}
+              value={sunHour}
+              onChange={e => setSunHour(+e.target.value)}
+              style={{ width: 100, accentColor: '#ffcc44' }}
+            />
+          </div>
+        </div>
+      )}
+
       <button
         onClick={() => setShowPicker(true)}
         onPointerDown={(e) => e.stopPropagation()}
         style={{
-          position: 'absolute', top: 16, left: 16, padding: '6px 12px',
+          position: 'absolute', top: showPicker ? 16 : 52, left: 16, padding: '6px 12px',
           background: 'rgba(0,0,0,0.6)', color: 'white', border: '1px solid #555',
           borderRadius: 4, cursor: 'pointer', fontSize: 12, fontFamily: 'monospace',
           zIndex: 100,
