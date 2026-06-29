@@ -15,7 +15,7 @@ export class TerrainElevation {
 
   constructor(
     private map: TerrainMap,
-    private toLocal: (lng: number, lat: number) => [number, number],
+    _toLocal: (lng: number, lat: number) => [number, number],
     private toLngLat: (x: number, z: number) => [number, number],
   ) {}
 

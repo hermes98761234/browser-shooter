@@ -10,7 +10,6 @@ import {
   BlendFunction,
   KernelSize,
   EdgeDetectionMode,
-  SMAAAreaImageSource,
 } from 'postprocessing'
 import * as THREE from 'three'
 import { PLANETARY_CONFIG } from './PlanetaryConfig'
@@ -27,8 +26,10 @@ export class PostProcessing {
   private normalPass: NormalPass | null = null
   private effectPass: EffectPass | null = null
   private disposed = false
+  private camera: THREE.Camera
 
   constructor(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera) {
+    this.camera = camera
     this.preset = PLANETARY_CONFIG.post.defaultPreset as PostQuality
     try {
       this.composer = new EffectComposer(renderer)
@@ -43,34 +44,42 @@ export class PostProcessing {
         luminanceSmoothing: 0.1,
         intensity: PLANETARY_CONFIG.post.bloomStrength,
       })
-      this.ssao = new SSAOEffect(camera, this.normalPass.renderTarget.texture, {
-        blendFunction: BlendFunction.MULTIPLY,
-        samples: 16,
-        rings: 4,
-        radius: PLANETARY_CONFIG.post.ssaoRadius,
-        intensity: 1.0,
-        worldDistanceThreshold: 200,
-        worldDistanceFalloff: 0.9,
+      this.smaa = new SMAAEffect({
+        edgeDetectionMode: EdgeDetectionMode.COLOR,
       })
-      this.smaa = new SMAAEffect(
-        EdgeDetectionMode.COLOR,
-        SMAAAreaImageSource.AREA_TEX,
-        SMAAAreaImageSource.SEARCH_TEX,
-      )
       this.toneMapping = new ToneMappingEffect({ mode: 2 /* ACES_FILMIC */ })
 
+      this.buildSSAO()
       this.rebuildEffectPass()
     } catch {
       this.composer = null
     }
   }
 
+  private buildSSAO(): void {
+    if (this.ssao) {
+      this.ssao.dispose()
+      this.ssao = null
+    }
+    const resScale = this.preset === 'low' ? 0.25 : this.preset === 'high' ? 1.0 : 0.5
+    const samples = this.preset === 'low' ? 8 : this.preset === 'high' ? 32 : 16
+    this.ssao = new SSAOEffect(this.camera, this.normalPass!.texture, {
+      blendFunction: BlendFunction.MULTIPLY,
+      samples,
+      rings: 4,
+      radius: PLANETARY_CONFIG.post.ssaoRadius,
+      intensity: 1.0,
+      resolutionScale: resScale,
+    })
+  }
+
   private rebuildEffectPass(): void {
     if (!this.composer || !this.bloom || !this.ssao || !this.smaa || !this.toneMapping) return
-    const oldPasses = this.composer.passes
-    for (let i = oldPasses.length - 1; i >= 0; i--) {
-      if (oldPasses[i] instanceof EffectPass) {
-        this.composer.removePass(oldPasses[i])
+    // Remove old EffectPass if present
+    const passes = this.composer.passes
+    for (let i = passes.length - 1; i >= 0; i--) {
+      if (passes[i] instanceof EffectPass) {
+        this.composer.removePass(passes[i])
       }
     }
 
@@ -82,22 +91,13 @@ export class PostProcessing {
     effects.unshift(this.ssao)
 
     this.effectPass = new EffectPass(undefined as never, ...effects as never[])
-    if (this.preset === 'low') {
-      this.ssao.ssaoMaterial.uniforms.get('resolutionScale')!.value = 0.25
-      this.ssao.ssaoMaterial.uniforms.get('samples')!.value = 8
-    } else if (this.preset === 'high') {
-      this.ssao.ssaoMaterial.uniforms.get('resolutionScale')!.value = 1.0
-      this.ssao.ssaoMaterial.uniforms.get('samples')!.value = 32
-    } else {
-      this.ssao.ssaoMaterial.uniforms.get('resolutionScale')!.value = 0.5
-      this.ssao.ssaoMaterial.uniforms.get('samples')!.value = 16
-    }
     this.composer.addPass(this.effectPass)
   }
 
   setQuality(preset: PostQuality): void {
     if (preset === this.preset) return
     this.preset = preset
+    this.buildSSAO()
     this.rebuildEffectPass()
   }
 
