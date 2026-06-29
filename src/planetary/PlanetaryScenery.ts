@@ -3,9 +3,9 @@ import type maplibregl from 'maplibre-gl'
 import { lngLatDistance } from './geoUtils'
 
 const RESCAN_METERS = 50
-const ROAD_LAYERS = ['transportation', 'road', 'road_link']
-const TREE_LAYERS = ['poi_label', 'nature', 'landuse_overlay']
-const GREEN_LAYERS = ['landuse', 'landcover']
+const ROAD_LAYERS = ['transportation']
+const TREE_LAYERS = ['poi']
+const GREEN_LAYERS = ['landuse', 'landcover', 'park']
 
 const ROAD_HALF_WIDTHS: Record<string, number> = {
   motorway: 8, trunk: 8,
@@ -106,7 +106,7 @@ export class PlanetaryScenery {
     const features = this.map.queryRenderedFeatures(undefined, { layers: TREE_LAYERS })
     for (const f of features) {
       if (f.geometry.type !== 'Point') continue
-      const nat = f.properties?.natural ?? f.properties?.type
+      const nat = f.properties?.natural ?? f.properties?.subclass ?? f.properties?.type
       if (nat !== 'tree') continue
       const coords = f.geometry.coordinates as [number, number]
       const [x, z] = this.toLocal(coords[0], coords[1])
@@ -116,7 +116,7 @@ export class PlanetaryScenery {
   }
 
   private extractGreenAreas(): Float32Array {
-    const GREEN_CLASSES = new Set(['grass', 'park', 'forest', 'farmland', 'scrub', 'meadow'])
+    const GREEN_CLASSES = new Set(['grass', 'park', 'wood', 'forest', 'farmland', 'scrub', 'meadow', 'vegetation'])
     const verts: number[] = []
     const features = this.map.queryRenderedFeatures(undefined, { layers: GREEN_LAYERS })
     for (const f of features) {
