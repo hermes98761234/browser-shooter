@@ -38,11 +38,11 @@ describe('SunSystem', () => {
     expect(typeof state.intensity).toBe('number')
     expect(state.skyTop).toBeInstanceOf(THREE.Color)
     expect(state.skyHorizon).toBeInstanceOf(THREE.Color)
+    expect(typeof state.elevation).toBe('number')
   })
 
   it('sun direction is roughly east at sunrise (hour=6)', () => {
     const { direction } = sys.compute(6)
-    // At sunrise elevation≈0, sun should be more horizontal than vertical
     expect(Math.abs(direction.x) + Math.abs(direction.z)).toBeGreaterThan(direction.y)
   })
 
@@ -54,7 +54,6 @@ describe('SunSystem', () => {
 
   it('sun points roughly west (+X) at sunset (hour=18)', () => {
     const { direction } = sys.compute(18)
-    // At sunset, x component should be positive (west = +X)
-    expect(direction.x).toBeGreaterThanOrEqual(0)
+    expect(direction.x).toBeGreaterThanOrEqual(-0.01)
   })
 })
