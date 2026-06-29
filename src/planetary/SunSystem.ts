@@ -1,25 +1,24 @@
 import * as THREE from 'three'
 
 export interface SunState {
-  direction: THREE.Vector3
+  direction: THREE.Vector3  // normalized, points from scene toward sun
   color: THREE.Color
-  intensity: number
+  intensity: number         // 0 at night, up to 1.2 at noon
   skyTop: THREE.Color
   skyHorizon: THREE.Color
-  elevation: number
 }
 
 export class SunSystem {
   compute(hour: number): SunState {
     // t: 0 at 6am, 0.5 at noon, 1 at 6pm, negative/>1 at night
     const t = (hour - 6) / 12
-    const elevAngle = t * Math.PI
+    const elevAngle = t * Math.PI  // radians; sin gives 0 at dawn, 1 at noon, 0 at dusk
     const sinElev = Math.sin(elevAngle)
 
     // Azimuth: sun sweeps from east (-X) at dawn through south (+Z) at noon to west (+X) at dusk
     const aziAngle = (t - 0.5) * Math.PI
 
-    // groundDist = cos(asin(sinElev)) = sqrt(1 - sinElev²)
+    // groundDist = cos(asin(sinElev)) = sqrt(1 - sinElev²), always non-negative
     const groundDist = Math.sqrt(Math.max(0, 1 - sinElev * sinElev))
 
     const dirX = groundDist * Math.sin(aziAngle)
@@ -31,8 +30,6 @@ export class SunSystem {
     if (direction.lengthSq() < 0.0001) direction.set(0, 1, 0)
     direction.normalize()
 
-    // Elevation: radians above horizon from the sin approximation
-    const elevation = elevAngle - Math.PI / 2
     const intensity = Math.max(0, sinElev) * 1.2
 
     const color = new THREE.Color()
@@ -60,6 +57,6 @@ export class SunSystem {
       skyHorizon.setHex(0x9ec7e8)
     }
 
-    return { direction, color, intensity, skyTop, skyHorizon, elevation }
+    return { direction, color, intensity, skyTop, skyHorizon }
   }
 }

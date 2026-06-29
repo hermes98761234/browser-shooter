@@ -39,35 +39,6 @@ vi.mock('three/addons/objects/Sky.js', () => {
   return { Sky }
 })
 
-// Mock new components to avoid WebGL dependencies in jsdom
-vi.mock('../AtmosphereConfig', () => ({
-  AtmosphereConfig: vi.fn().mockImplementation(() => ({
-    state: { turbidity: 10, rayleigh: 2, mieCoefficient: 0.005, mieDirectionalG: 0.8, fogColor: { r: 0.6, g: 0.8, b: 0.9 }, sunColor: { r: 1, g: 1, b: 1 }, sunIntensity: 1.2, ambientColor: { r: 1, g: 1, b: 1 }, groundColor: { r: 0.3, g: 0.3, b: 0.3 } },
-    update: vi.fn(() => ({ turbidity: 10, rayleigh: 2, mieCoefficient: 0.005, mieDirectionalG: 0.8, fogColor: { r: 0.6, g: 0.8, b: 0.9 }, sunColor: { r: 1, g: 1, b: 1 }, sunIntensity: 1.2, ambientColor: { r: 1, g: 1, b: 1 }, groundColor: { r: 0.3, g: 0.3, b: 0.3 } })),
-  })),
-}))
-
-vi.mock('../CascadedShadows', () => ({
-  CascadedShadows: vi.fn().mockImplementation(() => ({
-    lights: [],
-    addToScene: vi.fn(),
-    removeFromScene: vi.fn(),
-    update: vi.fn(),
-    setIntensity: vi.fn(),
-    setColor: vi.fn(),
-    dispose: vi.fn(),
-  })),
-}))
-
-vi.mock('../PostProcessing', () => ({
-  PostProcessing: vi.fn().mockImplementation(() => ({
-    composer: null,
-    setQuality: vi.fn(),
-    render: vi.fn(),
-    dispose: vi.fn(),
-  })),
-}))
-
 import { PlanetaryEngine } from '../PlanetaryEngine'
 import * as THREE from 'three'
 import { CollisionWorld } from '../../engine/CollisionWorld'
@@ -109,7 +80,7 @@ describe('PlanetaryEngine', () => {
     let afterCount = 0
     engine.scene.traverse(o => { if (o instanceof THREE.Mesh) afterCount++ })
 
-    expect(afterCount - beforeCount).toBe(world.boxes.length * 2)
+    expect(afterCount - beforeCount).toBe(world.boxes.length)
     engine.dispose()
   })
 
@@ -127,16 +98,15 @@ describe('PlanetaryEngine', () => {
 })
 
 describe('PlanetaryEngine — sun and shadows', () => {
-  it('setSunAngle updates the CSM cascade lights', () => {
+  it('setSunAngle updates the directional light position', () => {
     const container = document.createElement('div')
     const engine = new PlanetaryEngine(container)
     ;(engine.map as any)._triggerLoad()
     const sys = new SunSystem()
-    // setSunAngle should not throw and should use CSM (sun removed from scene)
-    expect(() => engine.setSunAngle(sys.compute(6))).not.toThrow()
-    expect(() => engine.setSunAngle(sys.compute(12))).not.toThrow()
-    // Verify sun is no longer in the scene (CSM replaced it)
-    expect(engine.scene.children.includes(engine.sun)).toBe(false)
+    const before = engine.sun.position.clone()
+    engine.setSunAngle(sys.compute(6))
+    engine.setSunAngle(sys.compute(12))
+    expect(engine.sun.position.y).toBeGreaterThan(before.y)
     engine.dispose()
   })
 

@@ -5,13 +5,6 @@ import { Sky } from 'three/addons/objects/Sky.js'
 import type { BoxCollider } from '../engine/CollisionWorld'
 import type { RoadStrip } from './PlanetaryScenery'
 import type { SunState } from './SunSystem'
-import { AtmosphereConfig } from './AtmosphereConfig'
-import { BuildingGeometry } from './BuildingGeometry'
-import type { BuildingSpec } from './BuildingGeometry'
-import { CascadedShadows } from './CascadedShadows'
-import { PostProcessing } from './PostProcessing'
-import type { PostQuality } from './PostProcessing'
-import { TerrainElevation } from './TerrainElevation'
 
 const STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty'
 const METERS_PER_DEG_LAT = 111320
@@ -40,10 +33,6 @@ export class PlanetaryEngine {
   private trees: THREE.InstancedMesh | null = null
   private greenAreas: THREE.Mesh | null = null
   private buildingMat: THREE.MeshStandardMaterial
-  private atmosphere = new AtmosphereConfig()
-  private csm = new CascadedShadows()
-  private postProcess: PostProcessing | null = null
-  private terrainElevation: TerrainElevation | null = null
   private roadMat: THREE.MeshStandardMaterial
   private treeMat: THREE.MeshBasicMaterial
   private greenMat: THREE.MeshStandardMaterial
@@ -117,13 +106,6 @@ export class PlanetaryEngine {
     this.scene.add(this.buildings)
     this.scene.add(this.roads)
 
-    // Replace single sun DirectionalLight with CSM system
-    if (this.scene.children.includes(this.sun)) {
-      this.scene.remove(this.sun)
-      this.scene.remove(this.sun.target)
-    }
-    this.csm.addToScene(this.scene)
-
     this.map = new maplibregl.Map({
       container,
       style: STYLE_URL,
@@ -152,101 +134,46 @@ export class PlanetaryEngine {
   }
 
   setSunAngle(state: SunState): void {
-    // Use atmosphere to drive sky/fog colors from sun elevation
-    const atm = this.atmosphere.update(state.elevation)
-    this.sky.material.uniforms['turbidity'].value = atm.turbidity
-    this.sky.material.uniforms['rayleigh'].value = atm.rayleigh
-    this.sky.material.uniforms['mieCoefficient'].value = atm.mieCoefficient
-    this.sky.material.uniforms['mieDirectionalG'].value = atm.mieDirectionalG
+    const d = state.direction
+    this.sun.position.set(d.x * 200, d.y * 200, d.z * 200)
+    this.sun.color.copy(state.color)
+    this.sun.intensity = state.intensity
     this.sky.material.uniforms['sunPosition'].value.copy(state.direction)
     if (this.scene.fog instanceof THREE.Fog) {
-      this.scene.fog.color.copy(atm.fogColor)
+      this.scene.fog.color.copy(state.skyHorizon)
     }
-    // Update CSM shadow cascade lights
-    this.csm.setIntensity(atm.sunIntensity)
-    this.csm.setColor(atm.sunColor)
-    this.csm.update(state.direction, this.camera)
   }
 
   setViewFromPlayer(playerPos: THREE.Vector3, yaw: number, pitch: number) {
     this.camera.position.copy(playerPos)
     this.camera.rotation.set(pitch, yaw, 0, 'YXZ')
+    // Keep shadow frustum centered on player
+    this.sun.target.position.copy(playerPos)
+    this.sun.target.updateMatrixWorld()
   }
 
   setBuildings(boxes: BoxCollider[]) {
     this.disposeGroup(this.buildings)
-    const wallMat = new THREE.MeshStandardMaterial({
-      map: this.buildingMat.map ?? undefined,
-      roughness: 0.85,
-      metalness: 0.05,
-    })
-    const roofMat = new THREE.MeshStandardMaterial({
-      color: 0x8b7d6b,
-      roughness: 0.6,
-      metalness: 0.1,
-    })
     for (const b of boxes) {
       const sx = b.max.x - b.min.x
       const sy = b.max.y - b.min.y
       const sz = b.max.z - b.min.z
-      const cx = (b.min.x + b.max.x) / 2
-      const cz = (b.min.z + b.max.z) / 2
-      // Create a square footprint centered at origin (mesh positioned at cx, min.y, cz)
-      const half = Math.max(sx, sz) / 2
-      const footprint: [number, number][] = [
-        [-half, -half],
-        [+half, -half],
-        [+half, +half],
-        [-half, +half],
-      ]
-      const spec: BuildingSpec = {
-        footprint,
-        height: sy,
-        roofShape: 'flat',
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), this.buildingMat)
+      mesh.position.set((b.min.x + b.max.x) / 2, (b.min.y + b.max.y) / 2, (b.min.z + b.max.z) / 2)
+      // UV repeat: tile every 4 m
+      const geo = mesh.geometry
+      const uvAttr = geo.getAttribute('uv') as THREE.BufferAttribute | null
+      if (uvAttr && uvAttr.array instanceof Float32Array) {
+        const uvArr = uvAttr.array
+        for (let i = 0; i < uvArr.length; i += 2) {
+          uvArr[i] *= sx / 4
+          uvArr[i + 1] *= sy / 4
+        }
+        uvAttr.needsUpdate = true
       }
-      const fullGeo = BuildingGeometry.generate(spec)
-      // BuildingGeometry produces walls first (6 vertices per edge), then roof
-      const ringLen = spec.footprint.length >= 2 &&
-        spec.footprint[0][0] === spec.footprint[spec.footprint.length - 1][0] &&
-        spec.footprint[0][1] === spec.footprint[spec.footprint.length - 1][1]
-          ? spec.footprint.length - 1
-          : spec.footprint.length
-      const wallVertCount = 6 * ringLen
-      const posAttr = fullGeo.getAttribute('position') as THREE.BufferAttribute
-      const normAttr = fullGeo.getAttribute('normal') as THREE.BufferAttribute
-      const uvAttr = fullGeo.getAttribute('uv') as THREE.BufferAttribute
-      const totalVerts = posAttr.count
-      // Walls mesh
-      if (wallVertCount > 0) {
-        const wallGeo = new THREE.BufferGeometry()
-        wallGeo.setAttribute('position',
-          new THREE.Float32BufferAttribute(posAttr.array.slice(0, wallVertCount * 3), 3))
-        wallGeo.setAttribute('normal',
-          new THREE.Float32BufferAttribute(normAttr.array.slice(0, wallVertCount * 3), 3))
-        wallGeo.setAttribute('uv',
-          new THREE.Float32BufferAttribute(uvAttr.array.slice(0, wallVertCount * 2), 2))
-        const wallMesh = new THREE.Mesh(wallGeo, wallMat)
-        wallMesh.position.set(cx, b.min.y, cz)
-        wallMesh.castShadow = true
-        wallMesh.receiveShadow = true
-        this.buildings.add(wallMesh)
-      }
-      // Roof mesh
-      const roofVertCount = totalVerts - wallVertCount
-      if (roofVertCount > 0) {
-        const roofGeo = new THREE.BufferGeometry()
-        roofGeo.setAttribute('position',
-          new THREE.Float32BufferAttribute(posAttr.array.slice(wallVertCount * 3), 3))
-        roofGeo.setAttribute('normal',
-          new THREE.Float32BufferAttribute(normAttr.array.slice(wallVertCount * 3), 3))
-        roofGeo.setAttribute('uv',
-          new THREE.Float32BufferAttribute(uvAttr.array.slice(wallVertCount * 2), 2))
-        const roofMesh = new THREE.Mesh(roofGeo, roofMat)
-        roofMesh.position.set(cx, b.min.y, cz)
-        roofMesh.castShadow = true
-        roofMesh.receiveShadow = true
-        this.buildings.add(roofMesh)
-      }
+      mesh.castShadow = true
+      mesh.receiveShadow = true
+      this.buildings.add(mesh)
     }
   }
 
@@ -342,10 +269,6 @@ export class PlanetaryEngine {
       canvas.style.height = '100%'
       this.container.appendChild(canvas)
       this.renderer = r
-      // Create post-processing pipeline
-      if (!this.postProcess) {
-        this.postProcess = new PostProcessing(r, this.scene, this.camera)
-      }
     }
     // Billboard trees: rotate each instance to face camera each frame
     if (this.trees) {
@@ -370,11 +293,7 @@ export class PlanetaryEngine {
       this.camera.aspect = w / h
       this.camera.updateProjectionMatrix()
     }
-    if (this.postProcess && this.postProcess.composer) {
-      this.postProcess.render(0)
-    } else {
-      this.renderer.render(this.scene, this.camera)
-    }
+    this.renderer.render(this.scene, this.camera)
   }
 
   localToMercator(localX: number, localZ: number, height = 0): THREE.Vector3 {
@@ -404,8 +323,6 @@ export class PlanetaryEngine {
   }
 
   dispose() {
-    this.postProcess?.dispose()
-    this.csm.dispose()
     this.disposeGroup(this.buildings)
     this.disposeGroup(this.roads)
     if (this.trees) { this.trees.geometry.dispose(); this.scene.remove(this.trees) }
@@ -413,13 +330,5 @@ export class PlanetaryEngine {
     this.renderer?.domElement.remove()
     this.renderer?.dispose()
     this.map.remove()
-  }
-
-  setPostProcessingPreset(preset: PostQuality): void {
-    this.postProcess?.setQuality(preset)
-  }
-
-  getTerrainHeight(x: number, z: number): number {
-    return this.terrainElevation?.getHeight(x, z) ?? 0
   }
 }
