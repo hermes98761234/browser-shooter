@@ -109,4 +109,61 @@ describe('BuildingGeometry.generate', () => {
     expect(geo.getAttribute('position').count).toBeGreaterThan(0)
     expect(geo.groups).toHaveLength(2)
   })
+
+  it('flat roof on concave L-shape: all triangle centroids inside polygon and normals up', () => {
+    // L-shaped (concave) footprint — fan triangulation would emit triangles
+    // whose centroids fall outside the polygon; earcut keeps them all inside.
+    const lShape: [number, number][] = [
+      [0, 0], [10, 0], [10, 4], [4, 4], [4, 10], [0, 10],
+    ]
+
+    const geo = BuildingGeometry.generate({ footprint: lShape, height: 8, roofShape: 'flat' })
+    const pos = geo.getAttribute('position') as THREE.BufferAttribute
+    const nrm = geo.getAttribute('normal') as THREE.BufferAttribute
+    const posArr = pos.array as Float32Array
+    const nrmArr = nrm.array as Float32Array
+
+    // groups[1] is the roof group; its .start equals wallVertCount
+    const wallVertCount = geo.groups[1].start
+    const roofVertCount = geo.groups[1].count
+    expect(roofVertCount).toBeGreaterThan(0)
+
+    // Ray-casting point-in-polygon for the XZ plane
+    function pointInPolygon(x: number, z: number, poly: [number, number][]): boolean {
+      let inside = false
+      const n = poly.length
+      for (let i = 0, j = n - 1; i < n; j = i++) {
+        const [xi, zi] = poly[i]
+        const [xj, zj] = poly[j]
+        if ((zi > z) !== (zj > z) &&
+            x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) {
+          inside = !inside
+        }
+      }
+      return inside
+    }
+
+    const triCount = roofVertCount / 3
+    for (let t = 0; t < triCount; t++) {
+      const vBase = wallVertCount + t * 3  // vertex index of triangle's first vertex
+      const pBase = vBase * 3              // float offset into posArr
+
+      // Triangle vertex positions (x, z only — y is constant eaveY)
+      const ax = posArr[pBase + 0], az = posArr[pBase + 2]
+      const bx = posArr[pBase + 3], bz = posArr[pBase + 5]
+      const cx = posArr[pBase + 6], cz = posArr[pBase + 8]
+
+      // Centroid must lie inside the L-polygon
+      const centX = (ax + bx + cx) / 3
+      const centZ = (az + bz + cz) / 3
+      expect(
+        pointInPolygon(centX, centZ, lShape),
+        `Roof triangle ${t} centroid (${centX.toFixed(3)}, ${centZ.toFixed(3)}) is outside the L-polygon`,
+      ).toBe(true)
+
+      // Normal stored per vertex — all 3 share the same normal; check the first
+      const nBase = vBase * 3
+      expect(nrmArr[nBase + 1]).toBeCloseTo(1, 5)  // ny ≈ 1 → normal points up
+    }
+  })
 })

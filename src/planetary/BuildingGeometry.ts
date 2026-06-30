@@ -32,17 +32,27 @@ type AddTriFn = (
 ) => void
 
 /**
- * Fan-triangulate a flat polygon in the XZ plane at y = eaveY.
- * CCW winding → normal (0, 1, 0).
+ * Earcut-triangulate a flat polygon in the XZ plane at y = eaveY.
+ * Uses THREE.ShapeUtils.triangulateShape so concave (non-convex) footprints
+ * are handled correctly — fan triangulation produces triangles outside the
+ * polygon for L/U/T shapes.
+ *
+ * The contour is already normalised to CCW (positive shoelace) by the caller.
+ * triangulateShape returns faces wound CCW in Vector2 (XY) space, which maps
+ * to a downward 3D normal when applied naively to the XZ plane.  Swapping the
+ * 2nd and 3rd vertices of each face (emitting a, c, b instead of a, b, c)
+ * reverses the winding and produces the required upward (0, 1, 0) normal.
  */
 function buildFlatRoof(pts: [number, number][], eaveY: number, add: AddTriFn): void {
-  const n = pts.length
-  // (pts[0], pts[i+1], pts[i]) gives (0,1,0) normal for CCW polygon
-  for (let i = 1; i < n - 1; i++) {
+  const contour = pts.map(([x, z]) => new THREE.Vector2(x, z))
+  const faces = THREE.ShapeUtils.triangulateShape(contour, [])
+  for (const [a, b, c] of faces) {
+    // Emit (a, c, b) — swapping 2nd and 3rd vertices — so the cross-product
+    // normal points up (+Y) for a CCW footprint in the XZ plane.
     add(
-      pts[0][0], eaveY, pts[0][1],
-      pts[i + 1][0], eaveY, pts[i + 1][1],
-      pts[i][0], eaveY, pts[i][1],
+      pts[a][0], eaveY, pts[a][1],
+      pts[c][0], eaveY, pts[c][1],
+      pts[b][0], eaveY, pts[b][1],
     )
   }
 }
