@@ -72,7 +72,6 @@ export function PlanetaryMode({ onExit }: PlanetaryModeProps) {
   const [isDead, setIsDead] = useState(false)
   const [respawnIn, setRespawnIn] = useState<number | null>(null)
   const killSeqRef = useRef(0)
-  const lastBuildingsVersionRef = useRef(-1)
   const mouseShootRef = useRef(false)
   const [mobileControls] = useState(() => mobileControlsActive(loadSettings()))
   const [csMode, setCsMode] = useState(false)
@@ -289,12 +288,6 @@ export function PlanetaryMode({ onExit }: PlanetaryModeProps) {
         const center = engine.map.getCenter()
         if (collisionRef.current) {
           session.collisionWorld = collisionRef.current.update(center.lng, center.lat)
-          // Re-mesh exactly when (and only when) the collision world was actually rebuilt.
-          const v = collisionRef.current.rebuildVersion
-          if (v !== lastBuildingsVersionRef.current) {
-            lastBuildingsVersionRef.current = v
-            engine.setBuildings(collisionRef.current.collisionWorld.boxes)
-          }
         }
 
         // 6b. Rebuild scenery (roads, trees, green areas) when stale
@@ -303,10 +296,11 @@ export function PlanetaryMode({ onExit }: PlanetaryModeProps) {
           const sv = sceneryRef.current.rebuildVersion
           if (sv !== lastSceneryVersionRef.current) {
             lastSceneryVersionRef.current = sv
-            const { roads, treePositions, greenTriangles } = sceneryRef.current.data
+            const { roads, treePositions, greenTriangles, buildings } = sceneryRef.current.data
             engine.setRoads(roads)
             engine.setTrees(treePositions)
             engine.setGreenAreas(greenTriangles)
+            engine.setBuildings(buildings)
           }
         }
 

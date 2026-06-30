@@ -2,323 +2,320 @@ import * as THREE from 'three'
 import { PLANETARY_CONFIG } from './PlanetaryConfig'
 
 export interface BuildingSpec {
-  footprint: [number, number][]
-  height: number
-  minHeight?: number
-  roofShape: string
-  roofHeight?: number
-  roofAngle?: number
+  footprint: [number, number][]   // ring of absolute local [x, z] meters; may be open or closed
+  height: number                   // absolute top Y (meters)
+  minHeight?: number               // ground Y (default 0)
+  roofShape?: string               // 'flat' | 'gabled' | 'hipped' | 'pyramidal' | other→flat
+  roofHeight?: number              // peak rise above height's eave; capped to 50% of wall height
 }
 
-function addVertex(
-  positions: number[],
-  normals: number[],
-  uvs: number[],
-  x: number, y: number, z: number,
-  nx: number, ny: number, nz: number,
-  u: number, v: number,
-): void {
-  positions.push(x, y, z)
-  normals.push(nx, ny, nz)
-  uvs.push(u, v)
-}
+// ─── helpers ────────────────────────────────────────────────────────────────
 
-function addTriangle3D(
-  positions: number[],
-  normals: number[],
-  uvs: number[],
-  a: [number, number, number],
-  b: [number, number, number],
-  c: [number, number, number],
-): void {
-  // Compute face normal from cross product (b-a) × (c-a)
-  const abx = b[0] - a[0], aby = b[1] - a[1], abz = b[2] - a[2]
-  const acx = c[0] - a[0], acy = c[1] - a[1], acz = c[2] - a[2]
-  let nx = aby * acz - abz * acy
-  let ny = abz * acx - abx * acz
-  let nz = abx * acy - aby * acx
-  const len = Math.sqrt(nx * nx + ny * ny + nz * nz)
-  if (len > 0) {
-    nx /= len
-    ny /= len
-    nz /= len
+/** Shoelace signed area in the XZ plane. Positive = CCW (X right, Z "up"). */
+function signedArea2D(pts: [number, number][]): number {
+  let area = 0
+  const n = pts.length
+  for (let i = 0; i < n; i++) {
+    const [x1, z1] = pts[i]
+    const [x2, z2] = pts[(i + 1) % n]
+    area += x1 * z2 - x2 * z1
   }
-  addVertex(positions, normals, uvs, a[0], a[1], a[2], nx, ny, nz, 0, 0)
-  addVertex(positions, normals, uvs, b[0], b[1], b[2], nx, ny, nz, 1, 0)
-  addVertex(positions, normals, uvs, c[0], c[1], c[2], nx, ny, nz, 0, 1)
+  return area / 2
 }
 
-function centroid2D(ring: [number, number][], n: number): [number, number] {
+// ─── roof builders ──────────────────────────────────────────────────────────
+
+type AddTriFn = (
+  ax: number, ay: number, az: number,
+  bx: number, by: number, bz: number,
+  cx: number, cy: number, cz: number,
+) => void
+
+/**
+ * Earcut-triangulate a flat polygon in the XZ plane at y = eaveY.
+ * Uses THREE.ShapeUtils.triangulateShape so concave (non-convex) footprints
+ * are handled correctly — fan triangulation produces triangles outside the
+ * polygon for L/U/T shapes.
+ *
+ * The contour is already normalised to CCW (positive shoelace) by the caller.
+ * triangulateShape returns faces wound CCW in Vector2 (XY) space, which maps
+ * to a downward 3D normal when applied naively to the XZ plane.  Swapping the
+ * 2nd and 3rd vertices of each face (emitting a, c, b instead of a, b, c)
+ * reverses the winding and produces the required upward (0, 1, 0) normal.
+ */
+function buildFlatRoof(pts: [number, number][], eaveY: number, add: AddTriFn): void {
+  const contour = pts.map(([x, z]) => new THREE.Vector2(x, z))
+  const faces = THREE.ShapeUtils.triangulateShape(contour, [])
+  for (const [a, b, c] of faces) {
+    // Emit (a, c, b) — swapping 2nd and 3rd vertices — so the cross-product
+    // normal points up (+Y) for a CCW footprint in the XZ plane.
+    add(
+      pts[a][0], eaveY, pts[a][1],
+      pts[c][0], eaveY, pts[c][1],
+      pts[b][0], eaveY, pts[b][1],
+    )
+  }
+}
+
+/**
+ * Gabled roof: ridge runs along the longest bounding-box axis through the
+ * centroid. Each footprint edge becomes either a slope quad (2 triangles) or a
+ * gable-end triangle.  Winding chosen so normals are always outward-upward for
+ * a CCW footprint.
+ *
+ * No degenerate triangles: slope quads require distinct P1/P2 (pDist > ε);
+ * gable triangles always have V1≠P (differ in Y) and V2≠P (differ in Y) and
+ * V1≠V2 (different footprint vertices).
+ */
+function buildGabledRoof(
+  pts: [number, number][],
+  eaveY: number,
+  peakRise: number,
+  add: AddTriFn,
+): void {
+  const n = pts.length
   let cx = 0, cz = 0
-  for (let i = 0; i < n; i++) {
-    cx += ring[i][0]
-    cz += ring[i][1]
+  for (const [x, z] of pts) { cx += x; cz += z }
+  cx /= n; cz /= n
+
+  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity
+  for (const [x, z] of pts) {
+    if (x < minX) minX = x; if (x > maxX) maxX = x
+    if (z < minZ) minZ = z; if (z > maxZ) maxZ = z
   }
-  return [cx / n, cz / n]
-}
+  const extX = maxX - minX
+  const extZ = maxZ - minZ
 
-function addGableRoof(
-  positions: number[],
-  normals: number[],
-  uvs: number[],
-  ring: [number, number][],
-  n: number,
-  topY: number,
-  ridgeY: number,
-  ridgeDir: [number, number],
-): void {
-  // Project all vertices onto ridge direction to find extremes
-  let minProj = Infinity
-  let maxProj = -Infinity
-  const projs: number[] = []
-  for (let i = 0; i < n; i++) {
-    const proj = ring[i][0] * ridgeDir[0] + ring[i][1] * ridgeDir[1]
-    projs.push(proj)
-    if (proj < minProj) minProj = proj
-    if (proj > maxProj) maxProj = proj
-  }
+  // Principal axis: whichever bounding-box dimension is longer
+  const ax = extX >= extZ ? 1 : 0   // axis direction in X
+  const az = extX >= extZ ? 0 : 1   // axis direction in Z
 
-  // Ridge endpoints in 3D
-  const ridgeStart: [number, number, number] = [
-    minProj * ridgeDir[0], ridgeY, minProj * ridgeDir[1],
-  ]
-  const ridgeEnd: [number, number, number] = [
-    maxProj * ridgeDir[0], ridgeY, maxProj * ridgeDir[1],
-  ]
-  const midProj = (minProj + maxProj) / 2
+  // Scalar projections of each footprint vertex onto the axis (relative to centroid)
+  const ts = pts.map(([x, z]) => (x - cx) * ax + (z - cz) * az)
+  const tMin = Math.min(...ts)
+  const tMax = Math.max(...ts)
+
+  const ridgeY = eaveY + peakRise
 
   for (let i = 0; i < n; i++) {
-    const v1 = ring[i]
-    const v2 = ring[(i + 1) % n]
-    const proj1 = projs[i]
-    const proj2 = projs[(i + 1) % n]
+    const [V1x, V1z] = pts[i]
+    const [V2x, V2z] = pts[(i + 1) % n]
 
-    const v1Top: [number, number, number] = [v1[0], topY, v1[1]]
-    const v2Top: [number, number, number] = [v2[0], topY, v2[1]]
+    // Clamp each vertex's projection to the ridge span
+    const c1 = Math.max(tMin, Math.min(tMax, ts[i]))
+    const c2 = Math.max(tMin, Math.min(tMax, ts[(i + 1) % n]))
 
-    // Both vertices on same side of the ridge midpoint -> triangle to nearest endpoint
-    // Vertices span the ridge -> quadrilateral connecting to ridge line
-    const side1 = proj1 < midProj ? -1 : 1
-    const side2 = proj2 < midProj ? -1 : 1
+    const P1x = cx + c1 * ax, P1z = cz + c1 * az
+    const P2x = cx + c2 * ax, P2z = cz + c2 * az
 
-    if (side1 === side2) {
-      // Triangle to nearest ridge endpoint
-      const ridgePt = side1 < 0 ? ridgeStart : ridgeEnd
-      addTriangle3D(positions, normals, uvs, v1Top, v2Top, ridgePt)
+    const pDist = Math.hypot(P2x - P1x, P2z - P1z)
+
+    if (pDist < 1e-6) {
+      // Gable end — single triangle: V1, P, V2
+      // V1 and V2 at eaveY; P at ridgeY → all positions distinct.
+      add(V1x, eaveY, V1z, P1x, ridgeY, P1z, V2x, eaveY, V2z)
     } else {
-      // Edge crosses the ridge — two triangles forming a quad
-      // Find the intersection point along the edge at the ridge line
-      const t = (midProj - proj1) / (proj2 - proj1)
-      const ix = v1[0] + t * (v2[0] - v1[0])
-      const iz = v1[1] + t * (v2[1] - v1[1])
-      const intersect: [number, number, number] = [ix, topY, iz]
-      const ridgeIntersect: [number, number, number] = [ix, ridgeY, iz]
-
-      // Triangle 1: v1Top → intersect → ridgeStart/End
-      const rp1 = side1 < 0 ? ridgeStart : ridgeEnd
-      addTriangle3D(positions, normals, uvs, v1Top, intersect, rp1)
-      // Triangle 2: v1Top → rp1 → ridgeIntersect
-      addTriangle3D(positions, normals, uvs, v1Top, rp1, ridgeIntersect)
-      // Triangle 3: intersect → v2Top → ridgeEnd/Start
-      const rp2 = side2 < 0 ? ridgeStart : ridgeEnd
-      addTriangle3D(positions, normals, uvs, intersect, v2Top, rp2)
-      // Triangle 4: intersect → rp2 → ridgeIntersect  (redundant, keep simple)
-      // Actually let me simplify: just split the edge at the ridge
-      addTriangle3D(positions, normals, uvs, intersect, v2Top, rp2)
-      addTriangle3D(positions, normals, uvs, intersect, rp2, ridgeIntersect)
+      // Slope quad — two triangles with CCW outward winding:
+      //   T1 = (V1, P2, V2)    T2 = (V1, P1, P2)
+      add(V1x, eaveY, V1z, P2x, ridgeY, P2z, V2x, eaveY, V2z)
+      add(V1x, eaveY, V1z, P1x, ridgeY, P1z, P2x, ridgeY, P2z)
     }
   }
 }
 
-function addHippedRoof(
-  positions: number[],
-  normals: number[],
-  uvs: number[],
-  ring: [number, number][],
-  n: number,
-  topY: number,
-  ridgeY: number,
+/**
+ * Pyramidal roof: every footprint edge slopes to the centroid apex.
+ */
+function buildPyramidalRoof(
+  pts: [number, number][],
+  eaveY: number,
+  peakRise: number,
+  add: AddTriFn,
 ): void {
-  const [cx, cz] = centroid2D(ring, n)
+  const n = pts.length
+  let cx = 0, cz = 0
+  for (const [x, z] of pts) { cx += x; cz += z }
+  cx /= n; cz /= n
+  const apexY = eaveY + peakRise
 
-  // Inset vertices toward centroid by factor 0.7
-  const inset: [number, number, number][] = []
   for (let i = 0; i < n; i++) {
-    const ix = cx + 0.7 * (ring[i][0] - cx)
-    const iz = cz + 0.7 * (ring[i][1] - cz)
-    inset.push([ix, ridgeY, iz])
+    const [V1x, V1z] = pts[i]
+    const [V2x, V2z] = pts[(i + 1) % n]
+    // (V1, apex, V2) — winding gives outward normal for CCW polygon
+    add(V1x, eaveY, V1z, cx, apexY, cz, V2x, eaveY, V2z)
+  }
+}
+
+/**
+ * Hipped roof: footprint edges slope inward to a centroid-scaled ridge polygon.
+ * Uses a 30 % centroid-shrink so the ridge cap never collapses to a point.
+ */
+function buildHippedRoof(
+  pts: [number, number][],
+  eaveY: number,
+  peakRise: number,
+  add: AddTriFn,
+): void {
+  const n = pts.length
+  let cx = 0, cz = 0
+  for (const [x, z] of pts) { cx += x; cz += z }
+  cx /= n; cz /= n
+  const ridgeY = eaveY + peakRise
+  const SHRINK = 0.3
+
+  // Ridge polygon: each vertex moved 30 % toward centroid, elevated to ridgeY
+  const rp: [number, number, number][] = pts.map(([x, z]) => [
+    cx + (x - cx) * SHRINK, ridgeY, cz + (z - cz) * SHRINK,
+  ])
+
+  // Slope quads for each footprint edge
+  for (let i = 0; i < n; i++) {
+    const [V1x, V1z] = pts[i]
+    const [V2x, V2z] = pts[(i + 1) % n]
+    const [R1x, R1y, R1z] = rp[i]
+    const [R2x, R2y, R2z] = rp[(i + 1) % n]
+
+    add(V1x, eaveY, V1z, R2x, R2y, R2z, V2x, eaveY, V2z)
+    add(V1x, eaveY, V1z, R1x, R1y, R1z, R2x, R2y, R2z)
   }
 
-  // For each edge, create a quad (2 triangles) from edge(topY) to inset edge(ridgeY)
-  for (let i = 0; i < n; i++) {
-    const j = (i + 1) % n
-    const v1Top: [number, number, number] = [ring[i][0], topY, ring[i][1]]
-    const v2Top: [number, number, number] = [ring[j][0], topY, ring[j][1]]
-    const v1Inset = inset[i]
-    const v2Inset = inset[j]
-
-    // Triangle 1: v1Top → v2Top → v1Inset
-    addTriangle3D(positions, normals, uvs, v1Top, v2Top, v1Inset)
-    // Triangle 2: v2Top → v2Inset → v1Inset
-    addTriangle3D(positions, normals, uvs, v2Top, v2Inset, v1Inset)
-  }
-
-  // Flat top cap: fan triangulation of inset polygon
+  // Top cap: fan-triangulate the CCW ridge polygon (same winding as flat roof)
+  const [R0x, R0y, R0z] = rp[0]
   for (let i = 1; i < n - 1; i++) {
-    addTriangle3D(positions, normals, uvs, inset[0], inset[i], inset[i + 1])
+    const [Rix, Riy, Riz] = rp[i]
+    const [Ri1x, Ri1y, Ri1z] = rp[i + 1]
+    add(R0x, R0y, R0z, Ri1x, Ri1y, Ri1z, Rix, Riy, Riz)
   }
 }
 
-function addPyramidalRoof(
-  positions: number[],
-  normals: number[],
-  uvs: number[],
-  ring: [number, number][],
-  n: number,
-  topY: number,
-  ridgeY: number,
-): void {
-  const [cx, cz] = centroid2D(ring, n)
-  const apex: [number, number, number] = [cx, ridgeY, cz]
-
-  // For each edge, create a triangle from edge(topY) to apex(ridgeY)
-  for (let i = 0; i < n; i++) {
-    const j = (i + 1) % n
-    const v1Top: [number, number, number] = [ring[i][0], topY, ring[i][1]]
-    const v2Top: [number, number, number] = [ring[j][0], topY, ring[j][1]]
-    addTriangle3D(positions, normals, uvs, v1Top, v2Top, apex)
-  }
-}
+// ─── main export ────────────────────────────────────────────────────────────
 
 export class BuildingGeometry {
   static generate(spec: BuildingSpec): THREE.BufferGeometry {
-    // 1. Process footprint: strip duplicate-first ring closure
-    let ring = spec.footprint
-    if (ring.length >= 2) {
-      const first = ring[0]
-      const last = ring[ring.length - 1]
-      if (first[0] === last[0] && first[1] === last[1]) {
-        ring = ring.slice(0, -1)
+
+    // 1. Normalise footprint: drop duplicate closing vertex if present
+    let pts = [...spec.footprint]
+    if (pts.length > 1) {
+      const [fx, fz] = pts[0]
+      const [lx, lz] = pts[pts.length - 1]
+      if (Math.abs(fx - lx) < 1e-9 && Math.abs(fz - lz) < 1e-9) {
+        pts = pts.slice(0, -1)
       }
     }
 
-    // 2. Validate: at least 3 vertices
-    if (ring.length < 3) {
-      throw new Error('Footprint must have at least 3 unique vertices')
+    if (pts.length < 3) {
+      throw new Error(
+        `BuildingGeometry: footprint must have at least 3 distinct vertices, got ${pts.length}`,
+      )
+    }
+    if (spec.height < PLANETARY_CONFIG.building.minHeight) {
+      throw new Error(
+        `BuildingGeometry: height ${spec.height} is below minimum ${PLANETARY_CONFIG.building.minHeight}`,
+      )
     }
 
-    const minHeight = spec.minHeight ?? PLANETARY_CONFIG.building.minHeight
-    if (spec.height < minHeight) {
-      throw new Error(`Building height must be at least ${minHeight}`)
+    // 2. Normalise winding to CCW (positive shoelace area) so all roof
+    //    builders produce outward-upward normals.
+    if (signedArea2D(pts) < 0) {
+      pts = pts.slice().reverse()
     }
 
-    const positions: number[] = []
-    const normals: number[] = []
-    const uvs: number[] = []
+    const minHeight = spec.minHeight ?? 0
+    const wallHeight = spec.height - minHeight
+    const eaveY = spec.height
 
-    const groundY = 0
-    const topY = spec.height
-    const n = ring.length
+    // roofHeight is capped to 50 % of wall height
+    const rawRoofHeight = spec.roofHeight ?? wallHeight * 0.4
+    const effectiveRoofHeight = Math.min(rawRoofHeight, wallHeight * 0.5)
 
-    // 3. Build wall quads for each edge
+    // ── walls ──────────────────────────────────────────────────────────────
+    const wallPos: number[] = []
+    const wallNrm: number[] = []
+    const wallUV: number[] = []
+
+    let cumLen = 0
+    const n = pts.length
+
     for (let i = 0; i < n; i++) {
-      const p1 = ring[i]
-      const p2 = ring[(i + 1) % n]
-      const dx = p2[0] - p1[0]
-      const dz = p2[1] - p1[1]
-      const edgeLen = Math.sqrt(dx * dx + dz * dz)
+      const [ax, az] = pts[i]
+      const [bx, bz] = pts[(i + 1) % n]
+      const dx = bx - ax
+      const dz = bz - az
+      const len = Math.sqrt(dx * dx + dz * dz)
+      if (len < 1e-9) continue   // skip degenerate edges
 
-      // Normal perpendicular to edge in XZ plane
-      const nx = dz / edgeLen
-      const nz = -dx / edgeLen
-      const ny = 0
+      // Outward wall normal (as specified: −dz, 0, dx)
+      const nx = -dz / len
+      const nz = dx / len
 
-      const uLen = edgeLen / 4
-      const vH = topY / 4
+      const u0 = cumLen / 4
+      const u1 = (cumLen + len) / 4
+      const v1 = wallHeight / 4
+      cumLen += len
 
-      // Triangle 1: bottom-left, bottom-right, top-left
-      addVertex(positions, normals, uvs, p1[0], groundY, p1[1], nx, ny, nz, 0, 0)
-      addVertex(positions, normals, uvs, p2[0], groundY, p2[1], nx, ny, nz, uLen, 0)
-      addVertex(positions, normals, uvs, p1[0], topY, p1[1], nx, ny, nz, 0, vH)
+      // Triangle 1: BL, BR, TR
+      wallPos.push(ax, minHeight, az,  bx, minHeight, bz,  bx, eaveY, bz)
+      wallNrm.push(nx, 0, nz,  nx, 0, nz,  nx, 0, nz)
+      wallUV.push(u0, 0,  u1, 0,  u1, v1)
 
-      // Triangle 2: bottom-right, top-right, top-left
-      addVertex(positions, normals, uvs, p2[0], groundY, p2[1], nx, ny, nz, uLen, 0)
-      addVertex(positions, normals, uvs, p2[0], topY, p2[1], nx, ny, nz, uLen, vH)
-      addVertex(positions, normals, uvs, p1[0], topY, p1[1], nx, ny, nz, 0, vH)
+      // Triangle 2: BL, TR, TL
+      wallPos.push(ax, minHeight, az,  bx, eaveY, bz,  ax, eaveY, az)
+      wallNrm.push(nx, 0, nz,  nx, 0, nz,  nx, 0, nz)
+      wallUV.push(u0, 0,  u1, v1,  u0, v1)
     }
 
-    // 4. Roof
-    const roofHeight = spec.roofHeight ?? 0
-    const hasRoof = spec.roofShape !== 'flat' && roofHeight > 0
+    // ── roof ───────────────────────────────────────────────────────────────
+    const roofPos: number[] = []
+    const roofNrm: number[] = []
+    const roofUV: number[] = []
 
-    if (hasRoof) {
-      // Cap roof height to 50% of building height
-      const actualRoofH = Math.min(roofHeight, spec.height * 0.5)
-      const ridgeY = topY - actualRoofH
-
-      // Find longest edge direction for ridge
-      let maxLen = 0
-      let ridgeDir: [number, number] = [1, 0]
-      for (let i = 0; i < n; i++) {
-        const p1 = ring[i]
-        const p2 = ring[(i + 1) % n]
-        const dx = p2[0] - p1[0]
-        const dz = p2[1] - p1[1]
-        const len = Math.sqrt(dx * dx + dz * dz)
-        if (len > maxLen) {
-          maxLen = len
-          ridgeDir = [dx / len, dz / len]
-        }
+    /** Adds one roof triangle; computes normal via cross product; falls back
+     *  to (0,1,0) if the cross product is zero-length. */
+    const addRoofTri: AddTriFn = (ax, ay, az, bx, by, bz, cx, cy, cz) => {
+      const e1x = bx - ax, e1y = by - ay, e1z = bz - az
+      const e2x = cx - ax, e2y = cy - ay, e2z = cz - az
+      let rnx = e1y * e2z - e1z * e2y
+      let rny = e1z * e2x - e1x * e2z
+      let rnz = e1x * e2y - e1y * e2x
+      const rlen = Math.sqrt(rnx * rnx + rny * rny + rnz * rnz)
+      if (rlen < 1e-9) {
+        rnx = 0; rny = 1; rnz = 0
+      } else {
+        rnx /= rlen; rny /= rlen; rnz /= rlen
       }
+      roofPos.push(ax, ay, az,  bx, by, bz,  cx, cy, cz)
+      roofNrm.push(rnx, rny, rnz,  rnx, rny, rnz,  rnx, rny, rnz)
+      roofUV.push(0, 0,  1, 0,  0.5, 1)
+    }
 
-      switch (spec.roofShape) {
-        case 'gabled':
-          addGableRoof(positions, normals, uvs, ring, n, topY, ridgeY, ridgeDir)
-          break
-        case 'hipped':
-          addHippedRoof(positions, normals, uvs, ring, n, topY, ridgeY)
-          break
-        case 'pyramidal':
-          addPyramidalRoof(positions, normals, uvs, ring, n, topY, ridgeY)
-          break
-        default:
-          // Unknown shape — fall back to flat roof
-          addFlatRoof(positions, normals, uvs, ring, n, topY)
-          break
-      }
+    const roofShape = spec.roofShape ?? 'flat'
+
+    if (roofShape === 'gabled' && effectiveRoofHeight > 0) {
+      buildGabledRoof(pts, eaveY, effectiveRoofHeight, addRoofTri)
+    } else if (roofShape === 'pyramidal' && effectiveRoofHeight > 0) {
+      buildPyramidalRoof(pts, eaveY, effectiveRoofHeight, addRoofTri)
+    } else if (roofShape === 'hipped' && effectiveRoofHeight > 0) {
+      buildHippedRoof(pts, eaveY, effectiveRoofHeight, addRoofTri)
     } else {
-      // Flat roof
-      addFlatRoof(positions, normals, uvs, ring, n, topY)
+      // flat + unknown shapes + effectiveRoofHeight == 0 fallback
+      buildFlatRoof(pts, eaveY, addRoofTri)
     }
+
+    // ── assemble geometry ──────────────────────────────────────────────────
+    const allPos = [...wallPos, ...roofPos]
+    const allNrm = [...wallNrm, ...roofNrm]
+    const allUV  = [...wallUV,  ...roofUV]
 
     const geo = new THREE.BufferGeometry()
-    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
-    geo.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3))
-    geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2))
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(allPos), 3))
+    geo.setAttribute('normal',   new THREE.Float32BufferAttribute(new Float32Array(allNrm), 3))
+    geo.setAttribute('uv',       new THREE.Float32BufferAttribute(new Float32Array(allUV),  2))
+
+    const wallVertCount = wallPos.length / 3
+    const roofVertCount = roofPos.length / 3
+    geo.addGroup(0, wallVertCount, 0)
+    geo.addGroup(wallVertCount, roofVertCount, 1)
+
     return geo
-  }
-}
-
-function addFlatRoof(
-  positions: number[],
-  normals: number[],
-  uvs: number[],
-  ring: [number, number][],
-  n: number,
-  topY: number,
-): void {
-  const roofNormalNx = 0
-  const roofNormalNy = 1
-  const roofNormalNz = 0
-
-  // Fan triangulation from vertex 0
-  for (let i = 1; i < n - 1; i++) {
-    const p0 = ring[0]
-    const pa = ring[i]
-    const pb = ring[i + 1]
-
-    addVertex(positions, normals, uvs, p0[0], topY, p0[1], roofNormalNx, roofNormalNy, roofNormalNz, p0[0] / 4, p0[1] / 4)
-    addVertex(positions, normals, uvs, pa[0], topY, pa[1], roofNormalNx, roofNormalNy, roofNormalNz, pa[0] / 4, pa[1] / 4)
-    addVertex(positions, normals, uvs, pb[0], topY, pb[1], roofNormalNx, roofNormalNy, roofNormalNz, pb[0] / 4, pb[1] / 4)
   }
 }

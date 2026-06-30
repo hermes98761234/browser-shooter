@@ -1,11 +1,13 @@
 import * as THREE from 'three'
 import type maplibregl from 'maplibre-gl'
 import { lngLatDistance } from './geoUtils'
+import type { BuildingSpec } from './BuildingGeometry'
 
 const RESCAN_METERS = 50
 const ROAD_LAYERS = ['transportation']
 const TREE_LAYERS = ['poi']
 const GREEN_LAYERS = ['landuse', 'landcover', 'park']
+const BUILDING_LAYERS = ['building']
 
 const ROAD_HALF_WIDTHS: Record<string, number> = {
   motorway: 8, trunk: 8,
@@ -25,13 +27,14 @@ export interface SceneryData {
   roads: RoadStrip[]
   treePositions: THREE.Vector3[]
   greenTriangles: Float32Array  // flat [x,z, x,z, ...] for triangulated green areas
+  buildings: BuildingSpec[]
 }
 
 export class PlanetaryScenery {
   private lastLng = NaN
   private lastLat = NaN
   private _rebuildVersion = 0
-  private _data: SceneryData = { roads: [], treePositions: [], greenTriangles: new Float32Array(0) }
+  private _data: SceneryData = { roads: [], treePositions: [], greenTriangles: new Float32Array(0), buildings: [] }
 
   get rebuildVersion(): number { return this._rebuildVersion }
   get data(): SceneryData { return this._data }
@@ -59,6 +62,7 @@ export class PlanetaryScenery {
       roads: this.extractRoads(),
       treePositions: this.extractTrees(),
       greenTriangles: this.extractGreenAreas(),
+      buildings: this.extractBuildings(),
     }
     return this._data
   }
@@ -140,5 +144,36 @@ export class PlanetaryScenery {
       }
     }
     return new Float32Array(verts)
+  }
+
+  private extractBuildings(): BuildingSpec[] {
+    const specs: BuildingSpec[] = []
+    const features = this.map.queryRenderedFeatures(undefined, { layers: BUILDING_LAYERS })
+    for (const f of features) {
+      const rings: [number, number][][] =
+        f.geometry.type === 'Polygon'
+          ? [f.geometry.coordinates[0] as [number, number][]]
+          : f.geometry.type === 'MultiPolygon'
+          ? (f.geometry.coordinates as [number, number][][][]).map(p => p[0])
+          : []
+      const props = f.properties ?? {}
+      const rawHeight =
+        props.render_height != null ? Number(props.render_height)
+        : props.height != null ? Number(props.height)
+        : props['building:levels'] != null ? Number(props['building:levels']) * 3
+        : NaN
+      const height = (isFinite(rawHeight) && rawHeight > 0) ? rawHeight : 6
+      const rawMin = Number(props.render_min_height ?? 0) || 0
+      // Guard malformed data: a min_height at/above the top would give negative
+      // wall height (inverted walls). Treat as ground-level.
+      const minHeight = rawMin < height ? rawMin : 0
+      const roofShape = String(props['roof:shape'] ?? 'flat')
+      for (const ring of rings) {
+        if (ring.length < 3) continue
+        const footprint: [number, number][] = ring.map(([lng, lat]) => this.toLocal(lng, lat))
+        specs.push({ footprint, height, minHeight, roofShape })
+      }
+    }
+    return specs
   }
 }
