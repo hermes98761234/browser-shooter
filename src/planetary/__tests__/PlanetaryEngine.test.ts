@@ -154,6 +154,18 @@ function makeRoadStrip(): RoadStrip {
   }
 }
 
+function makeFarRoadStrip(): RoadStrip {
+  return {
+    corners: [
+      new THREE.Vector3(700, 0.05, 700),
+      new THREE.Vector3(700, 0.05, 704),
+      new THREE.Vector3(710, 0.05, 704),
+      new THREE.Vector3(710, 0.05, 700),
+    ],
+    uvLength: 10,
+  }
+}
+
 describe('PlanetaryEngine — setRoads / setTrees / setGreenAreas', () => {
   it('setRoads adds meshes to scene', () => {
     const container = document.createElement('div')
@@ -172,6 +184,21 @@ describe('PlanetaryEngine — setRoads / setTrees / setGreenAreas', () => {
     ;(engine.map as any)._triggerLoad()
     engine.setRoads([makeRoadStrip()])
     engine.setRoads([makeRoadStrip(), makeRoadStrip()])
+    engine.dispose()
+  })
+
+  it('culls roads beyond the fog-far distance', () => {
+    const container = document.createElement('div')
+    const engine = new PlanetaryEngine(container)
+    ;(engine.map as any)._triggerLoad()
+    engine.setViewFromPlayer(new THREE.Vector3(0, 1.7, 0), 0, 0)
+
+    let before = 0; engine.scene.traverse(o => { if (o instanceof THREE.Mesh) before++ })
+    engine.setRoads([makeRoadStrip(), makeFarRoadStrip()])
+    let after = 0; engine.scene.traverse(o => { if (o instanceof THREE.Mesh) after++ })
+
+    // near strip adds a road mesh + a lane-marking mesh; far strip adds none
+    expect(after - before).toBe(2)
     engine.dispose()
   })
 

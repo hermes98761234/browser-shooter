@@ -224,8 +224,12 @@ export class PlanetaryEngine {
 
   setRoads(roads: RoadStrip[]): void {
     this.disposeGroup(this.roads)
+    const far = this.cullFar()
     for (const strip of roads) {
       const [a, b, c, d] = strip.corners
+      const mx = (a.x + b.x + c.x + d.x) / 4
+      const mz = (a.z + b.z + c.z + d.z) / 4
+      if (this.isBeyond(mx, mz, far)) continue
       const geo = new THREE.BufferGeometry()
       // Two triangles: ABD and BCD
       const positions = new Float32Array([
