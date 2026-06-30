@@ -2,9 +2,14 @@ import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import * as THREE from 'three'
 import { Sky } from 'three/addons/objects/Sky.js'
-import type { BoxCollider } from '../engine/CollisionWorld'
 import type { RoadStrip } from './PlanetaryScenery'
 import type { SunState } from './SunSystem'
+import { AtmosphereConfig } from './AtmosphereConfig'
+import { BuildingGeometry } from './BuildingGeometry'
+import type { BuildingSpec } from './BuildingGeometry'
+import { PostProcessing } from './PostProcessing'
+import type { PostQuality } from './PostProcessing'
+import { PLANETARY_CONFIG } from './PlanetaryConfig'
 
 const STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty'
 const METERS_PER_DEG_LAT = 111320
@@ -32,10 +37,16 @@ export class PlanetaryEngine {
   private roads = new THREE.Group()
   private trees: THREE.InstancedMesh | null = null
   private greenAreas: THREE.Mesh | null = null
-  private buildingMat: THREE.MeshStandardMaterial
+  private hemi: THREE.HemisphereLight
+  private wallMat: THREE.MeshStandardMaterial
+  private roofMat: THREE.MeshStandardMaterial
   private roadMat: THREE.MeshStandardMaterial
   private treeMat: THREE.MeshBasicMaterial
   private greenMat: THREE.MeshStandardMaterial
+  private laneMat = new THREE.MeshBasicMaterial({ color: 0xffffff })
+  private atmosphere = new AtmosphereConfig()
+  private postProcess: PostProcessing | null = null
+  private postPreset: PostQuality = PLANETARY_CONFIG.post.defaultPreset
   private loader = new THREE.TextureLoader()
   private readyCbs: (() => void)[] = []
   private originMercator: [number, number] = [0, 0]
@@ -50,8 +61,9 @@ export class PlanetaryEngine {
 
     this.camera = new THREE.PerspectiveCamera(75, 1, 0.1, 2000)
 
-    // Ambient light (soft fill)
-    this.scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 0.6))
+    // Ambient light (soft fill) — promoted to field so atmosphere can drive it
+    this.hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 0.6)
+    this.scene.add(this.hemi)
 
     // Directional sun with shadows
     this.sun = new THREE.DirectionalLight(0xffffff, 1.2)
@@ -81,7 +93,18 @@ export class PlanetaryEngine {
     if (facadeTex) {
       facadeTex.wrapS = facadeTex.wrapT = THREE.RepeatWrapping
     }
-    this.buildingMat = new THREE.MeshStandardMaterial({ map: facadeTex ?? undefined, roughness: 0.9, metalness: 0 })
+    this.wallMat = new THREE.MeshStandardMaterial({
+      map: facadeTex ?? undefined,
+      roughness: 0.85,
+      metalness: 0.05,
+      side: THREE.DoubleSide,
+    })
+    this.roofMat = new THREE.MeshStandardMaterial({
+      color: PLANETARY_CONFIG.building.roofColor,
+      roughness: 0.6,
+      metalness: 0.1,
+      side: THREE.DoubleSide,
+    })
 
     const roadTex = this.loadTex('./assets/road-asphalt.png')
     if (roadTex) {
@@ -139,9 +162,20 @@ export class PlanetaryEngine {
     this.sun.color.copy(state.color)
     this.sun.intensity = state.intensity
     this.sky.material.uniforms['sunPosition'].value.copy(state.direction)
+
+    const elev = Math.asin(THREE.MathUtils.clamp(state.direction.y, -1, 1))
+    const atmo = this.atmosphere.update(elev)
+
     if (this.scene.fog instanceof THREE.Fog) {
-      this.scene.fog.color.copy(state.skyHorizon)
+      this.scene.fog.color.copy(atmo.fogColor)
     }
+    this.hemi.color.copy(atmo.hemiSky)
+    this.hemi.groundColor.copy(atmo.hemiGround)
+    this.hemi.intensity = atmo.hemiIntensity
+    this.sky.material.uniforms['turbidity'].value = atmo.turbidity
+    this.sky.material.uniforms['rayleigh'].value = atmo.rayleigh
+    this.sky.material.uniforms['mieCoefficient'].value = atmo.mieCoefficient
+    this.sky.material.uniforms['mieDirectionalG'].value = atmo.mieDirectionalG
   }
 
   setViewFromPlayer(playerPos: THREE.Vector3, yaw: number, pitch: number) {
@@ -152,25 +186,17 @@ export class PlanetaryEngine {
     this.sun.target.updateMatrixWorld()
   }
 
-  setBuildings(boxes: BoxCollider[]) {
+  setBuildings(specs: BuildingSpec[]) {
     this.disposeGroup(this.buildings)
-    for (const b of boxes) {
-      const sx = b.max.x - b.min.x
-      const sy = b.max.y - b.min.y
-      const sz = b.max.z - b.min.z
-      const mesh = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), this.buildingMat)
-      mesh.position.set((b.min.x + b.max.x) / 2, (b.min.y + b.max.y) / 2, (b.min.z + b.max.z) / 2)
-      // UV repeat: tile every 4 m
-      const geo = mesh.geometry
-      const uvAttr = geo.getAttribute('uv') as THREE.BufferAttribute | null
-      if (uvAttr && uvAttr.array instanceof Float32Array) {
-        const uvArr = uvAttr.array
-        for (let i = 0; i < uvArr.length; i += 2) {
-          uvArr[i] *= sx / 4
-          uvArr[i + 1] *= sy / 4
-        }
-        uvAttr.needsUpdate = true
+    for (const spec of specs) {
+      let geo: THREE.BufferGeometry
+      try {
+        geo = BuildingGeometry.generate(spec)
+      } catch {
+        continue
       }
+      const mesh = new THREE.Mesh(geo, [this.wallMat, this.roofMat])
+      // DO NOT set mesh.position — footprints are absolute local XZ
       mesh.castShadow = true
       mesh.receiveShadow = true
       this.buildings.add(mesh)
@@ -203,6 +229,40 @@ export class PlanetaryEngine {
       const mesh = new THREE.Mesh(geo, this.roadMat)
       mesh.receiveShadow = true
       this.roads.add(mesh)
+
+      // Center-line marking: a 0.12 m-wide white quad strip raised +0.02 Y above the road.
+      // Corners [a, b, c, d]: a and b share v=0 (one short edge), d and c share v=uvLen (other short edge).
+      // Centerline endpoints are midpoints of the two short (cross-strip) edges.
+      const yOffset = 0.02
+      const mid1x = (a.x + b.x) / 2
+      const mid1y = (a.y + b.y) / 2 + yOffset
+      const mid1z = (a.z + b.z) / 2
+      const mid2x = (d.x + c.x) / 2
+      const mid2y = (d.y + c.y) / 2 + yOffset
+      const mid2z = (d.z + c.z) / 2
+
+      const cdx = mid2x - mid1x
+      const cdz = mid2z - mid1z
+      const clen = Math.sqrt(cdx * cdx + cdz * cdz)
+      if (clen > 1e-6) {
+        // Perpendicular offset of 0.06 m (half of 0.12 m width)
+        const px = (-cdz / clen) * 0.06
+        const pz = (cdx / clen) * 0.06
+
+        const lanePos = new Float32Array([
+          mid1x + px, mid1y, mid1z + pz,
+          mid1x - px, mid1y, mid1z - pz,
+          mid2x + px, mid2y, mid2z + pz,
+          mid1x - px, mid1y, mid1z - pz,
+          mid2x - px, mid2y, mid2z - pz,
+          mid2x + px, mid2y, mid2z + pz,
+        ])
+        const laneGeo = new THREE.BufferGeometry()
+        laneGeo.setAttribute('position', new THREE.BufferAttribute(lanePos, 3))
+        laneGeo.computeVertexNormals()
+        const laneMesh = new THREE.Mesh(laneGeo, this.laneMat)
+        this.roads.add(laneMesh)
+      }
     }
   }
 
@@ -269,6 +329,10 @@ export class PlanetaryEngine {
       canvas.style.height = '100%'
       this.container.appendChild(canvas)
       this.renderer = r
+      if (!this.postProcess) {
+        this.postProcess = new PostProcessing(this.renderer, this.scene, this.camera)
+        if (this.postProcess.active) this.renderer.toneMapping = THREE.NoToneMapping
+      }
     }
     // Billboard trees: rotate each instance to face camera each frame
     if (this.trees) {
@@ -292,8 +356,16 @@ export class PlanetaryEngine {
       this.renderer.setSize(w, h, false)
       this.camera.aspect = w / h
       this.camera.updateProjectionMatrix()
+      this.postProcess?.setSize(w, h)
     }
-    this.renderer.render(this.scene, this.camera)
+    if (this.postProcess?.active) this.postProcess.render(1 / 60)
+    else this.renderer.render(this.scene, this.camera)
+  }
+
+  setPostProcessingPreset(preset: PostQuality): void {
+    if (this.postPreset === preset) return
+    this.postPreset = preset
+    this.postProcess?.setQuality(preset)
   }
 
   localToMercator(localX: number, localZ: number, height = 0): THREE.Vector3 {
@@ -327,6 +399,10 @@ export class PlanetaryEngine {
     this.disposeGroup(this.roads)
     if (this.trees) { this.trees.geometry.dispose(); this.scene.remove(this.trees) }
     if (this.greenAreas) { this.greenAreas.geometry.dispose(); this.scene.remove(this.greenAreas) }
+    this.postProcess?.dispose()
+    this.wallMat.dispose()
+    this.roofMat.dispose()
+    this.laneMat.dispose()
     this.renderer?.domElement.remove()
     this.renderer?.dispose()
     this.map.remove()
