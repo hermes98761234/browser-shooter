@@ -185,9 +185,29 @@ export class PlanetaryEngine {
     this.sun.target.updateMatrixWorld()
   }
 
+  private cullFar(): number {
+    return this.scene.fog instanceof THREE.Fog ? this.scene.fog.far : Infinity
+  }
+
+  private isBeyond(x: number, z: number, far: number): boolean {
+    const dx = x - this.camera.position.x
+    const dz = z - this.camera.position.z
+    return dx * dx + dz * dz > far * far
+  }
+
+  private footprintCentroid(footprint: [number, number][]): [number, number] {
+    let sx = 0
+    let sz = 0
+    for (const [x, z] of footprint) { sx += x; sz += z }
+    return [sx / footprint.length, sz / footprint.length]
+  }
+
   setBuildings(specs: BuildingSpec[]) {
     this.disposeGroup(this.buildings)
+    const far = this.cullFar()
     for (const spec of specs) {
+      const [cx, cz] = this.footprintCentroid(spec.footprint)
+      if (this.isBeyond(cx, cz, far)) continue
       let geo: THREE.BufferGeometry
       try {
         geo = BuildingGeometry.generate(spec)

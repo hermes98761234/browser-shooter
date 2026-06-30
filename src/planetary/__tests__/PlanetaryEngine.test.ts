@@ -87,6 +87,27 @@ describe('PlanetaryEngine', () => {
     engine.dispose()
   })
 
+  it('culls buildings beyond the fog-far distance', () => {
+    const container = document.createElement('div')
+    const engine = new PlanetaryEngine(container)
+    engine.setViewFromPlayer(new THREE.Vector3(0, 1.7, 0), 0, 0)
+
+    let beforeCount = 0
+    engine.scene.traverse(o => { if (o instanceof THREE.Mesh) beforeCount++ })
+
+    const specs: BuildingSpec[] = [
+      { footprint: [[0,0],[8,0],[8,8],[0,8]], height: 12, roofShape: 'flat' },
+      { footprint: [[700,700],[708,700],[708,708],[700,708]], height: 12, roofShape: 'flat' },
+    ]
+    engine.setBuildings(specs)
+
+    let afterCount = 0
+    engine.scene.traverse(o => { if (o instanceof THREE.Mesh) afterCount++ })
+
+    expect(afterCount - beforeCount).toBe(1)
+    engine.dispose()
+  })
+
   it('places the camera at the player eye position and faces yaw/pitch', () => {
     const container = document.createElement('div')
     const engine = new PlanetaryEngine(container)
