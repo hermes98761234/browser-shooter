@@ -59,7 +59,7 @@ describe('PlanetaryScenery — roads', () => {
     const sc = new PlanetaryScenery(map as any, identity)
     sc.update(0, 0)
     sc.update(0.0001, 0.0001)  // ~15 m
-    expect(map.queryRenderedFeatures).toHaveBeenCalledTimes(4)
+    expect(map.queryRenderedFeatures).toHaveBeenCalledTimes(5)
   })
 
   it('bumps rebuildVersion only on actual rebuild', () => {
@@ -79,7 +79,7 @@ describe('PlanetaryScenery — roads', () => {
     sc.update(0, 0)
     sc.markStale()
     sc.update(0.0001, 0.0001)
-    expect(map.queryRenderedFeatures).toHaveBeenCalledTimes(8)
+    expect(map.queryRenderedFeatures).toHaveBeenCalledTimes(10)
   })
 
   it('ignores non-road geometry types', () => {
@@ -149,6 +149,15 @@ const grassFeature = {
   properties: { class: 'grass' },
 }
 
+const waterFeature = {
+  sourceLayer: 'water',
+  geometry: {
+    type: 'Polygon',
+    coordinates: [[[0, 0], [0.001, 0], [0.001, 0.001], [0, 0.001], [0, 0]]],
+  },
+  properties: { class: 'lake' },
+}
+
 describe('PlanetaryScenery — trees', () => {
   it('extracts tree positions from Point features with natural=tree', () => {
     const map = makeMap([treeFeature])
@@ -193,6 +202,22 @@ describe('PlanetaryScenery — green areas', () => {
     const sc = new PlanetaryScenery(map as any, identity)
     const { greenTriangles } = sc.update(0, 0)
     expect(greenTriangles.length).toBe(0)
+  })
+})
+
+describe('PlanetaryScenery — water areas', () => {
+  it('triangulates a water polygon', () => {
+    const map = makeMap([waterFeature])
+    const sc = new PlanetaryScenery(map as any, identity)
+    const { waterTriangles } = sc.update(0, 0)
+    expect(waterTriangles.length).toBeGreaterThan(0)
+    expect(waterTriangles.length % 6).toBe(0)
+  })
+
+  it('initial data has empty waterTriangles', () => {
+    const map = makeMap([])
+    const sc = new PlanetaryScenery(map as any, identity)
+    expect(sc.data.waterTriangles).toEqual(new Float32Array(0))
   })
 })
 

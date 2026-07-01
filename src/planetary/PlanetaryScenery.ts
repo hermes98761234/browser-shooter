@@ -13,6 +13,7 @@ const RESCAN_METERS = 50
 const ROAD_SOURCE_LAYER = 'transportation'
 const TREE_SOURCE_LAYER = 'poi'
 const GREEN_SOURCE_LAYERS = new Set(['landuse', 'landcover', 'park'])
+const WATER_SOURCE_LAYER = 'water'
 const BUILDING_SOURCE_LAYER = 'building'
 
 const ROAD_HALF_WIDTHS: Record<string, number> = {
@@ -36,6 +37,7 @@ export interface SceneryData {
   roads: RoadStrip[]
   treePositions: THREE.Vector3[]
   greenTriangles: Float32Array  // flat [x,z, x,z, ...] for triangulated green areas
+  waterTriangles: Float32Array  // flat [x,z, x,z, ...] for triangulated water areas
   buildings: BuildingSpec[]
 }
 
@@ -43,7 +45,7 @@ export class PlanetaryScenery {
   private lastLng = NaN
   private lastLat = NaN
   private _rebuildVersion = 0
-  private _data: SceneryData = { roads: [], treePositions: [], greenTriangles: new Float32Array(0), buildings: [] }
+  private _data: SceneryData = { roads: [], treePositions: [], greenTriangles: new Float32Array(0), waterTriangles: new Float32Array(0), buildings: [] }
 
   get rebuildVersion(): number { return this._rebuildVersion }
   get data(): SceneryData { return this._data }
@@ -92,6 +94,7 @@ export class PlanetaryScenery {
       roads: this.extractRoads(),
       treePositions: this.extractTrees(),
       greenTriangles: this.extractGreenAreas(),
+      waterTriangles: this.extractWaterAreas(),
       buildings: this.extractBuildings(),
     }
     return this._data
@@ -158,6 +161,30 @@ export class PlanetaryScenery {
     for (const f of features) {
       const cls = f.properties?.class ?? f.properties?.landuse ?? f.properties?.landcover
       if (!GREEN_CLASSES.has(cls)) continue
+      const rings: [number, number][][] =
+        f.geometry.type === 'Polygon'
+          ? [f.geometry.coordinates[0] as [number, number][]]
+          : f.geometry.type === 'MultiPolygon'
+          ? (f.geometry.coordinates as [number, number][][][]).map(p => p[0])
+          : []
+      for (const ring of rings) {
+        const local = ring.map(([lng, lat]) => this.toLocal(lng, lat))
+        const pts = local.map(([x, z]) => new THREE.Vector2(x, z))
+        const tris = THREE.ShapeUtils.triangulateShape(pts, [])
+        for (const [i, j, k] of tris) {
+          verts.push(local[i][0], local[i][1])
+          verts.push(local[j][0], local[j][1])
+          verts.push(local[k][0], local[k][1])
+        }
+      }
+    }
+    return new Float32Array(verts)
+  }
+
+  private extractWaterAreas(): Float32Array {
+    const verts: number[] = []
+    const features = this.queryBySourceLayer(WATER_SOURCE_LAYER)
+    for (const f of features) {
       const rings: [number, number][][] =
         f.geometry.type === 'Polygon'
           ? [f.geometry.coordinates[0] as [number, number][]]
