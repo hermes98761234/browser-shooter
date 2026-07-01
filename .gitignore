@@ -109,3 +109,6 @@ blob-report/
 
 # Vitest
 coverage/
+
+# Superpowers subagent-driven-development scratch (briefs, reports, diffs, ledger)
+.superpowers/
