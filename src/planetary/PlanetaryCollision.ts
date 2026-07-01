@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import type maplibregl from 'maplibre-gl'
 import { CollisionWorld } from '../engine/CollisionWorld'
 import { lngLatDistance } from './geoUtils'
+import { PLANETARY_CONFIG } from './PlanetaryConfig'
 
 const RESCAN_METERS = 50
 // The map runs at zoom 17. In the OpenFreeMap "liberty" style the flat `building`
@@ -59,6 +60,9 @@ export class PlanetaryCollision {
         (bLng - refLng) * metersPerDegLon,
         -(bLat - refLat) * metersPerDegLat,
       ])
+    // toLocal may be a fixed-origin frame, not ref-relative — measure the
+    // cull distance from the ref point explicitly rather than from (0,0).
+    const [refX, refZ] = toLocal(refLng, refLat)
 
     const features = this.map.queryRenderedFeatures(undefined, { layers: BUILDING_LAYERS })
     for (const f of features) {
@@ -81,6 +85,11 @@ export class PlanetaryCollision {
         }
         const sx = maxX - minX
         const sz = maxZ - minZ
+        const dx = (minX + maxX) / 2 - refX
+        const dz = (minZ + maxZ) / 2 - refZ
+        // Skip buildings beyond render distance — they're invisible, so
+        // colliding with them reads as "stuck against nothing".
+        if (dx * dx + dz * dz > PLANETARY_CONFIG.fogFar * PLANETARY_CONFIG.fogFar) continue
         if (sx > 0.5 && sz > 0.5) {
           this.world.addBox(
             new THREE.Vector3((minX + maxX) / 2, height / 2, (minZ + maxZ) / 2),

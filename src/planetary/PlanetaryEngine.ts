@@ -57,7 +57,7 @@ export class PlanetaryEngine {
     this.originMercator = lngLatToMercator(center[0], center[1])
 
     this.scene = new THREE.Scene()
-    this.scene.fog = new THREE.Fog(0x9ec7e8, 120, 600)
+    this.scene.fog = new THREE.Fog(0x9ec7e8, 120, PLANETARY_CONFIG.fogFar)
 
     this.camera = new THREE.PerspectiveCamera(75, 1, 0.1, 2000)
 

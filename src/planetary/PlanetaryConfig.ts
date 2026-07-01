@@ -1,4 +1,8 @@
 export const PLANETARY_CONFIG = {
+  // Must match scene.fog far in PlanetaryEngine — collision culls at the same
+  // distance as rendering, otherwise buildings can block movement after they
+  // stop being drawn.
+  fogFar: 600,
   post: {
     defaultPreset: 'medium' as 'low' | 'medium' | 'high',
     bloomThreshold: 1.0,
