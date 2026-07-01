@@ -26,6 +26,24 @@ import { SoundEffects } from '../audio/SoundEffects'
 import { AudioManager } from '../audio/AudioManager'
 import { weaponVisual } from '../weapons/WeaponDefs'
 import { stepBloom, BLOOM_PIXELS } from '../weapons/CrosshairBloom'
+import { RemotePlayerManager } from '../net/RemotePlayerManager'
+import { GrenadeManager } from '../weapons/GrenadeManager'
+import { GRENADE_DEFS } from '../weapons/GrenadeDefs'
+import { findItem, canAffordItem } from '../weapons/StoreCatalog'
+import { applyItem } from '../player/applyPurchase'
+import { createDamageIndicatorState, triggerDamage, updateDamageIndicator, type DamageIndicatorState } from '../effects/DamageIndicator'
+import { createFlashEffect, triggerFlash, updateFlash, type FlashEffectState } from '../effects/FlashEffect'
+import { DamageOverlay } from '../ui/DamageOverlay'
+import { FlashOverlay } from '../ui/FlashOverlay'
+import { BombState } from '../session/BombCarrier'
+import type { GrenadeType } from '../types'
+
+/** Maps a grenade store item id to its grenade type/inventory key (same as App.tsx). */
+const GRENADE_ITEM_KEY: Record<string, GrenadeType> = {
+  he_grenade: 'he',
+  flashbang: 'flash',
+  smoke_grenade: 'smoke',
+}
 
 interface PlanetaryModeProps {
   onExit: () => void
@@ -78,6 +96,35 @@ export function PlanetaryMode({ onExit }: PlanetaryModeProps) {
   const [mobileControls] = useState(() => mobileControlsActive(loadSettings()))
   const [csMode, setCsMode] = useState(false)
   const [bloom, setBloom] = useState(0)
+  const remotePlayersRef = useRef<RemotePlayerManager | null>(null)
+  const grenadeManagerRef = useRef<GrenadeManager | null>(null)
+  const damageStateRef = useRef(createDamageIndicatorState())
+  const flashStateRef = useRef(createFlashEffect())
+  const lastMapCenterRef = useRef({ x: 0, z: 0 })
+  const perfRef = useRef({ level: 0 as 0 | 1 | 2, acc: 0, n: 0, warm: false })
+  const [damageIndicator, setDamageIndicator] = useState<DamageIndicatorState | null>(null)
+  const [flashEffect, setFlashEffect] = useState<FlashEffectState | null>(null)
+  const [grenadeInventory, setGrenadeInventory] = useState({ he: 0, flash: 0, smoke: 0 })
+  const [selectedGrenade, setSelectedGrenade] = useState<GrenadeType | null>(null)
+  const [bombHud, setBombHud] = useState<{ state: BombState; timer: number; site: 'A' | 'B' | null; plant: number; defuse: number }>({
+    state: BombState.None, timer: 40, site: null, plant: 0, defuse: 0,
+  })
+
+  // Scoreboard state is event-driven (kills/deaths); snapshot on open so it isn't
+  // empty when nothing has happened yet (e.g. freshly added bots).
+  const openScoreboard = useCallback(() => {
+    const session = sessionRef.current
+    if (session) {
+      setScoreboardPlayers(session.getSnapshot().players.map(p => ({
+        id: p.id, kind: 'player' as const, type: 'player',
+        position: p.position, rotationY: p.rotationY, rotationX: p.rotationX,
+        health: p.health, isDead: p.isDead, weaponType: p.weaponType,
+        name: p.name, team: p.team, isBot: p.isBot,
+        respawnIn: p.respawnIn, hasArmor: p.hasArmor, hasHelmet: p.hasHelmet,
+      })))
+    }
+    setShowScoreboard(true)
+  }, [])
 
   // Auto-clear kill feed entries after 5 seconds
   useEffect(() => {
@@ -175,12 +222,44 @@ export function PlanetaryMode({ onExit }: PlanetaryModeProps) {
       const gameControls = new Controls(containerRef.current!, () => 'planetary', { ...loadSettings().keymap })
       desktopControlsRef.current = gameControls
 
+      // Bots and other players are session entities but need meshes to be visible.
+      remotePlayersRef.current = new RemotePlayerManager(engine.scene, session.localId)
+
+      // Grenade inventory/selection (client-side, same split as App.tsx)
+      const gm = new GrenadeManager()
+      grenadeManagerRef.current = gm
+      setGrenadeInventory({ he: 0, flash: 0, smoke: 0 })
+      setSelectedGrenade(null)
+      gameControls.onSelectGrenade = (type) => {
+        if (gm.select(type)) setSelectedGrenade(type)
+      }
+      gameControls.onCycleGrenade = () => setSelectedGrenade(gm.cycle())
+      // Keymap parity with App.tsx: [ adds a CT bot, ] adds a T bot, \ removes one.
+      gameControls.onAddBot = (team) => { session.addBot(team) }
+      gameControls.onRemoveBot = () => { session.removeBot() }
+
       sessionRef.current = session
 
       let last = performance.now()
       function loop(now: number) {
-        const dt = Math.min((now - last) / 1000, 0.05)
+        const rawMs = now - last
+        const dt = Math.min(rawMs / 1000, 0.05)
         last = now
+
+        // Auto-degrade visuals when the GPU can't keep up: postprocessing alone
+        // is ~2/3 of the frame on weak GPUs (measured — see PlanetaryEngine.setPerfLevel).
+        // First 30-frame window is discarded as tile-loading warmup.
+        const perf = perfRef.current
+        perf.acc += rawMs
+        if (++perf.n >= 30) {
+          const avg = perf.acc / perf.n
+          perf.acc = 0; perf.n = 0
+          if (!perf.warm) perf.warm = true
+          else if (avg > 70 && perf.level < 2) {
+            perf.level = (perf.level + 1) as 0 | 1 | 2
+            engine.setPerfLevel(perf.level)
+          }
+        }
 
         // 1. Get input from GeoControls (keyboard) and merge with touch
         const input = controls.getInput()
@@ -215,6 +294,8 @@ export function PlanetaryMode({ onExit }: PlanetaryModeProps) {
         session.applyInput(session.localId, input)
 
         // 4. Step the session (movement, combat, bots)
+        const grenadesBefore = new Set(session.activeGrenades)
+        const smokeCloudsBefore = new Set(session.smokeClouds)
         const events = session.step(dt)
 
         // 4. Update the Three.js camera from player state (eye pos + look).
@@ -302,6 +383,7 @@ export function PlanetaryMode({ onExit }: PlanetaryModeProps) {
               const point = new THREE.Vector3(hp.x, hp.y, hp.z)
               if (ev.hit.killed) particleSystemRef.current?.explosion(point, 'player')
               else particleSystemRef.current?.bloodSplatter(point)
+              if (ev.victimId === session.localId) audioRef.current?.playPlayerHit()
               break
             }
             case 'enemyShoot': {
@@ -310,9 +392,49 @@ export function PlanetaryMode({ onExit }: PlanetaryModeProps) {
               const dir = to.clone().sub(from).normalize()
               audioRef.current?.playWeaponShoot('rifle', from)
               particleSystemRef.current?.muzzleFlash(from, dir, 0xffcf6a, 4, 7)
+              if (ev.hit && ev.victimId === session.localId) {
+                audioRef.current?.playPlayerHit()
+                damageStateRef.current = triggerDamage(from.clone(), session.player.position.clone(), session.player.rotation.y)
+                setDamageIndicator({ ...damageStateRef.current })
+              }
+              break
+            }
+            case 'grenadeDetonated': {
+              audioRef.current?.playGrenadeDetonate(ev.grenadeType, ev.position)
+              if (ev.grenadeType === 'he') {
+                particleSystemRef.current?.explosion(new THREE.Vector3(ev.position.x, ev.position.y + 1, ev.position.z), 'grunt', 2.2)
+              }
+              if (ev.grenadeType === 'flash') {
+                particleSystemRef.current?.flashBang(new THREE.Vector3(ev.position.x, ev.position.y + 1, ev.position.z))
+                if (ev.affectedPlayers.includes(session.localId)) {
+                  flashStateRef.current = triggerFlash(flashStateRef.current, ev.blindDurations?.[session.localId] ?? 0)
+                  setFlashEffect({ ...flashStateRef.current })
+                }
+              }
               break
             }
           }
+        }
+
+        // Grenade + smoke meshes: add newly thrown, drop detonated/expired (same as App.tsx)
+        for (const g of session.activeGrenades) {
+          if (!g.meshRef.parent) engine.scene.add(g.meshRef)
+        }
+        for (const g of grenadesBefore) {
+          if (!session.activeGrenades.includes(g)) engine.scene.remove(g.meshRef)
+        }
+        for (const s of session.smokeClouds) {
+          if (!s.meshRef.parent) engine.scene.add(s.meshRef)
+        }
+        for (const s of smokeCloudsBefore) {
+          if (!session.smokeClouds.includes(s)) engine.scene.remove(s.meshRef)
+        }
+
+        // Render bots/other players (they exist in the session but have no mesh otherwise)
+        const snap = session.getSnapshot()
+        if (remotePlayersRef.current) {
+          remotePlayersRef.current.sync(snap.players)
+          remotePlayersRef.current.update(dt)
         }
 
         // Only update timers per-frame; event handlers own state/scores
@@ -326,7 +448,7 @@ export function PlanetaryMode({ onExit }: PlanetaryModeProps) {
 
         // Scoreboard only updates when a kill/death/respawn event occurs
         if (scoreboardDirty) {
-          setScoreboardPlayers(session.getSnapshot().players.map(p => ({
+          setScoreboardPlayers(snap.players.map(p => ({
             id: p.id, kind: 'player', type: 'player',
             position: p.position, rotationY: p.rotationY, rotationX: p.rotationX,
             health: p.health, isDead: p.isDead, weaponType: p.weaponType,
@@ -336,18 +458,25 @@ export function PlanetaryMode({ onExit }: PlanetaryModeProps) {
         }
 
         // 5. Keep the (hidden) map centered on the player so vector tiles load.
+        // Throttled: setCenter every frame keeps MapLibre permanently dirty, so it
+        // re-renders its (fully occluded, invisible) vector map every frame — that
+        // was the main GPU drain behind the ~2fps collapse. Tiles at zoom 17 cover
+        // far more than 30 m, so recentering only after 30 m of movement is safe.
         const [lng, lat] = engine.localToLngLat(p.x, p.z)
-        engine.map.setCenter([lng, lat])
+        const lc = lastMapCenterRef.current
+        if ((p.x - lc.x) * (p.x - lc.x) + (p.z - lc.z) * (p.z - lc.z) > 30 * 30) {
+          lastMapCenterRef.current = { x: p.x, z: p.z }
+          engine.map.setCenter([lng, lat])
+        }
 
         // 6. Rebuild collision near the player; mirror the boxes into the visible scene.
-        const center = engine.map.getCenter()
         if (collisionRef.current) {
-          session.collisionWorld = collisionRef.current.update(center.lng, center.lat)
+          session.collisionWorld = collisionRef.current.update(lng, lat)
         }
 
         // 6b. Rebuild scenery (roads, trees, green/water areas) when stale
         if (sceneryRef.current) {
-          sceneryRef.current.update(center.lng, center.lat)
+          sceneryRef.current.update(lng, lat)
           const sv = sceneryRef.current.rebuildVersion
           if (sv !== lastSceneryVersionRef.current) {
             lastSceneryVersionRef.current = sv
@@ -364,7 +493,7 @@ export function PlanetaryMode({ onExit }: PlanetaryModeProps) {
         engine.setSunAngle(sunSystemRef.current.compute(sunHourRef.current))
 
         // 7. Round boundary check
-        const status = boundaryRef.current.check(center.lng, center.lat)
+        const status = boundaryRef.current.check(lng, lat)
         setBoundaryStatus(status)
         if (status === 'out' && !session.player.isDead) {
           session.player.takeDamage(50 * dt)
@@ -381,6 +510,13 @@ export function PlanetaryMode({ onExit }: PlanetaryModeProps) {
           maxAmmo: session.weaponManager.current.def.maxAmmo,
           weaponName: session.weaponManager.current.def.name,
           money: session.economy?.money ?? 0,
+        })
+        setBombHud({
+          state: session.bomb.state,
+          timer: session.bomb.timer,
+          site: session.bomb.site,
+          plant: session.bomb.plantProgress / 3,
+          defuse: session.bomb.defuseProgress / session.bomb.defuseDuration,
         })
 
         // 9. Draw the FPS scene (lazily creates the WebGL canvas on first frame).
@@ -407,6 +543,14 @@ export function PlanetaryMode({ onExit }: PlanetaryModeProps) {
         // they spawn once and never move or get removed ("stuck in air").
         particleSystemRef.current?.update(dt)
 
+        // 11c. Fade damage direction indicator / flashbang blind over time
+        damageStateRef.current = updateDamageIndicator(damageStateRef.current, dt)
+        if (damageStateRef.current.active) setDamageIndicator({ ...damageStateRef.current })
+        else setDamageIndicator(prev => (prev ? null : prev))
+        flashStateRef.current = updateFlash(flashStateRef.current, dt)
+        if (flashStateRef.current.active) setFlashEffect({ ...flashStateRef.current })
+        else setFlashEffect(prev => (prev ? null : prev))
+
         // 12. Crosshair bloom: grow on fire/movement/jump, recover when still.
         setBloom(prev => stepBloom(prev, dt, {
           moving: Math.hypot(session.player.velocity.x, session.player.velocity.z) > 1.5,
@@ -428,6 +572,9 @@ export function PlanetaryMode({ onExit }: PlanetaryModeProps) {
       controlsRef.current?.detach()
       desktopControlsRef.current?.destroy()
       particleSystemRef.current?.clear()
+      remotePlayersRef.current?.clear()
+      remotePlayersRef.current = null
+      grenadeManagerRef.current = null
       viewmodelRef.current = null
       sceneryRef.current = null
       engine.dispose()
@@ -443,7 +590,7 @@ export function PlanetaryMode({ onExit }: PlanetaryModeProps) {
         setShowBuyMenu(prev => !prev)
       } else if (e.code === 'Tab') {
         e.preventDefault()
-        setShowScoreboard(true)
+        openScoreboard()
       } else if (e.code === 'Digit5') {
         if (sessionRef.current) {
           sessionRef.current.tryPlant(sessionRef.current.localId)
@@ -454,6 +601,9 @@ export function PlanetaryMode({ onExit }: PlanetaryModeProps) {
         }
       } else if (e.code === 'KeyQ') {
         if (sessionRef.current) {
+          // Switching weapons puts a selected grenade away so left click fires again
+          const gm = grenadeManagerRef.current
+          if (gm?.selected) { gm.selected = null; setSelectedGrenade(null) }
           const wm = sessionRef.current.weaponManager
           wm.cycleNext()
           viewmodelRef.current?.setWeapon(weaponVisual(wm.current.type))
@@ -465,7 +615,27 @@ export function PlanetaryMode({ onExit }: PlanetaryModeProps) {
         setShowScoreboard(false)
       }
     }
-    const handleMouseDown = (e: MouseEvent) => { if (e.button === 0) mouseShootRef.current = true }
+    // Left click throws a selected grenade (long) instead of firing; right click
+    // throws short. Mirrors Controls.onMouseDown, which is gated to the 'playing'
+    // game state and therefore inert in planetary mode.
+    const throwSelectedGrenade = (mode: 'long' | 'short'): boolean => {
+      const session = sessionRef.current
+      const gm = grenadeManagerRef.current
+      if (!session || !gm?.selected || session.player.isDead) return false
+      const thrown = gm.selected
+      if (!session.throwGrenade(session.localId, thrown, mode)) return false
+      gm.remove(thrown)
+      setGrenadeInventory({ he: gm.getCount('he'), flash: gm.getCount('flash'), smoke: gm.getCount('smoke') })
+      if (!gm.has(thrown)) setSelectedGrenade(gm.selected)
+      return true
+    }
+    const handleMouseDown = (e: MouseEvent) => {
+      if (e.button === 0) {
+        if (!throwSelectedGrenade('long')) mouseShootRef.current = true
+      } else if (e.button === 2) {
+        throwSelectedGrenade('short')
+      }
+    }
     const handleMouseUp = (e: MouseEvent) => { if (e.button === 0) mouseShootRef.current = false }
     window.addEventListener('keydown', handleKeyDown)
     window.addEventListener('keyup', handleKeyUp)
@@ -477,7 +647,7 @@ export function PlanetaryMode({ onExit }: PlanetaryModeProps) {
       window.removeEventListener('mousedown', handleMouseDown)
       window.removeEventListener('mouseup', handleMouseUp)
     }
-  }, [showPicker])
+  }, [showPicker, openScoreboard])
 
   const handleTeleport = useCallback((lng: number, lat: number) => {
     // Anchor the boundary immediately so the game loop never sees [0,0] as center
@@ -503,7 +673,10 @@ export function PlanetaryMode({ onExit }: PlanetaryModeProps) {
   }, [])
 
   return (
-    <div style={{ position: 'absolute', inset: 0, filter: csMode ? 'saturate(0.7) contrast(1.1)' : 'none' }}>
+    <div
+      style={{ position: 'absolute', inset: 0, filter: csMode ? 'saturate(0.7) contrast(1.1)' : 'none' }}
+      onContextMenu={(e) => e.preventDefault()}
+    >
       <div
         ref={containerRef}
         tabIndex={0}
@@ -531,29 +704,43 @@ export function PlanetaryMode({ onExit }: PlanetaryModeProps) {
           waveActive={false}
           enemiesRemaining={0}
           money={hudState.money}
+          bombState={bombHud.state}
+          bombTimer={bombHud.timer}
+          bombSite={bombHud.site ?? undefined}
+          plantProgress={bombHud.plant}
+          defuseProgress={bombHud.defuse}
+          grenadeInventory={grenadeInventory}
+          selectedGrenade={selectedGrenade}
+          mobile={mobileControls}
         />
       )}
+      {!showPicker && <DamageOverlay indicator={damageIndicator} />}
+      {!showPicker && <FlashOverlay flash={flashEffect} />}
 
       {!showPicker && showBuyMenu && (
         <BuyMenu
           team="ct"
           money={hudState.money}
           owned={[]}
+          grenadeInventory={grenadeInventory}
           onBuy={(itemId) => {
             const session = sessionRef.current
             if (!session || !session.economy) return
-            import('../weapons/StoreCatalog').then(({ findItem, canAffordItem }) => {
-              import('../player/applyPurchase').then(({ applyItem }) => {
-                if (canAffordItem(session.economy!.money, itemId)) {
-                  const item = findItem(itemId)
-                  if (item) {
-                    session.economy!.spendMoney(item.price)
-                    applyItem(item, session.player, session.weaponManager)
-                    viewmodelRef.current?.setWeapon(weaponVisual(session.weaponManager.current.type))
-                  }
-                }
-              })
-            })
+            const item = findItem(itemId)
+            if (!item || !canAffordItem(session.economy.money, itemId)) return
+            const grenadeKey = GRENADE_ITEM_KEY[itemId]
+            if (grenadeKey) {
+              // Grenades live in the client-side GrenadeManager, not applyItem
+              const gm = grenadeManagerRef.current
+              if (!gm || gm.getCount(grenadeKey) >= GRENADE_DEFS[grenadeKey].carryLimit) return
+              session.economy.spendMoney(item.price)
+              gm.add(grenadeKey)
+              setGrenadeInventory({ he: gm.getCount('he'), flash: gm.getCount('flash'), smoke: gm.getCount('smoke') })
+            } else {
+              session.economy.spendMoney(item.price)
+              applyItem(item, session.player, session.weaponManager)
+              viewmodelRef.current?.setWeapon(weaponVisual(session.weaponManager.current.type))
+            }
           }}
           onClose={() => setShowBuyMenu(false)}
         />
@@ -663,6 +850,21 @@ export function PlanetaryMode({ onExit }: PlanetaryModeProps) {
               style={{ width: 100, accentColor: '#ffcc44' }}
             />
           </div>
+          <div style={{ display: 'flex', gap: 4 }}>
+            {(['ct', 't'] as const).map(team => (
+              <button
+                key={team}
+                onClick={() => sessionRef.current?.addBot(team)}
+                style={{
+                  padding: '4px 8px', background: 'rgba(0,0,0,0.6)', color: 'white',
+                  border: '1px solid #555', borderRadius: 4, cursor: 'pointer',
+                  fontSize: 11, fontFamily: 'monospace',
+                }}
+              >
+                +{team.toUpperCase()} Bot
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
@@ -719,8 +921,12 @@ export function PlanetaryMode({ onExit }: PlanetaryModeProps) {
             viewmodelRef.current?.setWeapon(weaponVisual(wm.current.type))
           }}
           onToggleStore={() => setShowBuyMenu(prev => !prev)}
-          onToggleScoreboard={() => setShowScoreboard(prev => !prev)}
-          onSelectGrenade={() => {}}
+          onToggleScoreboard={() => (showScoreboard ? setShowScoreboard(false) : openScoreboard())}
+          onSelectGrenade={(type) => {
+            const gm = grenadeManagerRef.current
+            if (gm?.select(type)) setSelectedGrenade(type)
+          }}
+          activeGrenade={selectedGrenade}
         />
       )}
     </div>

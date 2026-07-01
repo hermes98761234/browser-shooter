@@ -59,6 +59,7 @@ export class PlanetaryEngine {
   private originMercator: [number, number] = [0, 0]
   private billboardDummy = new THREE.Object3D()
   private billboardMat = new THREE.Matrix4()
+  private sizeVec = new THREE.Vector2()
 
   constructor(private container: HTMLElement, center: [number, number] = [0, 0]) {
     this.originMercator = lngLatToMercator(center[0], center[1])
@@ -76,7 +77,9 @@ export class PlanetaryEngine {
     this.sun = new THREE.DirectionalLight(0xffffff, 1.2)
     this.sun.position.set(100, 100, 50)
     this.sun.castShadow = true
-    this.sun.shadow.mapSize.set(2048, 2048)
+    // ponytail: 1024 + hard PCF — 2048 PCFSoft was a large share of GPU frame time
+    // on weak GPUs; bump back if shadow edges bother anyone on desktop.
+    this.sun.shadow.mapSize.set(1024, 1024)
     this.sun.shadow.camera.near = 1
     this.sun.shadow.camera.far = 400
     this.sun.shadow.camera.left = -125
@@ -155,6 +158,32 @@ export class PlanetaryEngine {
     this.map.on('load', () => {
       this.readyCbs.forEach(cb => cb())
     })
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(window as any).__eng = this // debug handle used by headless perf-verification scripts
+  }
+
+  /** Progressive visual degrade for weak GPUs, driven by measured frame time.
+   *  0 = full (post + shadows + sky), 1 = postprocessing off, 2 = also shadows + sky off.
+   *  Measured on software GL: level 0 ≈ 350ms/frame, level 1 ≈ 117ms, level 2 ≈ 50ms. */
+  setPerfLevel(level: 0 | 1 | 2): void {
+    if (level >= 1 && this.postProcess) {
+      this.postProcess.dispose() // sets composer null → render() falls back to direct
+      // Post chain owned tone mapping; approximate it with the built-in (cheap) one.
+      if (this.renderer) this.renderer.toneMapping = THREE.ACESFilmicToneMapping
+    }
+    if (level >= 2) {
+      this.sun.castShadow = false
+      if (this.renderer) this.renderer.shadowMap.enabled = false
+      this.sky.visible = false
+      this.scene.background = this.scene.fog instanceof THREE.Fog ? this.scene.fog.color : null
+      // Shadow/lighting shader chunks are baked into compiled materials — recompile once.
+      this.scene.traverse(o => {
+        if (o instanceof THREE.Mesh) {
+          const mats = Array.isArray(o.material) ? o.material : [o.material]
+          for (const m of mats) m.needsUpdate = true
+        }
+      })
+    }
   }
 
   private loadTex(url: string): THREE.Texture {
@@ -383,10 +412,12 @@ export class PlanetaryEngine {
 
   render() {
     if (!this.renderer) {
-      const r = new THREE.WebGLRenderer({ antialias: true })
+      // antialias off: SMAA in the postprocessing chain already does AA; MSAA on
+      // top of it doubled the fill cost for no visible gain.
+      const r = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' })
       r.setPixelRatio(Math.min(window.devicePixelRatio, 2))
       r.shadowMap.enabled = true
-      r.shadowMap.type = THREE.PCFSoftShadowMap
+      r.shadowMap.type = THREE.PCFShadowMap
       const canvas = r.domElement
       canvas.style.position = 'absolute'
       canvas.style.inset = '0'
@@ -416,7 +447,7 @@ export class PlanetaryEngine {
     }
     const w = this.container.clientWidth || 1
     const h = this.container.clientHeight || 1
-    const size = this.renderer.getSize(new THREE.Vector2())
+    const size = this.renderer.getSize(this.sizeVec)
     if (size.x !== w || size.y !== h) {
       this.renderer.setSize(w, h, false)
       this.camera.aspect = w / h
@@ -469,6 +500,11 @@ export class PlanetaryEngine {
     this.wallMat.dispose()
     this.houseWallMat.dispose()
     this.roofMat.dispose()
+    this.roadMat.dispose()
+    this.pathMat.dispose()
+    this.treeMat.dispose()
+    this.greenMat.dispose()
+    this.waterMat.dispose()
     this.laneMat.dispose()
     this.renderer?.domElement.remove()
     this.renderer?.dispose()
