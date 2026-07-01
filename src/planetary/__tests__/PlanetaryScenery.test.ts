@@ -310,4 +310,35 @@ describe('PlanetaryScenery — buildings', () => {
     const sc = new PlanetaryScenery(map as any, identity)
     expect(sc.data.buildings).toEqual([])
   })
+
+  it('tags building=house as buildingType "house"', () => {
+    const houseFeature = {
+      sourceLayer: 'building',
+      geometry: { type: 'Polygon', coordinates: [[[0, 0], [0.001, 0], [0.001, 0.001], [0, 0.001]]] },
+      properties: { render_height: 6, building: 'house' },
+    }
+    const map = makeLayeredMap([houseFeature])
+    const sc = new PlanetaryScenery(map as any, identity)
+    const { buildings } = sc.update(0, 0)
+    expect(buildings[0].buildingType).toBe('house')
+  })
+
+  it('tags building=apartments as buildingType "other"', () => {
+    const apartmentsFeature = {
+      sourceLayer: 'building',
+      geometry: { type: 'Polygon', coordinates: [[[0, 0], [0.001, 0], [0.001, 0.001], [0, 0.001]]] },
+      properties: { render_height: 30, building: 'apartments' },
+    }
+    const map = makeLayeredMap([apartmentsFeature])
+    const sc = new PlanetaryScenery(map as any, identity)
+    const { buildings } = sc.update(0, 0)
+    expect(buildings[0].buildingType).toBe('other')
+  })
+
+  it('defaults to buildingType "other" when building tag is absent', () => {
+    const map = makeLayeredMap([buildingPolygon])
+    const sc = new PlanetaryScenery(map as any, identity)
+    const { buildings } = sc.update(0, 0)
+    expect(buildings[0].buildingType).toBe('other')
+  })
 })

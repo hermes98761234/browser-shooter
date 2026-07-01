@@ -26,6 +26,8 @@ const DEFAULT_HALF_WIDTH = 3
 
 const PATH_CLASSES = new Set(['pedestrian', 'path', 'footway', 'cycleway', 'steps', 'bridleway'])
 
+const HOUSE_BUILDING_TAGS = new Set(['house', 'detached', 'semidetached_house', 'bungalow', 'cabin', 'farm'])
+
 export interface RoadStrip {
   // quad corners in local XZ (Y=0.05 to sit above ground)
   corners: [THREE.Vector3, THREE.Vector3, THREE.Vector3, THREE.Vector3]
@@ -227,10 +229,11 @@ export class PlanetaryScenery {
       // wall height (inverted walls). Treat as ground-level.
       const minHeight = rawMin < height ? rawMin : 0
       const roofShape = String(props['roof:shape'] ?? 'flat')
+      const buildingType: 'house' | 'other' = HOUSE_BUILDING_TAGS.has(String(props.building ?? '')) ? 'house' : 'other'
       for (const ring of rings) {
         if (ring.length < 3) continue
         const footprint: [number, number][] = ring.map(([lng, lat]) => this.toLocal(lng, lat))
-        specs.push({ footprint, height, minHeight, roofShape })
+        specs.push({ footprint, height, minHeight, roofShape, buildingType })
       }
     }
     return specs

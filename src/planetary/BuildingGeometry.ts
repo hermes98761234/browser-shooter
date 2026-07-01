@@ -7,6 +7,7 @@ export interface BuildingSpec {
   minHeight?: number               // ground Y (default 0)
   roofShape?: string               // 'flat' | 'gabled' | 'hipped' | 'pyramidal' | other→flat
   roofHeight?: number              // peak rise above height's eave; capped to 50% of wall height
+  buildingType?: 'house' | 'other' // wall-material hint only; does not affect geometry generation
 }
 
 // ─── helpers ────────────────────────────────────────────────────────────────
