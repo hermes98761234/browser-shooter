@@ -10,6 +10,9 @@ import type { BuildingSpec } from './BuildingGeometry'
 import { PostProcessing } from './PostProcessing'
 import type { PostQuality } from './PostProcessing'
 import { PLANETARY_CONFIG } from './PlanetaryConfig'
+import buildingFacadeUrl from './assets/building-facade.png'
+import roadAsphaltUrl from './assets/road-asphalt.png'
+import treeSpriteUrl from './assets/tree-sprite.png'
 
 const STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty'
 const METERS_PER_DEG_LAT = 111320
@@ -89,7 +92,7 @@ export class PlanetaryEngine {
     this.sky.material.uniforms['mieDirectionalG'].value = 0.8
 
     // Materials (textures loaded lazily; won't crash in jsdom because TextureLoader defers WebGL)
-    const facadeTex = this.loadTex('./assets/building-facade.png')
+    const facadeTex = this.loadTex(buildingFacadeUrl)
     if (facadeTex) {
       facadeTex.wrapS = facadeTex.wrapT = THREE.RepeatWrapping
     }
@@ -106,13 +109,13 @@ export class PlanetaryEngine {
       side: THREE.DoubleSide,
     })
 
-    const roadTex = this.loadTex('./assets/road-asphalt.png')
+    const roadTex = this.loadTex(roadAsphaltUrl)
     if (roadTex) {
       roadTex.wrapS = roadTex.wrapT = THREE.RepeatWrapping
     }
     this.roadMat = new THREE.MeshStandardMaterial({ map: roadTex ?? undefined, roughness: 1, metalness: 0 })
 
-    const treeTex = this.loadTex('./assets/tree-sprite.png')
+    const treeTex = this.loadTex(treeSpriteUrl)
     this.treeMat = new THREE.MeshBasicMaterial({ map: treeTex ?? undefined, transparent: true, alphaTest: 0.5, side: THREE.DoubleSide })
 
     this.greenMat = new THREE.MeshStandardMaterial({ color: 0x4a6b38, roughness: 1, metalness: 0 })
@@ -141,11 +144,10 @@ export class PlanetaryEngine {
     })
   }
 
-  private loadTex(relPath: string): THREE.Texture {
+  private loadTex(url: string): THREE.Texture {
     const fallback = new THREE.DataTexture(new Uint8Array([255, 0, 255, 255]), 1, 1)
     fallback.needsUpdate = true
     try {
-      const url = new URL(relPath, import.meta.url).href
       return this.loader.load(url, undefined, undefined, () => { /* silent on missing asset */ })
     } catch {
       return fallback
