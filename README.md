@@ -35,6 +35,10 @@
 |:----------:|
 | ![Map Editor](screenshots/map-editor.png) |
 
+| Planetary | Planetary Picker |
+|:---------:|:----------------:|
+| ![Planetary](screenshots/planetary.png) | ![Planetary Picker](screenshots/planetary-picker.png) |
+
 </div>
 
 ---
