@@ -514,3 +514,39 @@ describe('PlanetaryScenery — labels', () => {
     expect(labels[0].text).toBe('p0')
   })
 })
+
+describe('PlanetaryScenery — street objects', () => {
+  const longFeat = (cls: string, coords: number[][] = [[0, 0], [0.01, 0]]) => ({
+    sourceLayer: 'transportation',
+    geometry: { type: 'LineString', coordinates: coords },  // 0.01° ≈ 1113 m
+    properties: { class: cls },
+  })
+
+  it('places lamps every ~35 m along car roads, on the sidewalk line', () => {
+    const sc = new PlanetaryScenery(makeMap([longFeat('residential')]) as any, identity)
+    const { lampPositions } = sc.update(0, 0)
+    expect(lampPositions.length).toBeGreaterThan(25)
+    // residential halfWidth 4 → lamps on the sidewalk centerline at z = +5
+    for (const p of lampPositions) expect(p.z).toBeCloseTo(5, 1)
+  })
+
+  it('caps lamps at 200', () => {
+    const sc = new PlanetaryScenery(makeMap([longFeat('residential', [[0, 0], [0.1, 0]])]) as any, identity)
+    expect(sc.update(0, 0).lampPositions).toHaveLength(200)
+  })
+
+  it('places benches with yaw along footways, capped at 80', () => {
+    const sc = new PlanetaryScenery(makeMap([longFeat('footway')]) as any, identity)
+    const { benches } = sc.update(0, 0)
+    expect(benches.length).toBeGreaterThan(10)
+    expect(benches.length).toBeLessThanOrEqual(80)
+    expect(typeof benches[0].yaw).toBe('number')
+  })
+
+  it('does not put lamps on footways or benches on car roads', () => {
+    const scPath = new PlanetaryScenery(makeMap([longFeat('footway')]) as any, identity)
+    expect(scPath.update(0, 0).lampPositions).toHaveLength(0)
+    const scRoad = new PlanetaryScenery(makeMap([longFeat('residential')]) as any, identity)
+    expect(scRoad.update(0, 0).benches).toHaveLength(0)
+  })
+})

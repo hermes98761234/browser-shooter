@@ -47,6 +47,17 @@ const HOUSE_BUILDING_TAGS = new Set(['house', 'detached', 'semidetached_house', 
 const LABEL_SOURCE_LAYERS = new Set(['poi', 'place'])
 const LABEL_CAP = 40  // nearest named features get floating labels
 
+const LAMP_STEP = 35        // one street lamp per ~35 m of car road
+const LAMP_CAP = 200
+const BENCH_STEP = 50       // one bench per ~50 m of footpath
+const BENCH_CAP = 80
+
+export interface BenchSpec {
+  x: number
+  z: number
+  yaw: number  // rotation.y aligning the bench's long axis with the path
+}
+
 export interface RoadStrip {
   // quad corners in local XZ (Y=0.05 to sit above ground)
   corners: [THREE.Vector3, THREE.Vector3, THREE.Vector3, THREE.Vector3]
@@ -67,13 +78,15 @@ export interface SceneryData {
   waterTriangles: Float32Array  // flat [x,z, x,z, ...] for triangulated water areas
   buildings: BuildingSpec[]
   labels: LabelSpec[]
+  lampPositions: THREE.Vector3[]
+  benches: BenchSpec[]
 }
 
 export class PlanetaryScenery {
   private lastLng = NaN
   private lastLat = NaN
   private _rebuildVersion = 0
-  private _data: SceneryData = { roads: [], treePositions: [], greenTriangles: new Float32Array(0), waterTriangles: new Float32Array(0), buildings: [], labels: [] }
+  private _data: SceneryData = { roads: [], treePositions: [], greenTriangles: new Float32Array(0), waterTriangles: new Float32Array(0), buildings: [], labels: [], lampPositions: [], benches: [] }
 
   get rebuildVersion(): number { return this._rebuildVersion }
   get data(): SceneryData { return this._data }
@@ -120,13 +133,16 @@ export class PlanetaryScenery {
     this._rebuildVersion += 1
     const [px, pz] = this.toLocal(lng, lat)
     const green = this.extractGreenAreas()
+    const roadData = this.extractRoads()
     this._data = {
-      roads: [...this.extractRoads(), ...this.extractWaterways()],
+      roads: [...roadData.strips, ...this.extractWaterways()],
       treePositions: [...this.extractTrees(), ...green.forestTrees],
       greenTriangles: green.triangles,
       waterTriangles: this.extractWaterAreas(),
       buildings: this.extractBuildings(),
       labels: this.extractLabels(px, pz),
+      lampPositions: roadData.lamps,
+      benches: roadData.benches,
     }
     return this._data
   }
@@ -167,8 +183,47 @@ export class PlanetaryScenery {
     }
   }
 
-  private extractRoads(): RoadStrip[] {
+  /** Walk a feature's line(s), emitting a point every `step` meters,
+   *  laterally offset from the line by `offset` m along the segment normal. */
+  private placeAlongFeature(
+    f: MapGeoJSONFeature,
+    step: number,
+    offset: number,
+    emit: (x: number, z: number, yaw: number) => void,
+  ): void {
+    const lines: [number, number][][] =
+      f.geometry.type === 'LineString'
+        ? [f.geometry.coordinates as [number, number][]]
+        : f.geometry.type === 'MultiLineString'
+        ? (f.geometry.coordinates as [number, number][][])
+        : []
+    for (const line of lines) {
+      let acc = step / 2  // first object half a step in, not at the corner
+      for (let i = 0; i < line.length - 1; i++) {
+        const [ax, az] = this.toLocal(line[i][0], line[i][1])
+        const [bx, bz] = this.toLocal(line[i + 1][0], line[i + 1][1])
+        const dx = bx - ax
+        const dz = bz - az
+        const len = Math.sqrt(dx * dx + dz * dz)
+        if (len < 0.1) continue
+        const ux = -dz / len
+        const uz = dx / len
+        // rotation.y turning an X-aligned object to point along (dx, dz)
+        const yaw = Math.atan2(-dz, dx)
+        while (acc <= len) {
+          const t = acc / len
+          emit(ax + dx * t + ux * offset, az + dz * t + uz * offset, yaw)
+          acc += step
+        }
+        acc -= len
+      }
+    }
+  }
+
+  private extractRoads(): { strips: RoadStrip[]; lamps: THREE.Vector3[]; benches: BenchSpec[] } {
     const strips: RoadStrip[] = []
+    const lamps: THREE.Vector3[] = []
+    const benches: BenchSpec[] = []
     const features = this.queryBySourceLayer(ROAD_SOURCE_LAYER)
     for (const f of features) {
       // Tunnels (subway lines, underpasses) are underground — drawing them on the
@@ -185,10 +240,16 @@ export class PlanetaryScenery {
         const off = halfWidth + 1
         this.stripsFromFeature(f, SIDEWALK_HALF_WIDTH, 'path', 0.04, strips, off)
         this.stripsFromFeature(f, SIDEWALK_HALF_WIDTH, 'path', 0.04, strips, -off)
+        this.placeAlongFeature(f, LAMP_STEP, off, (x, z) => {
+          if (lamps.length < LAMP_CAP) lamps.push(new THREE.Vector3(x, 0, z))
+        })
+      } else if (kind === 'path') {
+        this.placeAlongFeature(f, BENCH_STEP, 1.4, (x, z, yaw) => {
+          if (benches.length < BENCH_CAP) benches.push({ x, z, yaw })
+        })
       }
     }
-    // ponytail: sidewalks triple the per-segment mesh count in setRoads; if draw calls ever dominate frame time, merge strips per material into one geometry there.
-    return strips
+    return { strips, lamps, benches }
   }
 
   private extractWaterways(): RoadStrip[] {
