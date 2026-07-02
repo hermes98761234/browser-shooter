@@ -882,7 +882,7 @@ function App() {
       gameDataRef.current.voiceChat?.stopTalking()
     }
     data.controls.onVideoToggle = () => {
-      if (gameStateRef.current !== 'playing') return
+      if (gameStateRef.current !== 'playing' && gameStateRef.current !== 'planetary') return
       const vc = gameDataRef.current.videoChat
       if (!vc) return
       vc.toggleCamera().then(() => {
@@ -1686,7 +1686,12 @@ function App() {
           }}
         />
       )}
-      {gameState === 'planetary' && <VoiceIndicator speakers={speakers} />}
+      {gameState === 'planetary' && (
+        <>
+          <VoiceIndicator speakers={speakers} />
+          <VideoTiles streams={videoStreams} selfStream={localVideoStream} />
+        </>
+      )}
 
       {gameState === 'playing' && (
         <>
@@ -1742,20 +1747,6 @@ function App() {
             onClose={() => setConsoleOpen(false)}
             playerNames={gameDataRef.current.lastPlayers.map(p => p.name).filter((n): n is string => !!n)}
           />
-          {voiceNotice && (
-            <div style={{ position: 'absolute', left: 16, bottom: 64, zIndex: 60,
-              background: 'rgba(95,29,29,0.85)', color: '#fff', padding: '6px 12px',
-              borderRadius: 6, fontFamily: 'monospace', fontSize: 13, pointerEvents: 'none' }}>
-              {voiceNotice}
-            </div>
-          )}
-          {videoNotice && (
-            <div style={{ position: 'absolute', left: 16, bottom: 88, zIndex: 60,
-              background: 'rgba(95,29,29,0.85)', color: '#fff', padding: '6px 12px',
-              borderRadius: 6, fontFamily: 'monospace', fontSize: 13, pointerEvents: 'none' }}>
-              {videoNotice}
-            </div>
-          )}
           {respawnIn !== null && <RespawnOverlay seconds={respawnIn} />}
           {showScoreboard && <Scoreboard players={scoreboardPlayers} roomCode={roomCode} scores={matchScores ?? undefined} />}
           {mobileControlsActive(settings) && gameDataRef.current.controls && (
@@ -1772,6 +1763,25 @@ function App() {
             />
           )}
           <RotateHint enabled={mobileControlsActive(settings)} />
+        </>
+      )}
+
+      {(gameState === 'playing' || gameState === 'planetary') && (
+        <>
+          {voiceNotice && (
+            <div style={{ position: 'absolute', left: 16, bottom: 64, zIndex: 60,
+              background: 'rgba(95,29,29,0.85)', color: '#fff', padding: '6px 12px',
+              borderRadius: 6, fontFamily: 'monospace', fontSize: 13, pointerEvents: 'none' }}>
+              {voiceNotice}
+            </div>
+          )}
+          {videoNotice && (
+            <div style={{ position: 'absolute', left: 16, bottom: 88, zIndex: 60,
+              background: 'rgba(95,29,29,0.85)', color: '#fff', padding: '6px 12px',
+              borderRadius: 6, fontFamily: 'monospace', fontSize: 13, pointerEvents: 'none' }}>
+              {videoNotice}
+            </div>
+          )}
         </>
       )}
 
