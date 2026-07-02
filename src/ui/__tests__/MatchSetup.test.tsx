@@ -51,3 +51,13 @@ describe('MatchSetup join policy', () => {
     expect(onConfirm).toHaveBeenCalledWith(expect.objectContaining({ joinPolicy: 'lobby', password: 'secret' }))
   })
 })
+
+describe('MatchSetup planetary zone', () => {
+  it('emits zoneId planetary when the planetary card is selected', () => {
+    const onConfirm = vi.fn()
+    render(<MatchSetup onConfirm={onConfirm} onBack={vi.fn()} onCreateMap={vi.fn()} onEditMap={vi.fn()} />)
+    fireEvent.click(screen.getByText(/Planetary/i))
+    fireEvent.click(screen.getByText('Create Room'))
+    expect(onConfirm).toHaveBeenCalledWith(expect.objectContaining({ zoneId: 'planetary' }))
+  })
+})

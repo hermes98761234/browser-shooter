@@ -18,6 +18,8 @@ export interface MatchConfig {
   randomSeed?: number       // seed for the random zone; host generates once, clients receive via welcome
   customZone?: ZoneDef     // full zone definition when zoneId === 'custom'
   voiceMode?: 'team' | 'proximity'
+  /** [lng, lat] drop-in point for a planetary (real-world map) match; presence marks the match as planetary. */
+  planetaryCenter?: [number, number]
 }
 
 export function defaultMatchConfig(): MatchConfig {

@@ -144,6 +144,20 @@ export function MatchSetup({
                 </button>
               )
             })}
+            {(() => {
+              const active = zoneId === 'planetary'
+              return (
+                <button onClick={() => { setZoneId('planetary'); setCustomZone(undefined) }} style={{
+                  cursor: 'pointer', fontFamily: 'monospace', textAlign: 'left',
+                  padding: '8px 12px', width: 170, boxSizing: 'border-box',
+                  background: active ? '#ff6600' : '#1d1d2a', color: active ? '#000' : '#fff',
+                  border: active ? '1px solid #ff6600' : '1px solid #3a3a55',
+                }}>
+                  <div style={{ fontSize: 14, fontWeight: 'bold' }}>🌍 Planetary</div>
+                  <div style={{ fontSize: 11, opacity: active ? 0.75 : 0.6, marginTop: 3, lineHeight: 1.3 }}>Real-world map — you pick the drop point next</div>
+                </button>
+              )
+            })()}
           </div>
         </div>
 
