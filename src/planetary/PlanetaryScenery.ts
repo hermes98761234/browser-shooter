@@ -20,13 +20,16 @@ const BUILDING_SOURCE_LAYER = 'building'
 const ROAD_HALF_WIDTHS: Record<string, number> = {
   motorway: 8, trunk: 8,
   primary: 6, secondary: 6,
-  tertiary: 4, residential: 4, service: 4,
+  tertiary: 4, residential: 4, service: 4, minor: 4,
   path: 2, footway: 2, cycleway: 2,
+  track: 1.5, pedestrian: 1.5, steps: 1,
 }
 const DEFAULT_HALF_WIDTH = 3
 
-const PATH_CLASSES = new Set(['pedestrian', 'path', 'footway', 'cycleway', 'steps', 'bridleway'])
+const PATH_CLASSES = new Set(['pedestrian', 'path', 'footway', 'cycleway', 'steps', 'bridleway', 'track'])
 const RAIL_CLASSES = new Set(['rail', 'transit', 'tram', 'subway', 'light_rail', 'narrow_gauge', 'funicular', 'monorail'])
+// Water/air transport lines must not paint roads on the ground.
+const SKIP_ROAD_CLASSES = new Set(['ferry', 'aerialway', 'cable_car'])
 
 const WATERWAY_HALF_WIDTHS: Record<string, number> = {
   river: 6, canal: 4, stream: 1.5, ditch: 1, drain: 1,
@@ -156,6 +159,7 @@ export class PlanetaryScenery {
       // surface paints phantom roads/rails across the map.
       if (f.properties?.brunnel === 'tunnel') continue
       const cls = (f.properties?.subclass ?? f.properties?.class ?? 'residential') as string
+      if (SKIP_ROAD_CLASSES.has(cls)) continue
       const isRail = RAIL_CLASSES.has(cls)
       const halfWidth = isRail ? 1.5 : ROAD_HALF_WIDTHS[cls] ?? DEFAULT_HALF_WIDTH
       const kind: RoadStrip['kind'] = isRail ? 'rail' : PATH_CLASSES.has(cls) ? 'path' : 'road'

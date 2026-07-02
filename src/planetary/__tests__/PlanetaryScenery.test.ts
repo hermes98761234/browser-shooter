@@ -419,3 +419,32 @@ describe('PlanetaryScenery — buildings', () => {
     expect(buildings[0].buildingType).toBe('other')
   })
 })
+
+describe('PlanetaryScenery — road coverage tuning', () => {
+  const line = { type: 'LineString', coordinates: [[0, 0], [0.001, 0]] }
+  const feat = (cls: string) => ({
+    sourceLayer: 'transportation',
+    geometry: line,
+    properties: { class: cls },
+  })
+
+  it('renders class=minor at 8 m width, kind road', () => {
+    const sc = new PlanetaryScenery(makeMap([feat('minor')]) as any, identity)
+    const { roads } = sc.update(0, 0)
+    const road = roads.find(r => r.kind === 'road')!
+    expect(road).toBeDefined()
+    expect(road.corners[0].distanceTo(road.corners[1])).toBeCloseTo(8, 0)
+  })
+
+  it('classifies class=track as a 3 m-wide path', () => {
+    const sc = new PlanetaryScenery(makeMap([feat('track')]) as any, identity)
+    const { roads } = sc.update(0, 0)
+    expect(roads[0].kind).toBe('path')
+    expect(roads[0].corners[0].distanceTo(roads[0].corners[1])).toBeCloseTo(3, 0)
+  })
+
+  it('skips ferry lines (no phantom roads across water)', () => {
+    const sc = new PlanetaryScenery(makeMap([feat('ferry')]) as any, identity)
+    expect(sc.update(0, 0).roads).toHaveLength(0)
+  })
+})
