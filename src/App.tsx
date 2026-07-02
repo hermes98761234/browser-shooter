@@ -213,6 +213,16 @@ function App() {
     return () => clearInterval(id)
   }, [showScoreboard])
 
+  // Planetary matches have no arena render loop, so drive voice-chat heartbeats
+  // (resend + stale-speaker prune) from an interval instead.
+  useEffect(() => {
+    if (gameState !== 'planetary') return
+    const id = setInterval(() => {
+      gameDataRef.current.voiceChat?.tick(performance.now())
+    }, 250)
+    return () => clearInterval(id)
+  }, [gameState])
+
   const lookRef = useRef({ yaw: 0, pitch: 0 })
 
   const gameDataRef = useRef({
@@ -832,8 +842,14 @@ function App() {
       setShowScoreboard(show)
     }
     // Authority-only: [ adds a CT bot, ] adds a T bot, \ removes the last bot.
-    data.controls.onAddBot = (team) => { if (data.role !== 'client') data.session.addBot(team) }
-    data.controls.onRemoveBot = () => { if (data.role !== 'client') data.session.removeBot() }
+    data.controls.onAddBot = (team) => {
+      if (gameStateRef.current !== 'playing') return
+      if (data.role !== 'client') data.session.addBot(team)
+    }
+    data.controls.onRemoveBot = () => {
+      if (gameStateRef.current !== 'playing') return
+      if (data.role !== 'client') data.session.removeBot()
+    }
 
     data.controls.onSelectGrenade = (type: GrenadeType) => {
       if (gameStateRef.current !== 'playing') return
@@ -853,7 +869,7 @@ function App() {
     }
 
     data.controls.onTalkStart = () => {
-      if (gameStateRef.current !== 'playing') return
+      if (gameStateRef.current !== 'playing' && gameStateRef.current !== 'planetary') return
       const chat = gameDataRef.current.voiceChat
       if (!chat) return
       chat.startTalking().catch(() => {
@@ -1670,6 +1686,7 @@ function App() {
           }}
         />
       )}
+      {gameState === 'planetary' && <VoiceIndicator speakers={speakers} />}
 
       {gameState === 'playing' && (
         <>
