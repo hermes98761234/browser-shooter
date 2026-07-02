@@ -11,11 +11,11 @@ Procedural augmentation of the existing `PlanetaryScenery` → `engine.setX()` p
 
 ### 1. More road coverage
 
-Widen the `transportation` sourceLayer filter in `PlanetaryScenery.ts`:
+Reality check against the code: `extractRoads()` already renders every `transportation` class via a default half-width fallback, so coverage is nearly complete. Remaining work in `PlanetaryScenery.ts`:
 
-- Add classes: `service`, `track`, `pedestrian`, `busway`, `raceway`.
-- Accept all `path` subclasses: `footway`, `cycleway`, `steps` (2 m wide), `pedestrian` (3 m wide).
-- Same strip pipeline (`stripsFromFeature`), no new rendering code.
+- Explicit widths: `minor` 8 m, `track` 3 m, `pedestrian` 3 m, `steps` 2 m (currently all default to 6 m).
+- Classify `track` as a path (dirt/gravel look via `pathMat`).
+- Skip `ferry`, `aerialway`, `cable_car` lines — ferries currently render as phantom roads across water.
 
 ### 2. Sidewalks
 
@@ -37,7 +37,7 @@ For each car-road strip (class `minor` and above; not paths, not rails):
 Two `InstancedMesh`es, no shadow casting, hidden at perf level 2:
 
 - **Lamp posts** (cylinder + small emissive sphere): every ~35 m along major/minor road strips, deterministic hash jitter (same pattern as forest trees). Cap ~200.
-- **Benches** (two boxes): every ~50 m along paths that fall inside green areas. Cap ~80.
+- **Benches** (two boxes): every ~50 m along footpath features. Cap ~80. (Green-area containment dropped — it would couple road extraction to green-polygon extraction for marginal realism; benches do line real streets.)
 
 **Out of scope:** fences/hedges — OMT tiles carry no barrier data and procedural fences along every road read as noise.
 
