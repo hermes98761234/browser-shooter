@@ -432,39 +432,39 @@ export class PlanetaryEngine {
     for (const spec of specs) {
       if (this.isBeyond(spec.x, spec.z, 300)) continue  // labels read badly beyond 300 m
       const sprite = this.makeLabelSprite(spec.text)
-      if (!sprite) continue  // no 2D canvas (jsdom/headless) — labels are cosmetic, skip
+      if (!sprite) continue  // 2D context unavailable or stubbed (jsdom/test envs) — labels are cosmetic, skip
       sprite.position.set(spec.x, 10, spec.z)
       this.labels.add(sprite)
     }
   }
 
   private makeLabelSprite(text: string): THREE.Sprite | null {
-    try {
-      const canvas = document.createElement('canvas')
-      const ctx = canvas.getContext('2d')
-      if (!ctx) return null
-      const font = 'bold 40px sans-serif'
-      ctx.font = font
-      canvas.width = Math.ceil(ctx.measureText(text).width) + 16
-      canvas.height = 56
-      ctx.font = font  // canvas resize resets 2D state
-      ctx.textBaseline = 'middle'
-      ctx.lineWidth = 6
-      ctx.strokeStyle = 'rgba(0,0,0,0.85)'
-      ctx.fillStyle = '#ffffff'
-      ctx.strokeText(text, 8, 28)
-      ctx.fillText(text, 8, 28)
-      const tex = new THREE.CanvasTexture(canvas)
-      // depthTest off + high renderOrder: labels stay readable through buildings,
-      // matching the streets-gl reference.
-      const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, depthTest: false })
-      const sprite = new THREE.Sprite(mat)
-      sprite.renderOrder = 999
-      sprite.scale.set(canvas.width * 0.045, canvas.height * 0.045, 1)  // 40px glyphs ≈ 1.8 m tall
-      return sprite
-    } catch {
-      return null
-    }
+    const canvas = document.createElement('canvas')
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return null
+    const font = 'bold 40px sans-serif'
+    ctx.font = font
+    // Guard: test environments stub getContext with a no-op proxy whose
+    // measureText() returns undefined — treat that like "no 2D canvas".
+    const metrics = ctx.measureText(text)
+    if (!metrics) return null
+    canvas.width = Math.ceil(metrics.width) + 16
+    canvas.height = 56
+    ctx.font = font  // canvas resize resets 2D state
+    ctx.textBaseline = 'middle'
+    ctx.lineWidth = 6
+    ctx.strokeStyle = 'rgba(0,0,0,0.85)'
+    ctx.fillStyle = '#ffffff'
+    ctx.strokeText(text, 8, 28)
+    ctx.fillText(text, 8, 28)
+    const tex = new THREE.CanvasTexture(canvas)
+    // depthTest off + high renderOrder: labels stay readable through buildings,
+    // matching the streets-gl reference.
+    const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, depthTest: false })
+    const sprite = new THREE.Sprite(mat)
+    sprite.renderOrder = 999
+    sprite.scale.set(canvas.width * 0.045, canvas.height * 0.045, 1)  // 40px glyphs ≈ 1.8 m tall
+    return sprite
   }
 
   render() {
