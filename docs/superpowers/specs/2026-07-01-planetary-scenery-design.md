@@ -36,7 +36,7 @@ For each car-road strip (class `minor` and above; not paths, not rails):
 
 Two `InstancedMesh`es, no shadow casting, hidden at perf level 2:
 
-- **Lamp posts** (cylinder + small emissive sphere): every ~35 m along major/minor road strips, deterministic hash jitter (same pattern as forest trees). Cap ~200.
+- **Lamp posts** (cylinder + small emissive sphere): every ~35 m along major/minor road strips. Cap ~200. (Implemented with even spacing, no hash jitter — dropped at plan stage; likewise labels use a hard 300 m draw cutoff instead of distance fade.)
 - **Benches** (two boxes): every ~50 m along footpath features. Cap ~80. (Green-area containment dropped — it would couple road extraction to green-polygon extraction for marginal realism; benches do line real streets.)
 
 **Out of scope:** fences/hedges — OMT tiles carry no barrier data and procedural fences along every road read as noise.
