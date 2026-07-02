@@ -480,13 +480,14 @@ export function PlanetaryMode({ onExit }: PlanetaryModeProps) {
           const sv = sceneryRef.current.rebuildVersion
           if (sv !== lastSceneryVersionRef.current) {
             lastSceneryVersionRef.current = sv
-            const { roads, treePositions, greenTriangles, waterTriangles, buildings, labels } = sceneryRef.current.data
+            const { roads, treePositions, greenTriangles, waterTriangles, buildings, labels, lampPositions, benches } = sceneryRef.current.data
             engine.setRoads(roads)
             engine.setTrees(treePositions)
             engine.setGreenAreas(greenTriangles)
             engine.setWaterAreas(waterTriangles)
             engine.setBuildings(buildings)
             engine.setLabels(labels)
+            engine.setStreetObjects(lampPositions, benches)
           }
         }
 

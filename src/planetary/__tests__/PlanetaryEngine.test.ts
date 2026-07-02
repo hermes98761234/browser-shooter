@@ -340,3 +340,36 @@ describe('PlanetaryEngine — labels', () => {
     engine.dispose()
   })
 })
+
+describe('PlanetaryEngine — street objects', () => {
+  it('setStreetObjects adds instanced lamp and bench meshes', () => {
+    const container = document.createElement('div')
+    const engine = new PlanetaryEngine(container)
+    engine.setStreetObjects([new THREE.Vector3(10, 0, 10)], [{ x: 5, z: 5, yaw: 0.5 }])
+    const group = engine.scene.getObjectByName('street-objects')!
+    // lamp pole + lamp head + bench seat + bench back
+    expect(group.children.filter(o => o instanceof THREE.InstancedMesh)).toHaveLength(4)
+    engine.dispose()
+  })
+
+  it('culls street objects beyond the fog-far distance and rebuilds cleanly', () => {
+    const container = document.createElement('div')
+    const engine = new PlanetaryEngine(container)
+    engine.setViewFromPlayer(new THREE.Vector3(0, 1.7, 0), 0, 0)
+    engine.setStreetObjects([new THREE.Vector3(10, 0, 10), new THREE.Vector3(800, 0, 800)], [])
+    const group = engine.scene.getObjectByName('street-objects')!
+    const poles = group.children[0] as THREE.InstancedMesh
+    expect(poles.count).toBe(1)
+    engine.setStreetObjects([], [])
+    expect(group.children).toHaveLength(0)
+    engine.dispose()
+  })
+
+  it('setPerfLevel(2) hides street objects', () => {
+    const container = document.createElement('div')
+    const engine = new PlanetaryEngine(container)
+    engine.setPerfLevel(2)
+    expect(engine.scene.getObjectByName('street-objects')!.visible).toBe(false)
+    engine.dispose()
+  })
+})

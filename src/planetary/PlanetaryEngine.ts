@@ -2,7 +2,7 @@ import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import * as THREE from 'three'
 import { Sky } from 'three/addons/objects/Sky.js'
-import type { RoadStrip, LabelSpec } from './PlanetaryScenery'
+import type { RoadStrip, LabelSpec, BenchSpec } from './PlanetaryScenery'
 import type { SunState } from './SunSystem'
 import { AtmosphereConfig } from './AtmosphereConfig'
 import { BuildingGeometry } from './BuildingGeometry'
@@ -39,6 +39,10 @@ export class PlanetaryEngine {
   private buildings = new THREE.Group()
   private roads = new THREE.Group()
   private labels = new THREE.Group()
+  private streetObjects = new THREE.Group()
+  private lampPoleMat = new THREE.MeshStandardMaterial({ color: 0x3c4048, metalness: 0.6, roughness: 0.5 })
+  private lampHeadMat = new THREE.MeshBasicMaterial({ color: 0xfff2cc })  // basic = always lit, cheap glow look
+  private benchMat = new THREE.MeshStandardMaterial({ color: 0x6b4f35, roughness: 0.9, metalness: 0 })
   private trees: THREE.InstancedMesh | null = null
   private greenAreas: THREE.Mesh | null = null
   private waterAreas: THREE.Mesh | null = null
@@ -152,6 +156,8 @@ export class PlanetaryEngine {
     this.scene.add(this.roads)
     this.labels.name = 'labels'
     this.scene.add(this.labels)
+    this.streetObjects.name = 'street-objects'
+    this.scene.add(this.streetObjects)
 
     this.map = new maplibregl.Map({
       container,
@@ -181,6 +187,7 @@ export class PlanetaryEngine {
       if (this.renderer) this.renderer.shadowMap.enabled = false
       this.sky.visible = false
       this.labels.visible = false
+      this.streetObjects.visible = false
       this.scene.background = this.scene.fog instanceof THREE.Fog ? this.scene.fog.color : null
       // Shadow/lighting shader chunks are baked into compiled materials — recompile once.
       this.scene.traverse(o => {
@@ -467,6 +474,51 @@ export class PlanetaryEngine {
     return sprite
   }
 
+  /** Instanced street furniture: lamp posts along car roads, benches along footpaths. */
+  setStreetObjects(lamps: THREE.Vector3[], benches: BenchSpec[]): void {
+    for (const m of this.streetObjects.children) {
+      if (m instanceof THREE.Mesh) m.geometry.dispose()
+    }
+    this.streetObjects.clear()
+    const far = this.cullFar()
+    const dummy = new THREE.Object3D()
+
+    const nearLamps = lamps.filter(p => !this.isBeyond(p.x, p.z, far))
+    if (nearLamps.length > 0) {
+      // Geometries pre-translated so the instance origin sits on the ground.
+      const poleGeo = new THREE.CylinderGeometry(0.06, 0.1, 5, 6).translate(0, 2.5, 0)
+      const headGeo = new THREE.SphereGeometry(0.25, 8, 6).translate(0, 5, 0)
+      const poles = new THREE.InstancedMesh(poleGeo, this.lampPoleMat, nearLamps.length)
+      const heads = new THREE.InstancedMesh(headGeo, this.lampHeadMat, nearLamps.length)
+      for (let i = 0; i < nearLamps.length; i++) {
+        dummy.position.set(nearLamps[i].x, 0, nearLamps[i].z)
+        dummy.rotation.set(0, 0, 0)
+        dummy.updateMatrix()
+        poles.setMatrixAt(i, dummy.matrix)
+        heads.setMatrixAt(i, dummy.matrix)
+      }
+      this.streetObjects.add(poles, heads)
+    }
+
+    const nearBenches = benches.filter(b => !this.isBeyond(b.x, b.z, far))
+    if (nearBenches.length > 0) {
+      // Two instanced boxes sharing the same per-instance matrices — avoids a
+      // BufferGeometryUtils merge for a two-box prop.
+      const seatGeo = new THREE.BoxGeometry(1.6, 0.08, 0.5).translate(0, 0.45, 0)
+      const backGeo = new THREE.BoxGeometry(1.6, 0.5, 0.08).translate(0, 0.75, -0.25)
+      const seats = new THREE.InstancedMesh(seatGeo, this.benchMat, nearBenches.length)
+      const backs = new THREE.InstancedMesh(backGeo, this.benchMat, nearBenches.length)
+      for (let i = 0; i < nearBenches.length; i++) {
+        dummy.position.set(nearBenches[i].x, 0, nearBenches[i].z)
+        dummy.rotation.set(0, nearBenches[i].yaw, 0)
+        dummy.updateMatrix()
+        seats.setMatrixAt(i, dummy.matrix)
+        backs.setMatrixAt(i, dummy.matrix)
+      }
+      this.streetObjects.add(seats, backs)
+    }
+  }
+
   render() {
     if (!this.renderer) {
       // antialias off: SMAA in the postprocessing chain already does AA; MSAA on
@@ -549,6 +601,7 @@ export class PlanetaryEngine {
 
   dispose() {
     this.setLabels([])
+    this.setStreetObjects([], [])
     this.disposeGroup(this.buildings)
     this.disposeGroup(this.roads)
     if (this.trees) { this.trees.geometry.dispose(); this.scene.remove(this.trees) }
@@ -565,6 +618,9 @@ export class PlanetaryEngine {
     this.greenMat.dispose()
     this.waterMat.dispose()
     this.laneMat.dispose()
+    this.lampPoleMat.dispose()
+    this.lampHeadMat.dispose()
+    this.benchMat.dispose()
     this.renderer?.domElement.remove()
     this.renderer?.dispose()
     this.map.remove()
