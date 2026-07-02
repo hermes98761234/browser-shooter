@@ -21,7 +21,7 @@ import { TouchControls } from '../ui/TouchControls'
 import { Viewmodel } from '../weapons/Viewmodel'
 import { Controls } from '../player/Controls'
 import { mobileControlsActive, loadSettings } from '../settings/Settings'
-import type { EntityState } from '../session/protocol'
+import type { EntityState, GrenadeState, SessionEvent, Snapshot } from '../session/protocol'
 import { ParticleSystem } from '../effects/ParticleSystem'
 import { renderRemoteShot, renderLocalTracer } from '../effects/shotEffects'
 import { SoundEffects } from '../audio/SoundEffects'
@@ -102,6 +102,9 @@ export function PlanetaryMode({ onExit, net }: PlanetaryModeProps) {
   const [isDead, setIsDead] = useState(false)
   const [respawnIn, setRespawnIn] = useState<number | null>(null)
   const killSeqRef = useRef(0)
+  // Client session events arrive via NetClient's onEvent callback (fed from
+  // snapshot.events), not from session.step — buffered here for the loop to drain.
+  const clientEventsRef = useRef<SessionEvent[]>([])
   const mouseShootRef = useRef(false)
   const [mobileControls] = useState(() => mobileControlsActive(loadSettings()))
   const [csMode, setCsMode] = useState(false)
@@ -121,19 +124,16 @@ export function PlanetaryMode({ onExit, net }: PlanetaryModeProps) {
     state: BombState.None, timer: 40, site: null, plant: 0, defuse: 0,
   })
 
+  // openScoreboard lives outside the render loop, so it needs a live handle on `net`.
+  const netRef = useRef(net)
+  netRef.current = net
+
   // Scoreboard state is event-driven (kills/deaths); snapshot on open so it isn't
   // empty when nothing has happened yet (e.g. freshly added bots).
   const openScoreboard = useCallback(() => {
-    const session = sessionRef.current
-    if (session) {
-      setScoreboardPlayers(session.getSnapshot().players.map(p => ({
-        id: p.id, kind: 'player' as const, type: 'player',
-        position: p.position, rotationY: p.rotationY, rotationX: p.rotationX,
-        health: p.health, isDead: p.isDead, weaponType: p.weaponType,
-        name: p.name, team: p.team, isBot: p.isBot,
-        respawnIn: p.respawnIn, hasArmor: p.hasArmor, hasHelmet: p.hasHelmet,
-      })))
-    }
+    const clientSnap = netRef.current?.netClient?.latestSnapshot
+    const source = clientSnap ? clientSnap.players : (sessionRef.current ? sessionRef.current.getSnapshot().players : [])
+    setScoreboardPlayers(source.map(p => ({ ...p, kind: 'player' as const, type: 'player' })))
     setShowScoreboard(true)
   }, [])
 
@@ -234,7 +234,9 @@ export function PlanetaryMode({ onExit, net }: PlanetaryModeProps) {
       desktopControlsRef.current = gameControls
 
       // Bots and other players are session entities but need meshes to be visible.
-      remotePlayersRef.current = new RemotePlayerManager(engine.scene, session.localId)
+      // Clients render everyone but themselves — key off the network id, which is
+      // assigned before this component mounts (join happens in the lobby).
+      remotePlayersRef.current = new RemotePlayerManager(engine.scene, net?.netClient?.playerId ?? session.localId)
 
       // Grenade inventory/selection (client-side, same split as App.tsx)
       const gm = new GrenadeManager()
@@ -246,15 +248,68 @@ export function PlanetaryMode({ onExit, net }: PlanetaryModeProps) {
       }
       gameControls.onCycleGrenade = () => setSelectedGrenade(gm.cycle())
       // Keymap parity with App.tsx: [ adds a CT bot, ] adds a T bot, \ removes one.
-      gameControls.onAddBot = (team) => { session.addBot(team) }
-      gameControls.onRemoveBot = () => { session.removeBot() }
+      // Host-authoritative — clients can't spawn/remove bots directly.
+      gameControls.onAddBot = (team) => { if (net?.role === 'client') return; session.addBot(team) }
+      gameControls.onRemoveBot = () => { if (net?.role === 'client') return; session.removeBot() }
 
       sessionRef.current = session
+      // Client session events arrive via NetClient (fed from snapshot.events), not
+      // session.step. This replaces the arena handler App registered in joinGame —
+      // planetary owns effects while mounted; leaveMultiplayer tears down on exit.
+      if (net?.role === 'client' && net.netClient) {
+        net.netClient.onEvent((ev) => clientEventsRef.current.push(ev))
+      }
       net?.onRemotePlayers?.(remotePlayersRef.current)
       // hostGame() disables auto waves for the arena lobby; planetary has no
       // manual wave button, so co-op/hybrid AI must auto-spawn here.
       if (net?.role === 'host' && (config.mode === 'coop' || config.mode === 'hybrid')) {
         session.waveManager.auto = true
+      }
+
+      // Client-only render mirrors: enemies/grenades are session entities on the
+      // host, but the client never steps its session — it renders straight from
+      // the snapshot instead (mirrors App.tsx's renderClientEnemies/Grenades).
+      const clientEnemyMeshes = new Map<string, THREE.Mesh>()
+      function renderClientEnemies(enemies: EntityState[]) {
+        const seen = new Set<string>()
+        for (const e of enemies) {
+          seen.add(e.id)
+          let mesh = clientEnemyMeshes.get(e.id)
+          if (!mesh) {
+            mesh = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.8, 0.8), new THREE.MeshStandardMaterial({ color: 0xcc3333 }))
+            clientEnemyMeshes.set(e.id, mesh)
+            engine.scene.add(mesh)
+          }
+          mesh.position.set(e.position.x, e.position.y + 0.9, e.position.z)
+          mesh.rotation.y = e.rotationY
+          mesh.visible = !e.isDead
+        }
+        for (const [id, mesh] of clientEnemyMeshes) {
+          if (!seen.has(id)) {
+            engine.scene.remove(mesh); mesh.geometry.dispose(); (mesh.material as THREE.Material).dispose()
+            clientEnemyMeshes.delete(id)
+          }
+        }
+      }
+      const clientGrenadeMeshes = new Map<string, THREE.Mesh>()
+      function renderClientGrenades(grenades: GrenadeState[]) {
+        const seen = new Set<string>()
+        for (const g of grenades) {
+          seen.add(g.id)
+          let mesh = clientGrenadeMeshes.get(g.id)
+          if (!mesh) {
+            mesh = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 8), new THREE.MeshStandardMaterial({ color: 0x2a3a2a }))
+            clientGrenadeMeshes.set(g.id, mesh)
+            engine.scene.add(mesh)
+          }
+          mesh.position.set(g.position.x, g.position.y, g.position.z)
+        }
+        for (const [id, mesh] of clientGrenadeMeshes) {
+          if (!seen.has(id)) {
+            engine.scene.remove(mesh); mesh.geometry.dispose(); (mesh.material as THREE.Material).dispose()
+            clientGrenadeMeshes.delete(id)
+          }
+        }
       }
 
       let last = performance.now()
@@ -307,21 +362,64 @@ export function PlanetaryMode({ onExit, net }: PlanetaryModeProps) {
         input.yaw = gc.yaw
         input.pitch = gc.pitch
 
-        // 3. Apply input to the session so the logical player moves
-        session.applyInput(session.localId, input)
-
-        // 4. Step the session (movement, combat, bots)
+        // 3-4. Apply input / step the session. Clients don't step their own
+        // session — they predict locally via NetClient and send input to the
+        // host, which is authoritative. (Follows App.tsx's updateClient.)
+        const isClient = net?.role === 'client' && !!net.netClient
+        let events: SessionEvent[]
+        let snap: Snapshot
+        let firedThisFrame = false
         const grenadesBefore = new Set(session.activeGrenades)
         const smokeCloudsBefore = new Set(session.smokeClouds)
         const enemiesBefore = [...session.enemies]
-        const events = session.step(dt)
+
+        if (isClient) {
+          const client = net!.netClient!
+          const meSnap = client.latestSnapshot?.players.find(pl => pl.id === client.playerId)
+          const dead = meSnap?.isDead ?? false
+          client.sendInput({
+            ...input,
+            forward: dead ? false : input.forward,
+            backward: dead ? false : input.backward,
+            left: dead ? false : input.left,
+            right: dead ? false : input.right,
+            jump: dead ? false : input.jump,
+            shoot: dead ? false : input.shoot,
+          })
+          client.collisionWorld = collisionRef.current?.collisionWorld ?? null
+          client.arenaSize = 5000
+          client.predictLocal(dt)
+          // Local gun feel: host is authoritative for hits; the client owns sound/kick/ammo.
+          const wm = session.weaponManager
+          wm.update(dt)
+          if (!dead && input.shoot && wm.current.shoot()) {
+            firedThisFrame = true
+            viewmodel.fire()
+            audioRef.current?.playWeaponShoot(weaponVisual(wm.current.type), client.getLocalPosition())
+          }
+          events = clientEventsRef.current
+          clientEventsRef.current = []
+          snap = client.latestSnapshot ?? {
+            tick: 0, seq: 0, ack: {}, players: [], enemies: [], grenades: [], events: [],
+            scores: { teams: { ct: 0, t: 0 }, players: {}, matchOver: false, winningTeam: null },
+          }
+          setIsDead(dead)
+          setRespawnIn(meSnap?.respawnIn ?? null)
+        } else {
+          session.applyInput(session.localId, input)
+          events = session.step(dt)
+          snap = session.getSnapshot()
+        }
 
         // 4. Update the Three.js camera from player state (eye pos + look).
-        const p = session.player.position
-        engine.setViewFromPlayer(p, session.player.rotation.y, session.player.rotation.x)
+        const p = isClient ? net!.netClient!.getLocalPosition() : session.player.position
+        const viewYaw = isClient ? gc.yaw : session.player.rotation.y
+        const viewPitch = isClient ? gc.pitch : session.player.rotation.x
+        engine.setViewFromPlayer(p, viewYaw, viewPitch)
 
         // 5. Process session events for round flow
         let scoreboardDirty = false
+        const localPid = isClient ? net!.netClient!.playerId! : session.localId
         for (const ev of events) {
           switch (ev.type) {
             case 'roundStart':
@@ -351,25 +449,28 @@ export function PlanetaryMode({ onExit, net }: PlanetaryModeProps) {
               setRoundState(prev => prev ? { ...prev, state: RoundState.Over } : null)
               break
             case 'playerKilledPlayer': {
-              const a = session.getPlayer(ev.attackerId)?.name ?? 'Unknown'
-              const v = session.getPlayer(ev.victimId)?.name ?? 'Unknown'
+              const nameOf = (pid: string) => isClient
+                ? (net!.netClient!.latestSnapshot?.players.find(pl => pl.id === pid)?.name ?? pid)
+                : (session.getPlayer(pid)?.name ?? 'Unknown')
+              const a = nameOf(ev.attackerId)
+              const v = nameOf(ev.victimId)
               const id = killSeqRef.current++
               setKillFeed(prev => [...prev.slice(-4), { id, attacker: a, victim: v, ts: Date.now() }])
-              if (ev.victimId === session.localId) {
+              if (ev.victimId === localPid) {
                 setIsDead(true)
               }
               scoreboardDirty = true
               break
             }
             case 'playerDied':
-              if (ev.playerId === session.localId) {
+              if (ev.playerId === localPid) {
                 setIsDead(true)
-                setRespawnIn(session.respawnQueue.isPending(session.localId) ? session.respawnQueue.remaining(session.localId) : null)
+                if (!isClient) setRespawnIn(session.respawnQueue.isPending(session.localId) ? session.respawnQueue.remaining(session.localId) : null)
               }
               scoreboardDirty = true
               break
             case 'playerRespawned':
-              if (ev.playerId === session.localId) {
+              if (ev.playerId === localPid) {
                 setIsDead(false)
                 setRespawnIn(null)
               }
@@ -385,7 +486,7 @@ export function PlanetaryMode({ onExit, net }: PlanetaryModeProps) {
               break
             case 'playerShot':
               if (particleSystemRef.current) {
-                if (ev.shooterId === session.localId) renderLocalTracer(particleSystemRef.current, ev)
+                if (ev.shooterId === localPid) renderLocalTracer(particleSystemRef.current, ev)
                 else if (audioRef.current) renderRemoteShot(particleSystemRef.current, audioRef.current, ev)
               }
               break
@@ -401,7 +502,7 @@ export function PlanetaryMode({ onExit, net }: PlanetaryModeProps) {
               const point = new THREE.Vector3(hp.x, hp.y, hp.z)
               if (ev.hit.killed) particleSystemRef.current?.explosion(point, 'player')
               else particleSystemRef.current?.bloodSplatter(point)
-              if (ev.victimId === session.localId) audioRef.current?.playPlayerHit()
+              if (ev.victimId === localPid) audioRef.current?.playPlayerHit()
               break
             }
             case 'enemyShoot': {
@@ -410,9 +511,9 @@ export function PlanetaryMode({ onExit, net }: PlanetaryModeProps) {
               const dir = to.clone().sub(from).normalize()
               audioRef.current?.playWeaponShoot('rifle', from)
               particleSystemRef.current?.muzzleFlash(from, dir, 0xffcf6a, 4, 7)
-              if (ev.hit && ev.victimId === session.localId) {
+              if (ev.hit && ev.victimId === localPid) {
                 audioRef.current?.playPlayerHit()
-                damageStateRef.current = triggerDamage(from.clone(), session.player.position.clone(), session.player.rotation.y)
+                damageStateRef.current = triggerDamage(from.clone(), p.clone(), viewYaw)
                 setDamageIndicator({ ...damageStateRef.current })
               }
               break
@@ -424,8 +525,8 @@ export function PlanetaryMode({ onExit, net }: PlanetaryModeProps) {
               }
               if (ev.grenadeType === 'flash') {
                 particleSystemRef.current?.flashBang(new THREE.Vector3(ev.position.x, ev.position.y + 1, ev.position.z))
-                if (ev.affectedPlayers.includes(session.localId)) {
-                  flashStateRef.current = triggerFlash(flashStateRef.current, ev.blindDurations?.[session.localId] ?? 0)
+                if (ev.affectedPlayers.includes(localPid)) {
+                  flashStateRef.current = triggerFlash(flashStateRef.current, ev.blindDurations?.[localPid] ?? 0)
                   setFlashEffect({ ...flashStateRef.current })
                 }
               }
@@ -434,33 +535,40 @@ export function PlanetaryMode({ onExit, net }: PlanetaryModeProps) {
           }
         }
 
-        // Grenade + smoke meshes: add newly thrown, drop detonated/expired (same as App.tsx)
-        for (const g of session.activeGrenades) {
-          if (!g.meshRef.parent) engine.scene.add(g.meshRef)
-        }
-        for (const g of grenadesBefore) {
-          if (!session.activeGrenades.includes(g)) engine.scene.remove(g.meshRef)
-        }
-        for (const s of session.smokeClouds) {
-          if (!s.meshRef.parent) engine.scene.add(s.meshRef)
-        }
-        for (const s of smokeCloudsBefore) {
-          if (!session.smokeClouds.includes(s)) engine.scene.remove(s.meshRef)
-        }
+        // Grenade + smoke meshes: add newly thrown, drop detonated/expired (same as
+        // App.tsx). Host/solo only — session.activeGrenades/smokeClouds/enemies
+        // aren't stepped on clients; those render straight from the snapshot below.
+        if (!isClient) {
+          for (const g of session.activeGrenades) {
+            if (!g.meshRef.parent) engine.scene.add(g.meshRef)
+          }
+          for (const g of grenadesBefore) {
+            if (!session.activeGrenades.includes(g)) engine.scene.remove(g.meshRef)
+          }
+          for (const s of session.smokeClouds) {
+            if (!s.meshRef.parent) engine.scene.add(s.meshRef)
+          }
+          for (const s of smokeCloudsBefore) {
+            if (!session.smokeClouds.includes(s)) engine.scene.remove(s.meshRef)
+          }
 
-        // AI wave enemies (co-op/hybrid): session owns the meshes; mirror into the scene.
-        for (const e of session.enemies) {
-          if (!e.mesh.parent) engine.scene.add(e.mesh)
-        }
-        for (const e of enemiesBefore) {
-          if (!session.enemies.includes(e)) { engine.scene.remove(e.mesh); e.dispose() }
+          // AI wave enemies (co-op/hybrid): session owns the meshes; mirror into the scene.
+          for (const e of session.enemies) {
+            if (!e.mesh.parent) engine.scene.add(e.mesh)
+          }
+          for (const e of enemiesBefore) {
+            if (!session.enemies.includes(e)) { engine.scene.remove(e.mesh); e.dispose() }
+          }
         }
 
         // Render bots/other players (they exist in the session but have no mesh otherwise)
-        const snap = session.getSnapshot()
         if (remotePlayersRef.current) {
           remotePlayersRef.current.sync(snap.players)
           remotePlayersRef.current.update(dt)
+        }
+        if (isClient) {
+          renderClientGrenades(snap.grenades)
+          renderClientEnemies(snap.enemies)
         }
 
         // Host: broadcast the authoritative snapshot to all clients.
@@ -470,8 +578,10 @@ export function PlanetaryMode({ onExit, net }: PlanetaryModeProps) {
           if (pingAccumRef.current >= 1) { pingAccumRef.current = 0; net.netHost.pingClients() }
         }
 
-        // Only update timers per-frame; event handlers own state/scores
-        if (session.roundManager) {
+        // Only update timers per-frame; event handlers own state/scores.
+        // Host/solo only — the client's session.roundManager never ticks; its
+        // roundState is seeded by the roundStart/buyPhaseStart events above.
+        if (!isClient && session.roundManager) {
           setRoundState(prev => prev ? {
             ...prev,
             buyTimer: session.roundManager!.buyPhaseTimer,
@@ -528,8 +638,11 @@ export function PlanetaryMode({ onExit, net }: PlanetaryModeProps) {
         engine.setSunAngle(sunSystemRef.current.compute(sunHourRef.current))
 
         // 7. Update HUD state
+        const myHealth = isClient
+          ? (net!.netClient!.latestSnapshot?.players.find(pl => pl.id === net!.netClient!.playerId)?.health ?? 100)
+          : session.player.health
         setHudState({
-          health: session.player.health,
+          health: myHealth,
           maxHealth: session.player.maxHealth,
           ammo: session.weaponManager.current.ammo,
           maxAmmo: session.weaponManager.current.def.maxAmmo,
@@ -548,14 +661,19 @@ export function PlanetaryMode({ onExit, net }: PlanetaryModeProps) {
         engine.render()
 
         // 10. Shooting feedback: detect fired-this-frame (same pattern as App.tsx).
+        // Client gun feel (fire/sound/ammo) already happened up in the branch above;
+        // this only needs to fire the muzzle-flash particle once the camera is set.
         const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(engine.camera.quaternion)
-        let firedThisFrame = false
         const weapon = session.weaponManager.current
-        if (!session.player.isDead && input.shoot && weapon.fireTimer > weapon.def.fireRate - dt) {
-          firedThisFrame = true
-          viewmodel.fire()
-          audioRef.current?.playWeaponShoot(weaponVisual(weapon.type), session.player.position)
-          particleSystemRef.current?.muzzleFlash(session.player.position.clone().add(fwd), fwd)
+        if (!isClient) {
+          if (!session.player.isDead && input.shoot && weapon.fireTimer > weapon.def.fireRate - dt) {
+            firedThisFrame = true
+            viewmodel.fire()
+            audioRef.current?.playWeaponShoot(weaponVisual(weapon.type), session.player.position)
+            particleSystemRef.current?.muzzleFlash(session.player.position.clone().add(fwd), fwd)
+          }
+        } else if (firedThisFrame) {
+          particleSystemRef.current?.muzzleFlash(p.clone().add(fwd), fwd)
         }
 
         // 11. Update audio listener position for 3D positional sound.
@@ -577,9 +695,14 @@ export function PlanetaryMode({ onExit, net }: PlanetaryModeProps) {
         else setFlashEffect(prev => (prev ? null : prev))
 
         // 12. Crosshair bloom: grow on fire/movement/jump, recover when still.
+        // Client is non-authoritative for physics, so bloom is driven from input.
+        const moving = isClient
+          ? (input.forward || input.backward || input.left || input.right)
+          : Math.hypot(session.player.velocity.x, session.player.velocity.z) > 1.5
+        const airborne = isClient ? input.jump : !session.player.isGrounded
         setBloom(prev => stepBloom(prev, dt, {
-          moving: Math.hypot(session.player.velocity.x, session.player.velocity.z) > 1.5,
-          airborne: !session.player.isGrounded,
+          moving,
+          airborne,
           shotsFired: firedThisFrame ? 1 : 0,
           weaponSpread: weapon.def.spread,
         }))
@@ -618,11 +741,15 @@ export function PlanetaryMode({ onExit, net }: PlanetaryModeProps) {
         e.preventDefault()
         openScoreboard()
       } else if (e.code === 'Digit5') {
-        if (sessionRef.current) {
+        if (net?.role === 'client' && net.netClient) {
+          net.netClient.transport.send({ type: 'plantBomb', playerId: net.netClient.playerId! })
+        } else if (sessionRef.current) {
           sessionRef.current.tryPlant(sessionRef.current.localId)
         }
       } else if (e.code === 'KeyE') {
-        if (sessionRef.current) {
+        if (net?.role === 'client' && net.netClient) {
+          net.netClient.transport.send({ type: 'defuseBomb', playerId: net.netClient.playerId!, hasKit: false })
+        } else if (sessionRef.current) {
           sessionRef.current.tryDefuse(sessionRef.current.localId, false)
         }
       } else if (e.code === 'KeyQ') {
@@ -649,7 +776,9 @@ export function PlanetaryMode({ onExit, net }: PlanetaryModeProps) {
       const gm = grenadeManagerRef.current
       if (!session || !gm?.selected || session.player.isDead) return false
       const thrown = gm.selected
-      if (!session.throwGrenade(session.localId, thrown, mode)) return false
+      if (net?.role === 'client' && net.netClient) {
+        net.netClient.transport.send({ type: 'throwGrenade', playerId: net.netClient.playerId!, grenadeType: thrown, mode })
+      } else if (!session.throwGrenade(session.localId, thrown, mode)) return false
       gm.remove(thrown)
       setGrenadeInventory({ he: gm.getCount('he'), flash: gm.getCount('flash'), smoke: gm.getCount('smoke') })
       if (!gm.has(thrown)) setSelectedGrenade(gm.selected)
@@ -748,6 +877,9 @@ export function PlanetaryMode({ onExit, net }: PlanetaryModeProps) {
             if (!session || !session.economy) return
             const item = findItem(itemId)
             if (!item || !canAffordItem(session.economy.money, itemId)) return
+            if (net?.role === 'client' && net.netClient) {
+              net.netClient.transport.send({ type: 'buy', playerId: net.netClient.playerId!, item: itemId })
+            }
             const grenadeKey = GRENADE_ITEM_KEY[itemId]
             if (grenadeKey) {
               // Grenades live in the client-side GrenadeManager, not applyItem
@@ -859,21 +991,23 @@ export function PlanetaryMode({ onExit, net }: PlanetaryModeProps) {
               style={{ width: 100, accentColor: '#ffcc44' }}
             />
           </div>
-          <div style={{ display: 'flex', gap: 4 }}>
-            {(['ct', 't'] as const).map(team => (
-              <button
-                key={team}
-                onClick={() => sessionRef.current?.addBot(team)}
-                style={{
-                  padding: '4px 8px', background: 'rgba(0,0,0,0.6)', color: 'white',
-                  border: '1px solid #555', borderRadius: 4, cursor: 'pointer',
-                  fontSize: 11, fontFamily: 'monospace',
-                }}
-              >
-                +{team.toUpperCase()} Bot
-              </button>
-            ))}
-          </div>
+          {!(net?.role === 'client') && (
+            <div style={{ display: 'flex', gap: 4 }}>
+              {(['ct', 't'] as const).map(team => (
+                <button
+                  key={team}
+                  onClick={() => sessionRef.current?.addBot(team)}
+                  style={{
+                    padding: '4px 8px', background: 'rgba(0,0,0,0.6)', color: 'white',
+                    border: '1px solid #555', borderRadius: 4, cursor: 'pointer',
+                    fontSize: 11, fontFamily: 'monospace',
+                  }}
+                >
+                  +{team.toUpperCase()} Bot
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
