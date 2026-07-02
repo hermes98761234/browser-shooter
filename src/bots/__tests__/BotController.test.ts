@@ -94,4 +94,20 @@ describe('BotController', () => {
     expect(input.forward).toBe(false)
     expect(input.backward).toBe(false)
   })
+
+  it('ignores teammates without ffa flag (existing behavior)', () => {
+    const bot = entity('bot-1', 'ct', new THREE.Vector3(0, 2, 0))
+    const mate = entity('mate', 'ct', new THREE.Vector3(30, 2, 0))
+    const input = new BotController('bot-1').computeInput(bot, [bot, mate], null, 0.016)
+    // No valid target: bot stands still
+    expect(input.forward || input.backward || input.left || input.right).toBe(false)
+  })
+
+  it('targets a same-team player when ffa is true', () => {
+    const bot = entity('bot-1', 'ct', new THREE.Vector3(0, 2, 0))
+    const mate = entity('mate', 'ct', new THREE.Vector3(30, 2, 0))
+    const input = new BotController('bot-1').computeInput(bot, [bot, mate], null, 0.016, undefined, true)
+    // Target at distance 30 > STANDOFF(8): bot moves toward it
+    expect(input.forward || input.backward || input.left || input.right).toBe(true)
+  })
 })

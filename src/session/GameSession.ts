@@ -547,7 +547,7 @@ export class GameSession {
       for (const [id, controller] of this.bots) {
         const self = this.playerMap.get(id)
         if (!self) continue
-        this.applyInput(id, controller.computeInput(self, all, this.collisionWorld, dt, hostiles))
+        this.applyInput(id, controller.computeInput(self, all, this.collisionWorld, dt, hostiles, this.config.damagePolicy === 'ffa'))
       }
     }
 

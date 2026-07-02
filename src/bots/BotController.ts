@@ -32,10 +32,11 @@ export class BotController {
    *   the horde instead of each other. When omitted the bot falls back to the nearest
    *   enemy-team player in `others`; an explicit list (even if empty) means engage only
    *   those — an empty list leaves the bot idle between waves rather than shooting players.
+   * @param ffa when true, ignore team and target all players equally.
    */
   computeInput(
     self: PlayerEntity, others: PlayerEntity[], world: CollisionWorld | null, dt: number,
-    hostiles?: THREE.Vector3[],
+    hostiles?: THREE.Vector3[], ffa = false,
   ): PlayerInput {
     const input = emptyInput()
     if (self.player.isDead) { this.aimTimer = 0; this.escapeTimer = 0; this.checkTimer = 0; return input }
@@ -44,7 +45,7 @@ export class BotController {
     // stand around with an empty gun. canShoot() already blocks fire while reloading.
     if (self.weapons.current.ammo === 0) self.weapons.current.reload()
 
-    const targetPos = this.pickTargetPos(self, others, hostiles)
+    const targetPos = this.pickTargetPos(self, others, hostiles, ffa)
     if (!targetPos) { this.aimTimer = 0; return input }
 
     const delta = new THREE.Vector3().subVectors(targetPos, self.player.position)
@@ -143,7 +144,7 @@ export class BotController {
   /** Position of the nearest thing the bot should shoot: an explicit hostile (co-op
    *  wave enemy) if any were supplied, otherwise the nearest living enemy-team player. */
   private pickTargetPos(
-    self: PlayerEntity, others: PlayerEntity[], hostiles?: THREE.Vector3[],
+    self: PlayerEntity, others: PlayerEntity[], hostiles?: THREE.Vector3[], ffa = false,
   ): THREE.Vector3 | null {
     let best: THREE.Vector3 | null = null
     let bestDist = Infinity
@@ -157,7 +158,7 @@ export class BotController {
       return best
     }
     for (const o of others) {
-      if (o.id === self.id || o.player.isDead || o.team === self.team) continue
+      if (o.id === self.id || o.player.isDead || (!ffa && o.team === self.team)) continue
       const d = o.player.position.distanceToSquared(self.player.position)
       if (d < bestDist) { bestDist = d; best = o.player.position }
     }
